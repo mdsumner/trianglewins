@@ -70,6 +70,14 @@ adds the live-mesh question: refine nc, add one short constraint, and get the
 refined mesh again, by editing the handle (laridae, trowel) or by
 rebuilding (cdtr, RTriangle).
 
+## Real-world data
+
+[`guide/`](guide/README.md) is a guide to feeding the meshers from real
+layers: example interfaces (not part of the package, `source()` them) that
+read any wk handleable into the shared tables, mesh with any backend, label
+triangles by feature and write wkb back out, worked on
+`silicate::inlandwaters`.
+
 ## Running it
 
 ```r
