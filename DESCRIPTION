@@ -28,4 +28,4 @@ Remotes:
     hypertidy/trowel
 Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.1
+Config/roxygen2/version: 8.1.0
