@@ -1,0 +1,31 @@
+Package: trianglewins
+Title: Comparison Harness for Constrained Triangulation Backends
+Version: 0.0.1
+Authors@R: person("Michael", "Sumner", email = "mdsumner@gmail.com", role = c("aut", "cre"))
+Description: Runs the same planar straight line graphs (vertices and
+    constraint segments) through several constrained Delaunay triangulation
+    backends and measures the results with code that belongs to none of
+    them: vertex and triangle counts, whether area and angle bounds are
+    honoured, whether every input segment survives as a chain of mesh
+    edges, constraint depth computed independently from the output
+    triangles, attribute interpolation error, and time. Backends are
+    'laridae' (CGAL), 'cdtr' (CDT), 'trowel' (spade) and 'RTriangle'
+    (Triangle), all optional.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.1)
+Imports: grDevices, stats, utils
+Suggests:
+    cdtr,
+    laridae,
+    RTriangle,
+    sf,
+    testthat (>= 3.0.0),
+    trowel
+Remotes:
+    hypertidy/cdtr@cpp11,
+    hypertidy/laridae,
+    hypertidy/trowel
+Config/testthat/edition: 3
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
