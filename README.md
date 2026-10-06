@@ -15,6 +15,11 @@ All four are in Suggests. A backend that is not installed shows up in the
 results as skipped, not as a failure. It also serves as laridae's
 acceptance test.
 
+
+The performance benchmark at scale (geoBoundaries country boundaries from
+`sds::CGAZ()`, 23 thousand to 6.8 million vertices) is published at
+https://mdsumner.github.io/trianglewins/ and its code is in [bench/](bench/).
+
 ## What it measures
 
 The input contract is the one the three hypertidy packages share: vertices
