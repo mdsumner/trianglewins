@@ -151,7 +151,7 @@ cdtr and RTriangle have no handle, so the time is a rebuild with the points incl
 <p>Inputs come from <code>sds::CGAZ()</code>, the geoBoundaries CGAZ ADM0 GeoParquet (CC BY 4.0). Rings are converted by
 <code>bench/cgaz_pslg.py</code> into a vertex table and a segment table: exactly repeated vertices are merged and repeated
 segments dropped, so shared borders appear once (except <code>southern_africa_rings</code>, which keeps every ring in full).
-Coordinates are longitude and latitude, triangulated as planar xy (geometric dimension 2; the output is triangles, topological dimension 2). Each backend is called through the same adapter as the
+Coordinates are longitude and latitude, triangulated as planar xy (coordinate dimension 2; the output is triangles, topological dimension 2). Each backend is called through the same adapter as the
 rest of trianglewins, so times include reading the result tables back into R. Every refinement has a Steiner budget of
 100000 vertices. The area and angle columns are computed from the output; segment preservation and the empty-circle test
 run on inputs up to 50000 vertices. Code: <code>bench/</code> in

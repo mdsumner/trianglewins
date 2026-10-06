@@ -80,7 +80,7 @@ versions are the current CRAN or GitHub ones. Where a claim comes from
 upstream documentation rather than the R source it is marked (upstream
 docs).</p>
 <p><strong>Dimension has two meanings here, and we always say
-which.</strong> <em>Geometric dimension</em> is the number of
+which.</strong> <em>Coordinate dimension</em> is the number of
 coordinates per vertex: xy (2), xyz (3), xyzt (4) and so on.
 <em>Topological dimension</em> is the dimension of the shape itself: 0 a
 point, 1 a segment or line, 2 a triangle or polygon, 3 a tetrahedron. A
@@ -91,7 +91,9 @@ gives d-dimensional simplices: triangles for xy, tetrahedra for xyz.
 "2.5D" means triangles built from xy only, with z carried along, so the
 surface is a single-valued function of x and y. A value carried at a
 vertex that the triangulation does not use (elevation, temperature,
-time) is an attribute, not a coordinate.</p>
+time) is an attribute, not a coordinate. How other communities use these
+words, and where mixing them up bites, is in <a href="../dimension/">On
+dimension</a>.</p>
 <h2 id="1-the-algorithm-families">1. The algorithm families</h2>
 <p>Each package below falls into one (sometimes two) of these. The
 families differ in what they promise about the output, which matters

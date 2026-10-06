@@ -11,7 +11,7 @@ Where a claim comes from upstream documentation rather than the R source it
 is marked (upstream docs).
 
 **Dimension has two meanings here, and we always say which.**
-*Geometric dimension* is the number of coordinates per vertex: xy (2),
+*Coordinate dimension* is the number of coordinates per vertex: xy (2),
 xyz (3), xyzt (4) and so on. *Topological dimension* is the dimension of
 the shape itself: 0 a point, 1 a segment or line, 2 a triangle or polygon,
 3 a tetrahedron. A triangulation is made of topologically 2-dimensional
@@ -21,7 +21,9 @@ with d coordinates gives d-dimensional simplices: triangles for xy,
 tetrahedra for xyz. "2.5D" means triangles built from xy only, with z
 carried along, so the surface is a single-valued function of x and y. A
 value carried at a vertex that the triangulation does not use (elevation,
-temperature, time) is an attribute, not a coordinate.
+temperature, time) is an attribute, not a coordinate. How other
+communities use these words, and where mixing them up bites, is in
+[On dimension](../dimension/).
 
 ## 1. The algorithm families
 

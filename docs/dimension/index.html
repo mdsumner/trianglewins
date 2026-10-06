@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>On dimension</title>
+<meta name="description" content="Coordinate dimension versus topological dimension: how GIS, geometry, graphics, finite elements and array tools use the word, and where it matters for triangulation.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--grid); min-width: 9em; }
+th:first-child, td:first-child { min-width: 13em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../">trianglewins</a> / on dimension</p>
+<h1 id="dimension-one-word-several-meanings">Dimension: one word,
+several meanings</h1>
+<p>6 October 2026. "2D", "3D" and "n-dimensional" are used everywhere in
+meshing, GIS, graphics, finite elements and data analysis, and they do
+not always mean the same thing. A "3D mesh" is a surface of triangles to
+a graphics programmer and a volume of tetrahedra to a finite-element
+analyst; a "2.5D" mesh is a terrain to a GIS user and a curved surface
+to fdaPDE; a "4D dataset" is an array with a time axis to a climate
+scientist. This note sets out the two meanings that matter for
+triangulation, how different communities name them, and where mixing
+them up causes real mistakes. It is the reference for the wording on the
+rest of this site.</p>
+<h2 id="the-two-meanings">The two meanings</h2>
+<ul>
+<li><strong>Coordinate dimension</strong>: how many coordinates each
+vertex has. xy is 2, xyz is 3, xyzm or xyzt is 4. It describes the space
+the shape sits in.</li>
+<li><strong>Topological dimension</strong>: the dimension of the shape
+itself, independent of its coordinates. A point is 0, a segment or line
+is 1, a triangle or polygon is 2, a tetrahedron or solid is 3. In mesh
+terms a k-dimensional cell is a k-simplex.</li>
+</ul>
+<p>The topological dimension can never exceed the coordinate dimension,
+and it is often smaller: a triangle in xyz (2 in 3) is a piece of
+surface; a line in xy (1 in 2) is a path on a map. The difference is
+called the codimension. Triangulations are always made of topologically
+2-dimensional cells, whatever the coordinates; a tetrahedralisation is
+the 3-dimensional equivalent.</p>
+<p>This site first used "geometric dimension" for the coordinate count.
+The GIS standards and the R spatial packages say "coordinate dimension",
+and "geometric" is ambiguous (the geometry object in sf or GEOS reports
+its topological dimension), so the site now uses <strong>coordinate
+dimension</strong>.</p>
+<h2 id="who-calls-it-what">Who calls it what</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Community or library</th>
+<th>Coordinate count</th>
+<th>Shape dimension</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>OGC Simple Features, PostGIS</td>
+<td>coordinate dimension (<code>ST_CoordDim</code>,
+<code>ST_NDims</code>); spatial dimension counts XY or XYZ only, leaving
+out M (upstream docs)</td>
+<td>dimension, "topological dimension" (<code>ST_Dimension</code>)</td>
+<td>XYM and XYZM: M is a measure, a coordinate slot that is not
+spatial</td>
+</tr>
+<tr class="even">
+<td>sf</td>
+<td><code>XY</code>, <code>XYZ</code>, <code>XYM</code>,
+<code>XYZM</code> classes; <code>st_zm()</code></td>
+<td><code>st_dimension()</code>: 0 points, 1 lines, 2 surfaces</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td>geos (R)</td>
+<td><code>geos_coordinate_dimension()</code></td>
+<td><code>geos_dimension()</code></td>
+<td></td>
+</tr>
+<tr class="even">
+<td>GEOS C API</td>
+<td>"cartesian dimension"
+(<code>GEOSGeom_getCoordinateDimension</code>)</td>
+<td>"planar dimensionality" (<code>GEOSGeom_getDimensions</code>)</td>
+<td>two more names for the same pair</td>
+</tr>
+<tr class="odd">
+<td>Mathematics, topology</td>
+<td>ambient or embedding dimension</td>
+<td>intrinsic or topological dimension; a k-manifold, a k-simplex</td>
+<td>codimension = ambient minus intrinsic</td>
+</tr>
+<tr class="even">
+<td>Computational geometry (Qhull, CGAL)</td>
+<td>"d-dimensional" input; CGAL's <code>_2</code> and <code>_3</code>
+suffixes (<code>Triangulation_2</code>, <code>Mesh_3</code>) name the
+ambient dimension; CGAL dD triangulations report
+<code>maximal_dimension()</code></td>
+<td>the triangulation's current dimension (<code>dimension()</code>,
+<code>current_dimension()</code>), which drops below the ambient one for
+degenerate input such as collinear points</td>
+<td>a "d-dimensional Delaunay triangulation" means d coordinates and
+d-simplices: the two coincide when the input is full-dimensional</td>
+</tr>
+<tr class="odd">
+<td>Graphics (rgl, WebGL, game engines)</td>
+<td>"3D" almost always means xyz coordinates</td>
+<td>rarely named; a "3D mesh" is usually triangles (a surface),
+occasionally a volume</td>
+<td>"2D" often means screen space</td>
+</tr>
+<tr class="even">
+<td>Finite elements</td>
+<td>the problem's spatial dimension</td>
+<td>element dimension: 1D bars, 2D shells and plates, 3D solids</td>
+<td>fmesher: "1-, 2-, and 3-dimensional flat and curved manifolds"</td>
+</tr>
+<tr class="odd">
+<td>fdaPDE</td>
+<td>xy or xyz nodes</td>
+<td><code>mesh.1.5D</code> is a network of segments in xy,
+<code>mesh.2D</code> triangles in xy, <code>mesh.2.5D</code> triangles
+in xyz (any curved surface), <code>mesh.3D</code> tetrahedra</td>
+<td>the ".5" marks one topological dimension less than the
+coordinates</td>
+</tr>
+<tr class="even">
+<td>GIS terrain and LiDAR</td>
+<td>xyz points</td>
+<td>"2.5D": a surface that is a single-valued function z = f(x, y)</td>
+<td>a TIN or DEM is 2.5D; overhangs and caves need true surfaces or
+volumes ("3D GIS")</td>
+</tr>
+<tr class="odd">
+<td>Arrays (netCDF, GDAL multidimensional, stars, xarray)</td>
+<td>not this at all: a dimension is an array axis (x, y, z, time,
+band)</td>
+<td>not used</td>
+<td>a "4D" variable has four axes; nothing about mesh shape</td>
+</tr>
+<tr class="even">
+<td>Statistics and machine learning</td>
+<td>dimension = number of variables or features</td>
+<td>intrinsic dimension of the data (the manifold the points lie
+near)</td>
+<td>"dimension reduction" lowers the coordinate count, trying to keep
+the intrinsic structure</td>
+</tr>
+<tr class="odd">
+<td>silicate, anglr</td>
+<td>vertex tables with x_, y_ and optional z_ or other columns</td>
+<td>models named by primitive: SC on segments (1-simplices), TRI on
+triangles (2-simplices)</td>
+<td>attributes on vertices are columns, not coordinates, until you
+choose to plot them as such</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-many-25ds">The many "2.5D"s</h2>
+<p>The half dimension always means "one coordinate more than the shape
+really uses", but which shape varies:</p>
+<ul>
+<li><strong>GIS terrain</strong>: triangles built from xy, with z
+carried; the surface is a function of x and y (a TIN, a DEM). This is
+how this site uses it, and how delaunay's <code>elevation = TRUE</code>
+and lasR's triangulate stage work.</li>
+<li><strong>fdaPDE</strong>: <code>mesh.2.5D</code> is any triangulated
+surface in xyz, not necessarily a function of x and y (a sphere, a brain
+cortex); its <code>mesh.1.5D</code> is a network of segments.</li>
+<li><strong>Elsewhere</strong> (general usage, not from these packages):
+layered or extruded geometry in CAD and machining, and pseudo-3D
+isometric views in games.</li>
+</ul>
+<p>When someone says 2.5D, ask whether z can be recovered from x and y
+(terrain sense) or not (surface sense).</p>
+<h2 id="where-mixing-them-up-causes-mistakes">Where mixing them up
+causes mistakes</h2>
+<ol type="1">
+<li><strong>Delaunay of xyz points is not a triangulated
+surface.</strong> Delaunay of points with three coordinates gives
+tetrahedra filling their convex hull. If the points lie on a surface (a
+sphere, a terrain), you want triangles: on a sphere, the convex hull's
+facets (<code>geometry::convhulln</code>); on a terrain, a triangulation
+of xy with z carried. Asking for "3D Delaunay" when you mean a surface
+gives the wrong topological dimension.</li>
+<li><strong>Refinement bounds are measured in the coordinates the mesher
+sees.</strong> When a terrain is triangulated in xy and z is carried, a
+maximum area or minimum angle applies to the xy footprint, not to the
+surface: on a steep slope the real triangles are larger and thinner than
+the bound says. The same is true of longitude and latitude used as xy
+(the benchmark does this): areas and angles are in degrees, and both
+distort towards the poles.</li>
+<li><strong>Longitude and latitude are coordinate dimension 2 on a
+surface of topological dimension 2 that is not a plane.</strong>
+Treating them as planar xy is fine for topology (which triangle touches
+which), but not for shape, area or the Delaunay property on the sphere.
+Geocentric xyz restores the geometry at the cost of a third
+coordinate.</li>
+<li><strong>Degenerate input lowers the topological dimension.</strong>
+Collinear points have a hull of dimension 1, so there are no triangles
+to make: CGAL reports <code>dimension() == 1</code>, Qhull stops on a
+flat initial simplex unless joggled, and other libraries return nothing
+or an error. A pipeline that expects triangles should test for
+this.</li>
+<li><strong>Attributes are not coordinates until you say so.</strong>
+Elevation, time or temperature carried on vertices (point attributes in
+RTriangle, cdtr, trowel and laridae) are interpolated onto new vertices
+but play no part in where vertices go. Making them coordinates (xyz,
+xyt) changes the problem: a triangulation in xy becomes either a surface
+in xyz or, via Delaunay, a set of tetrahedra.</li>
+<li><strong>"Dimension" in array tools is an axis.</strong> A stars
+object with x, y and time "dimensions" is a 3-axis array; its cells are
+still topologically 2-dimensional pixels repeated through time.</li>
+</ol>
+<h2 id="the-words-this-site-uses">The words this site uses</h2>
+<ul>
+<li><strong>Coordinate dimension</strong> for the number of coordinates
+per vertex, written by name: xy, xyz, xyzm, xyzt.</li>
+<li><strong>Topological dimension</strong> for the shape: point (0),
+segment or line (1), triangle or polygon (2), tetrahedron (3);
+"k-simplex" in mesh contexts.</li>
+<li><strong>Triangles in xy</strong> for a planar mesh,
+<strong>triangles in xyz</strong> for a surface, <strong>tetrahedra in
+xyz</strong> for a volume mesh.</li>
+<li><strong>2.5D</strong> only in the terrain sense, defined where
+used.</li>
+<li>No bare "2D" or "3D" except inside a package's own function names
+(<code>create.mesh.2D()</code>, <code>Mesh_3</code>).</li>
+</ul>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>

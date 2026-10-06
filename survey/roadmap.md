@@ -10,8 +10,8 @@ hypertidy/laridae main, hypertidy/trowel main, mdsumner/trianglewins);
 claims about other packages come from their source on the CRAN mirrors and
 GitHub, or from PyPI metadata, and are marked (upstream docs) where they
 rest on documentation alone.
-"Dimension" is used in two senses, kept apart as in the
-[survey](../survey/): geometric dimension is the number of coordinates per
+"Dimension" is used in two senses, kept apart as in
+[On dimension](../dimension/): coordinate dimension is the number of coordinates per
 vertex (xy, xyz, xyzt), topological dimension is that of the shape (0
 point, 1 segment, 2 triangle, 3 tetrahedron). All three packages make
 topologically 2-dimensional meshes from xy coordinates.

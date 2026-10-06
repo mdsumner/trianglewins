@@ -14,7 +14,7 @@ in the [survey](../survey/), and measured times are in the
 [benchmark](../bench/).
 
 **Dimension has two meanings here, and we always say which.**
-*Geometric dimension* is the number of coordinates per vertex: xy (2),
+*Coordinate dimension* is the number of coordinates per vertex: xy (2),
 xyz (3), xyzt (4) and so on. *Topological dimension* is the dimension of
 the shape itself: 0 a point, 1 a segment or line, 2 a triangle or polygon,
 3 a tetrahedron. A triangulation is made of topologically 2-dimensional
@@ -24,7 +24,9 @@ with d coordinates gives d-dimensional simplices: triangles for xy,
 tetrahedra for xyz. "2.5D" means triangles built from xy only, with z
 carried along, so the surface is a single-valued function of x and y. A
 value carried at a vertex that the triangulation does not use (elevation,
-temperature, time) is an attribute, not a coordinate.
+temperature, time) is an attribute, not a coordinate. How other
+communities use these words, and where mixing them up bites, is in
+[On dimension](../dimension/).
 
 ## Quick answers
 
@@ -241,7 +243,7 @@ interactive tool, a simulation that moves a boundary, streaming data).
   subdivision).
 - On the sphere or ellipsoid, points only: convert longitude and latitude
   to geocentric xyz and take the convex hull of the xyz points. The hull's
-  facets are triangles: topological dimension 2 in geometric dimension 3.
+  facets are triangles: topological dimension 2 in coordinate dimension 3.
   Every point on a convex
   surface is a hull vertex, so the hull's triangular facets are a
   triangulation of the surface, and on a sphere it is exactly the

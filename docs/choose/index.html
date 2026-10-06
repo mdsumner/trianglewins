@@ -81,7 +81,7 @@ solved off CRAN today.</p>
 arguments) is in the <a href="../survey/">survey</a>, and measured times
 are in the <a href="../bench/">benchmark</a>.</p>
 <p><strong>Dimension has two meanings here, and we always say
-which.</strong> <em>Geometric dimension</em> is the number of
+which.</strong> <em>Coordinate dimension</em> is the number of
 coordinates per vertex: xy (2), xyz (3), xyzt (4) and so on.
 <em>Topological dimension</em> is the dimension of the shape itself: 0 a
 point, 1 a segment or line, 2 a triangle or polygon, 3 a tetrahedron. A
@@ -92,7 +92,9 @@ gives d-dimensional simplices: triangles for xy, tetrahedra for xyz.
 "2.5D" means triangles built from xy only, with z carried along, so the
 surface is a single-valued function of x and y. A value carried at a
 vertex that the triangulation does not use (elevation, temperature,
-time) is an attribute, not a coordinate.</p>
+time) is an attribute, not a coordinate. How other communities use these
+words, and where mixing them up bites, is in <a href="../dimension/">On
+dimension</a>.</p>
 <h2 id="quick-answers">Quick answers</h2>
 <table>
 <thead>
@@ -391,7 +393,7 @@ coordinates</h2>
 [CRAN]</strong> (icosahedral subdivision).</li>
 <li>On the sphere or ellipsoid, points only: convert longitude and
 latitude to geocentric xyz and take the convex hull of the xyz points.
-The hull's facets are triangles: topological dimension 2 in geometric
+The hull's facets are triangles: topological dimension 2 in coordinate
 dimension 3. Every point on a convex surface is a hull vertex, so the
 hull's triangular facets are a triangulation of the surface, and on a
 sphere it is exactly the spherical Delaunay triangulation (the
