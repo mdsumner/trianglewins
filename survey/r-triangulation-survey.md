@@ -143,7 +143,7 @@ using CDT's own.
 
 | Package | Upstream code | Algorithm | Input | Constraints | Output control | Output |
 |---|---|---|---|---|---|---|
-| cdtr (hypertidy/cdtr, branch cpp11) | artem-ogre/CDT (MPL-2.0) via cpp11 | CDT, conforming mode, CDT's own refinement (one criterion per pass) | x, y, s0, s1 index vectors; `cdt_pslg()` from RTriangle pslg | segments, crossings resolved | `max_area`, `min_angle`, `max_steiner`, data-driven `min_edge_length`; `unrefined` report; attributes on Steiner vertices | contract tables: vertices with origin, triangles with depth, segments |
+| cdtr (hypertidy/cdtr) | artem-ogre/CDT (MPL-2.0) via cpp11 | CDT, conforming mode, CDT's own refinement (one criterion per pass) | x, y, s0, s1 index vectors; `cdt_pslg()` from RTriangle pslg | segments, crossings resolved | `max_area`, `min_angle`, `max_steiner`, data-driven `min_edge_length`; `unrefined` report; attributes on Steiner vertices | contract tables: vertices with origin, triangles with depth, segments |
 | trowel (hypertidy/trowel) | spade 2.15 (Rust, MIT/Apache) via extendr | live CDT handle; insert and remove points and segments; spade refinement | same tables, incremental | segments, crossings spliced into chains | `min_angle`, `max_area`, `max_steiner` | same tables, stable ids across edits |
 | laridae (hypertidy/laridae, off CRAN by decision) | CGAL Constrained_triangulation_plus_2 + Delaunay_mesher_2 via cpp11 | fully dynamic CDT with exact predicates; Delaunay mesher with seeds and stepping | x, y, s0, s1, PA; lari_add_points/segments | segments, crossings exact | `min_angle`, `max_area`, `min_edge_length`, sizing function or grid (`size_fun`, `grid_x/y/z`), seeds, `max_steiner`, `lari_step()` | same tables, `lari_depth()` |
 

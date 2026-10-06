@@ -7,7 +7,7 @@ to none of them.
 | backend | library | source |
 |---|---|---|
 | laridae | CGAL 6 (`Constrained_triangulation_plus_2`, `Delaunay_mesher_2`) | hypertidy/laridae, main |
-| cdtr | artem-ogre/CDT | hypertidy/cdtr, branch cpp11 |
+| cdtr | artem-ogre/CDT | hypertidy/cdtr |
 | trowel | spade (Rust, via extendr) | hypertidy/trowel, main |
 | RTriangle | Shewchuk's Triangle | CRAN |
 

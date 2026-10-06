@@ -163,7 +163,7 @@ know which triangle lies in which polygon.
   interfaces: only for valid polygons, one polygon at a time; shared edges
   between neighbours are not matched and loose lines and points are not
   allowed.
-- **cdtr [GitHub]** (`remotes::install_github("hypertidy/cdtr@cpp11")`):
+- **cdtr [GitHub]** (`remotes::install_github("hypertidy/cdtr")`):
   CDT with refinement and the same vertex/segment/triangle tables in and
   out, a depth for every triangle (how many boundaries lie between it and
   the outside), the origin of every vertex, and attribute interpolation.
