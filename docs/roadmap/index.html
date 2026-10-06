@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roadmap for R and Python</title>
+<meta name="description" content="Development steps, CRAN order and blockers for cdtr, laridae and trowel, and what this work can offer other R and Python triangulation packages.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--grid); min-width: 9em; }
+th:first-child, td:first-child { min-width: 13em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../">trianglewins</a> / roadmap</p>
+<h1
+id="roadmap-cdtr-laridae-trowel-and-the-r-and-python-communities">Roadmap:
+cdtr, laridae, trowel and the R and Python communities</h1>
+<p>6 October 2026. A step back from the benchmark and the survey: which
+development steps give the most improvement for the most people, which
+of this project's packages should go to CRAN and in what order, what
+stands in the way of each, and what this work can offer the authors of
+other packages, in R and in Python. Claims about our packages were
+checked against their repositories on this date (hypertidy/cdtr main,
+hypertidy/laridae main, hypertidy/trowel main, mdsumner/trianglewins);
+claims about other packages come from their source on the CRAN mirrors
+and GitHub, or from PyPI metadata, and are marked (upstream docs) where
+they rest on documentation alone.</p>
+<h2 id="in-short">In short</h2>
+<ol type="1">
+<li><strong>Write the contract down before anything goes to
+CRAN.</strong> The three packages agree on vertex / segment / triangle
+tables, depth and origin, but the meaning of depth on doubled boundaries
+already differs (cdtr and laridae count each copy, trowel counts one).
+Once a package is on CRAN its output columns are a promise. A short
+versioned spec plus the trianglewins cases as a conformance corpus fixes
+that, and is the thing other packages, in either language, can
+adopt.</li>
+<li><strong>CRAN order: cdtr, then laridae, then trowel.</strong>
+trianglewins stays off CRAN. Put all four on the hypertidy r-universe
+now, so users get binaries while the CRAN work proceeds.</li>
+<li><strong>Two small upstream changes help more people than any feature
+of our own:</strong> an <code>exclude_faces</code> set for spade's
+refinement, and a shared home for the CDT headers so the three CRAN
+packages that vendor CDT (RCDT, tulpaMesh, and cdtr when it lands) stop
+carrying three copies of three different versions.</li>
+<li><strong>Python has no spade binding and no depth anywhere.</strong>
+trowel's Rust code split into a core crate would give Python an editable
+constrained mesh through PyO3 with little new code, and the conformance
+corpus would let Python packages be judged by the same measures.</li>
+</ol>
+<h2 id="1-where-the-three-packages-stand">1. Where the three packages
+stand</h2>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th>cdtr</th>
+<th>laridae</th>
+<th>trowel</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Engine</td>
+<td>artem-ogre/CDT 2.0.1 (vendored, identical to upstream master of 21
+Sep 2026)</td>
+<td>CGAL &gt;= 6.0, <code>Constrained_triangulation_plus_2</code>,
+<code>Delaunay_mesher_2</code></td>
+<td>spade 2.15 via extendr</td>
+</tr>
+<tr class="even">
+<td>Licence</td>
+<td>MIT, with MPL-2.0 CDT files and BSD-3 predicates</td>
+<td>GPL (&gt;= 3)</td>
+<td>MIT; spade MIT/Apache</td>
+</tr>
+<tr class="odd">
+<td>Install needs</td>
+<td>a C++ compiler</td>
+<td>CGAL 6 and Boost headers (found by <code>configure</code>, falls
+back to RcppCGAL)</td>
+<td>cargo and rustc</td>
+</tr>
+<tr class="even">
+<td>Unique value</td>
+<td>refinement on a general PSLG without Triangle's licence; least
+memory (2.4 GB for the world, against 5.5 to 5.6 for RTriangle and
+laridae)</td>
+<td>sizing field, exact predicates, step-wise mesher, fastest live
+insert (1000 points into the world mesh in 0.09 s)</td>
+<td>editable mesh with stable ids, no CGAL</td>
+</tr>
+<tr class="odd">
+<td>Known weak spots</td>
+<td>about 3 ms R wrapper overhead per call; refines one criterion per
+pass</td>
+<td>8.9 GB peak inserting into the world mesh</td>
+<td>slow on large unordered input (152 s for a million points, others 2
+to 4 s); stalled on southern Africa with 0 degree triangles; some
+Steiner attributes take the nearest value</td>
+</tr>
+<tr class="even">
+<td>Tests</td>
+<td>40 tests, one file</td>
+<td>five test files</td>
+<td>49 tests, one file</td>
+</tr>
+<tr class="odd">
+<td>Version</td>
+<td>0.0.0.9000</td>
+<td>0.1.0.9000</td>
+<td>0.0.0.9000</td>
+</tr>
+</tbody>
+</table>
+<p>Numbers are from the <a href="../bench/">benchmark</a> and the
+state-of-three notes.</p>
+<h2
+id="2-development-steps-ranked-by-how-much-they-improve-things-overall">2.
+Development steps, ranked by how much they improve things overall</h2>
+<p>Ranked by reach (how many users and packages benefit) over cost.</p>
+<ol type="1">
+<li><strong>Contract v1 as a written spec and a conformance
+corpus.</strong> One page: column names and types for the three tables
+in and the three out, what depth counts (per boundary copy, or per
+distinct boundary, or per tag), the origin codes, what "unrefined"
+reports, how attributes are interpolated. The trianglewins cases
+(inst/extdata) and the measures in R/measures.R become the corpus: each
+case is CSV, the expected invariants are stated, and the measures can be
+re-implemented in a few dozen lines of Python. Reach: every package
+here, every future binding, and any outside package that wants to be
+comparable. Cost: days. Decide the depth-multiplicity question here, not
+after release.</li>
+<li><strong>r-universe for all four now.</strong> The hypertidy universe
+builds binaries for Windows, macOS and Linux, including Rust (trowel)
+and packages that need CGAL headers from RcppCGAL (laridae). Users stop
+needing toolchains today. Cost: a line each in the universe's
+packages.json.</li>
+<li><strong>cdtr to CRAN</strong> (section 3). It closes the one real
+gap on CRAN that the survey found: quality refinement on an arbitrary
+segment set with a free licence and per-triangle depth. It also unparks
+anglr's cdtr backend, which lets anglr (and a revived sfdct, or its
+replacement) return to CRAN without the non-commercial clause.</li>
+<li><strong>Upstream spade <code>exclude_faces</code>.</strong> A small
+PR to spade's <code>RefinementParameters</code>; spade already keeps an
+excluded-face set internally. trowel's re-refine drops from about 8.4 ms
+to about 2 ms on nc (state-of-three estimate, not yet run), and every
+spade user gets caller-decided refinement regions. Reach: the whole
+spade user base, not only R.</li>
+<li><strong>trowel: spatial sort or bulk load in
+<code>mesh_new()</code>.</strong> laridae closed the same gap by sorting
+points before insertion. The benchmark shows this is the difference
+between 152 s and a few seconds on a million points. Fix the southern
+Africa stall and the nearest-value attribute cases in the same pass.
+Without this trowel is not ready for CRAN, whatever the toolchain
+story.</li>
+<li><strong>Promote <code>pslg_from_wk()</code> out of the guide into
+cdtr</strong> (wk in Suggests). The guide's reader takes any
+wk-handleable geometry (sf, terra via wkb, geos, geoarrow) to the input
+tables with shared vertices merged. Users meet the packages through
+their sf objects, not through index vectors, and this is the missing
+adapter. cdtr is the first to CRAN, so it is the natural home; laridae
+and trowel can call it.</li>
+<li><strong>A shared CDT header package.</strong> RCDT and tulpaMesh
+vendor pre-2.0 CDT (no <code>refineTriangles</code>, no
+<code>Unrefined</code> counts); cdtr vendors 2.0.1. A header-only
+package (in the pattern of BH for Boost and RcppCGAL for CGAL) that all
+three could LinkingTo would let one upgrade reach all of them. This is
+an offer to Stephane Laurent (RCDT) and Gilles Colling (tulpaMesh), not
+a precondition for cdtr; cdtr can switch to it later.</li>
+<li><strong>CDT combined angle plus area in one pass.</strong> Halves
+cdtr's refine cost (state-of-three estimate). tulpaMesh already does
+this in its own off-centre Ruppert loop (src/mesh.cpp); the useful move
+is to put a combined criterion into CDT itself, where RCDT, tulpaMesh,
+cdtr and PythonCDT all get it.</li>
+<li><strong>trowel's Rust core as its own crate, then a PyO3
+binding</strong> (section 5).</li>
+<li><strong>cdtr wrapper overhead.</strong> About 3 ms per call in R
+code; worth fixing before CRAN only if it is simple, since it only
+matters for small inputs called many times.</li>
+</ol>
+<p>Deliberately not on the list: 3D, periodic and conforming/Gabriel
+modes in laridae (PLAN.md section 3.4), and the sphere. fmesher and
+tulpaMesh already cover the sphere for statistical meshes; nothing in
+the benchmark or the survey shows planar users waiting on the
+others.</p>
+<h2 id="3-cran-order-and-what-blocks-each">3. CRAN: order and what
+blocks each</h2>
+<h3 id="order">Order</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Order</th>
+<th>Package</th>
+<th>Why this position</th>
+<th>Readiness</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>cdtr</td>
+<td>No system dependency, permissive licence, smallest surface, fills
+the licence gap, unblocks anglr</td>
+<td>Close: packaging items only</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>laridae</td>
+<td>GPL is fine on CRAN; RcppCGAL 6.2.1 (CRAN, 5 Sep 2026) ships CGAL
+6.2.1 headers, so CRAN machines can build it with no system CGAL</td>
+<td>A decision (it is off CRAN by an earlier choice) and a build-cost
+check</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>trowel</td>
+<td>Most novel, but the Rust policy is the heaviest and the performance
+gaps are real</td>
+<td>Code work first, then vendoring</td>
+</tr>
+<tr class="even">
+<td>-</td>
+<td>trianglewins</td>
+<td>A harness, with every backend in Suggests and Remotes; CRAN would
+require all Suggests to be installable from CRAN or a declared
+repository, and the bench needs hours and gigabytes</td>
+<td>Stay on GitHub and r-universe</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cdtr">cdtr</h3>
+<p>Blocking:</p>
+<ul>
+<li><strong>Copyright holders and component licences.</strong>
+DESCRIPTION lists only Michael Sumner, but src/CDT carries Artem
+Amirkhanov's MPL-2.0 code and William C. Lenthe's BSD-3 predicates. Add
+both to Authors@R as <code>c("ctb", "cph")</code> with a comment naming
+the files, and add inst/COPYRIGHTS stating that the package is MIT and
+the CDT files remain MPL-2.0 under MPL section 3.3 (Larger Work).
+tulpaMesh did exactly this and is on CRAN; copy its wording. Record the
+CDT version (2.0.1, upstream commit 3765e08).</li>
+<li><strong><code>CXX_STD = CXX11</code> in src/Makevars.</strong>
+Current R warns on a C++11 requirement and CRAN asks packages to drop
+it; remove the line (and "SystemRequirements: C++11") so the default
+C++17 is used.</li>
+<li><strong>Stray files in the build.</strong> Rplots.pdf and
+README.html are in the repo and not in .Rbuildignore; R CMD check
+reports them. Delete Rplots.pdf and ignore README.html.</li>
+<li><strong>Contract v1 decided</strong> (step 1 above), because cdtr's
+column names and depth meaning become fixed on release.</li>
+<li>Version 0.1.0, NEWS.md, examples that run in under 5 s,
+<code>\value</code> on every exported function (CRAN checks this by
+hand), single quotes around 'CDT' and other software names in
+Description, a reference for the algorithms in Description (Chew;
+Ruppert 1995; the CDT repository).</li>
+</ul>
+<p>Not blocking: the combined criterion, wrapper overhead, the shared
+header package.</p>
+<h3 id="laridae">laridae</h3>
+<p>The earlier decision to keep laridae off CRAN was made when the CGAL
+route meant system headers. That has changed: RcppCGAL is current
+(6.2.1, with CGAL 6.2.1 headers unpacked at install), and delaunay,
+cgalPolygons and raybevel are on CRAN through it. laridae is header-only
+with Epick, so it needs no gmp or mpfr. Reopening the decision is the
+user's call; if it is reopened:</p>
+<ul>
+<li><strong>LinkingTo: RcppCGAL, BH</strong> in DESCRIPTION, keeping
+<code>configure</code> as is (it already falls back to RcppCGAL), so
+CRAN machines find headers without CGAL_INCLUDE_DIR.</li>
+<li><strong>Build cost.</strong> CRAN limits check time; CGAL template
+code is slow and memory-hungry to compile. Measure a clean
+<code>R CMD INSTALL</code> time and peak memory with the RcppCGAL
+headers; if it is long, split the translation units (mesher in one file,
+dynamic triangulation in another) so each compiles in less memory.</li>
+<li><strong>Warnings from CGAL headers</strong> under CRAN's -Wall
+-pedantic flags, and on clang with the additional checks. Build with
+those flags locally and silence nothing in our own code. Warnings that
+come from CGAL itself go upstream to CGAL, as the earlier archived CGAL
+bindings learned.</li>
+<li>Peak memory on large edits (8.9 GB for the world) is not a CRAN
+issue, but worth a line in the documentation.</li>
+</ul>
+<h3 id="trowel">trowel</h3>
+<ul>
+<li><strong>Code first:</strong> spatial sort or bulk load (step 5), the
+southern Africa stall, the nearest-value attribute cases. Ideally the
+spade <code>exclude_faces</code> change is in a released spade, so the
+vendored crates are a release, not a fork.</li>
+<li><strong>CRAN's Rust policy</strong> (Using Rust in CRAN packages):
+vendor all crates into src/rust/vendor.tar.xz (the Makevars already has
+the unpacking branch; the tarball does not exist yet), build offline, at
+most two build jobs (<code>cargo build -j 2</code>), print
+<code>rustc --version</code> in the install log, declare the minimum
+Rust version in SystemRequirements, and list every vendored crate's
+authors and licence in inst/AUTHORS. <code>rextendr</code> produces most
+of this (<code>rextendr::vendor_pkgs()</code>); the size of the vendored
+extendr plus spade tarball must stay under CRAN's 5 MB package limit,
+which is usually fine for these two.</li>
+<li>Same packaging items as cdtr: Authors@R copyright holders for spade
+(Stefan Altmayer) and extendr, version, NEWS, <code>\value</code>.</li>
+</ul>
+<h2 id="4-the-other-r-packages-what-we-could-offer">4. The other R
+packages: what we could offer</h2>
+<p>Each item names the evidence and what would be offered (an issue, a
+PR, or inclusion in the harness). None is a criticism of design choices
+made for other purposes.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Package (author)</th>
+<th>Offer</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>RCDT (Stephane Laurent)</td>
+<td>Expose CDT's <code>calculateTriangleDepths()</code> as a triangle
+column; it is already in the library RCDT vendors. Parity
+(<code>eraseOuterTrianglesAndHoles</code>, RCDT src/delaunay.cpp line
+95) cannot represent a coverage of neighbouring polygons; depth can.
+Offer the shared CDT header package.</td>
+<td>survey section 4, state-of-three lesson 4</td>
+</tr>
+<tr class="even">
+<td>delaunay (Stephane Laurent)</td>
+<td>Same depth suggestion; CGAL's nesting level is available</td>
+<td>survey section 4</td>
+</tr>
+<tr class="odd">
+<td>tulpaMesh (Gilles Colling)</td>
+<td>Its combined Ruppert loop with off-centres over CDT is the feature
+CDT itself lacks; propose upstreaming the criterion to CDT, and the
+shared header package. Invite it into the harness (it takes a boundary
+and points, so it is a natural fit for the statistical-mesh cases)</td>
+<td>tulpaMesh src/mesh.cpp, inst/COPYRIGHTS</td>
+</tr>
+<tr class="even">
+<td>fmesher (Finn Lindgren)</td>
+<td>Harness inclusion; a compare of its <code>cutoff</code> and two-zone
+<code>max.edge</code> against cdtr's data-driven
+<code>min_edge_length</code> floor would inform both</td>
+<td>survey section 5</td>
+</tr>
+<tr class="odd">
+<td>RTriangle (David Sterratt)</td>
+<td>Merge or report duplicated vertices instead of refusing ("Duplicated
+vertices in P" was the cause of all four failed benchmark jobs); report
+what refinement could not do (it stops short of the angle bound on large
+coastlines without saying so)</td>
+<td>bench findings</td>
+</tr>
+<tr class="even">
+<td>sf, geos, terra, gdalraster (GEOS interfaces)</td>
+<td>A documentation line saying the constrained function is a polygon
+triangulation: no Steiner points, polygons triangulated independently,
+no loose segments. Users read "constrained Delaunay" as a PSLG
+triangulation</td>
+<td>survey sections 4 and 10.5</td>
+</tr>
+<tr class="odd">
+<td>decido, silicate, anglr (hypertidy)</td>
+<td>Align silicate's TRI0 columns with contract v1; anglr's cdtr backend
+becomes default once cdtr is on CRAN</td>
+<td>state-of-three, anglr branch cdtr-backend</td>
+</tr>
+<tr class="even">
+<td>terrainmeshr (Tyler Morgan-Wall)</td>
+<td>Its engine (hmm) is the same as Python's pydelatin; a constrained
+greedy-insertion TIN (hmm's criterion with segments kept) is a natural
+trowel use, and the adaptive-meshing notes propose it</td>
+<td>survey section 6</td>
+</tr>
+</tbody>
+</table>
+<p>How to make the offers: one issue per package, linking the survey and
+the benchmark, with the measured case attached. The harness adapter for
+a new backend is one function in R/backends.R returning vertices,
+triangles (with depth, NA if none) and an unrefined string; offering to
+write it is the lowest-friction invitation.</p>
+<h2 id="5-python">5. Python</h2>
+<h3 id="the-landscape-briefly">The landscape, briefly</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Python package (PyPI version)</th>
+<th>Upstream</th>
+<th>What it does</th>
+<th>Overlap with this project</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>triangle (20250106)</td>
+<td>Shewchuk's Triangle</td>
+<td>CDT, refinement, attributes; dict input <code>vertices</code>,
+<code>segments</code>, <code>holes</code>, <code>regions</code></td>
+<td>Same table shape as the contract. PyPI metadata says LGPL-3.0, but
+the Triangle C code it builds carries Shewchuk's non-commercial terms,
+the same situation as RTriangle</td>
+</tr>
+<tr class="even">
+<td>meshpy (2026.1.1)</td>
+<td>Triangle and TetGen</td>
+<td>quality 2D and 3D meshing</td>
+<td>Triangle licence again; TetGen is AGPL (upstream docs)</td>
+</tr>
+<tr class="odd">
+<td>scipy.spatial.Delaunay (1.18.1)</td>
+<td>Qhull</td>
+<td>point Delaunay, n-D</td>
+<td>as R's geometry; no constraints</td>
+</tr>
+<tr class="even">
+<td>matplotlib.tri (3.11.2)</td>
+<td>Qhull for Delaunay; accepts any triangle array</td>
+<td>plotting, linear and cubic interpolation, uniform subdivision</td>
+<td>Contract output plugs straight into
+<code>Triangulation(x, y, triangles)</code></td>
+</tr>
+<tr class="odd">
+<td>shapely 2.1 (2.1.2)</td>
+<td>GEOS</td>
+<td><code>delaunay_triangles</code>,
+<code>constrained_delaunay_triangles</code></td>
+<td>Same GEOS polygon triangulation as sf (no Steiner, per polygon)</td>
+</tr>
+<tr class="even">
+<td>mapbox-earcut (2.1.0)</td>
+<td>earcut.hpp</td>
+<td>ear cutting</td>
+<td>Same as decido</td>
+</tr>
+<tr class="odd">
+<td>PythonCDT (GitHub artem-ogre/PythonCDT, not on PyPI)</td>
+<td>CDT</td>
+<td>CDT, by the CDT author</td>
+<td>Same library as cdtr; whether it exposes 2.0's refinement and depths
+was not checked</td>
+</tr>
+<tr class="even">
+<td>cgal (cgal-swig-bindings, 5.6, February 2024)</td>
+<td>CGAL 5.6</td>
+<td>includes a Mesh_2 module (<code>Delaunay_mesher_2</code>)</td>
+<td>laridae's engine, two CGAL releases behind on PyPI</td>
+</tr>
+<tr class="odd">
+<td>pygalmesh (0.10.7)</td>
+<td>CGAL</td>
+<td>mostly 3D mesh generation</td>
+<td>GPL</td>
+</tr>
+<tr class="even">
+<td>jigsawpy (GitHub dengwirda/jigsaw-python, not on PyPI)</td>
+<td>JIGSAW</td>
+<td>sizing-field driven Delaunay refinement</td>
+<td>laridae's sizing field is the same idea</td>
+</tr>
+<tr class="odd">
+<td>pydelatin (0.3.0)</td>
+<td>hmm</td>
+<td>greedy-insertion TIN</td>
+<td>Same as terrainmeshr</td>
+</tr>
+<tr class="even">
+<td>dmsh (0.3.8)</td>
+<td>own</td>
+<td>DistMesh-style</td>
+<td>Same family as geometry::distmesh2d</td>
+</tr>
+<tr class="odd">
+<td>trimesh, manifold3d, pyvista</td>
+<td>earcut, Triangle, VTK</td>
+<td>3D tooling that triangulates polygons on the side</td>
+<td>consumers</td>
+</tr>
+</tbody>
+</table>
+<p>Facts here come from PyPI metadata and the projects' repositories on
+this date; behaviour was not run. Note that the PyPI names
+<code>spade</code>, <code>pyspade</code> and <code>cdt</code> belong to
+unrelated projects (an agent framework, a gene expression tool, a
+causal-discovery toolbox), so a binding would need a different name.</p>
+<h3
+id="what-is-missing-in-python-and-what-this-project-could-offer">What is
+missing in Python, and what this project could offer</h3>
+<ul>
+<li><strong>No editable constrained mesh and no spade binding.</strong>
+Split trowel's Rust into a <code>trowel-core</code> crate (mesh handle,
+stable ids, segment chains, depth BFS, attribute interpolation) with the
+extendr layer on top; a PyO3 layer on the same crate gives Python the
+live mesh with little new code, built and published as wheels with
+maturin. This is the highest-leverage Python step, because the hard part
+(ids, chains, depth) is already written and tested once.</li>
+<li><strong>No depth anywhere.</strong> Every Python mesher above
+decides inside and outside by hole seeds, regions or parity. A depth
+column in PythonCDT (<code>calculateTriangleDepths()</code> is already
+in CDT) is a small PR to artem-ogre and the same suggestion as for
+RCDT.</li>
+<li><strong>The conformance corpus in Python.</strong> The cases are
+CSV; the measures (segment chains present, empty circumcircle, bound
+honoured, depth by an independent walk, attribute error) are simple
+array code. A small Python port lets triangle, PythonCDT, cgal and
+shapely be measured on the same cases, and makes the comparison a
+cross-language reference rather than an R page.</li>
+<li><strong>Interchange.</strong> Plain numpy arrays for the three
+tables match what triangle, matplotlib and meshio already use; for
+files, GeoArrow or Parquet tables (the benchmark already reads
+GeoParquet with pyarrow) let R and Python exchange meshes without a
+mesh-specific format.</li>
+<li><strong>Advice upstream:</strong> triangle and meshpy could state
+the Triangle licence in their own metadata; cgal-swig-bindings could
+publish wheels for CGAL 6; shapely's constrained function could carry
+the same documentation line as GEOS's R interfaces.</li>
+</ul>
+<h2 id="6-proposed-sequence">6. Proposed sequence</h2>
+<ol type="1">
+<li>Contract v1 spec and conformance corpus in trianglewins; decide
+depth multiplicity.</li>
+<li>r-universe entries for cdtr, laridae, trowel, trianglewins.</li>
+<li>cdtr packaging fixes and CRAN submission;
+<code>pslg_from_wk()</code> moved in.</li>
+<li>Issues offered to RCDT, tulpaMesh, RTriangle and the GEOS
+interfaces; the spade <code>exclude_faces</code> PR; the CDT combined
+criterion discussion.</li>
+<li>anglr on cdtr, back to CRAN.</li>
+<li>laridae: decide on CRAN; if yes, RcppCGAL LinkingTo, measure build
+cost, submit.</li>
+<li>trowel: spatial sort, stall and attribute fixes, then vendoring and
+CRAN; in parallel, the core crate and the PyO3 binding.</li>
+</ol>
+<h2 id="method">Method</h2>
+<p>Package DESCRIPTION, Makevars, configure and vendored headers read
+from the four repositories on 6 October 2026. RcppCGAL, RCDT and
+tulpaMesh read from their CRAN mirrors (github.com/cran); CDT upstream
+from github.com/artem-ogre/CDT (tag list and master, diffed against
+cdtr's src/CDT, no differences). Python facts from the PyPI JSON API and
+the repositories named. Performance figures from the trianglewins
+benchmark (180 jobs, CGAZ ADM0). Nothing in this page was submitted
+anywhere; each offer above is a proposal.</p>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>
