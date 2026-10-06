@@ -27,7 +27,7 @@ in the [survey](../survey/), and measured times are in the
 | Good-shaped triangles (min angle, max area) on a general segment set | RTriangle | [GitHub] cdtr, laridae, trowel |
 | Mesh density that varies over space | fmesher | geometry::distmesh2d; [GitHub] laridae |
 | Add or remove points and segments after building | nothing on CRAN | [GitHub] trowel, laridae |
-| A mesh on the sphere | fmesher | tulpaMesh |
+| A mesh on the sphere | fmesher | tulpaMesh; for points only, geometry::convhulln on geocentric XYZ (PROJ "+proj=cart" via reproj, PROJ, gdalraster, sf, terra) |
 | Delaunay in 3D or higher | geometry, tessellation | delaunay (3D, CGAL) |
 
 ## 1. Drawing polygons: fill them with triangles
@@ -222,9 +222,39 @@ interactive tool, a simulation that moves a boundary, streaming data).
 
 ## 11. The sphere, and higher dimensions
 
-- On the sphere: **fmesher [CRAN]** (globe and S2 meshes) and
-  **tulpaMesh [CRAN]** (icosahedral subdivision). Everything else here is
-  planar, so project your data first.
+- On the sphere, with constraints or refinement: **fmesher [CRAN]**
+  (globe and S2 meshes) and **tulpaMesh [CRAN]** (icosahedral
+  subdivision).
+- On the sphere or ellipsoid, points only: convert longitude and latitude
+  to geocentric XYZ and take the 3D convex hull. Every point on a convex
+  surface is a hull vertex, so the hull's triangular facets are a
+  triangulation of the surface, and on a sphere it is exactly the
+  spherical Delaunay triangulation (the empty-circumcircle test on the
+  sphere is the empty-half-space test of the hull). On an ellipsoid the
+  hull is still a valid triangulation of the points, only not strictly
+  Delaunay in the geodesic sense.
+  - XYZ: any PROJ interface with the target `"+proj=cart"` (geocentric
+    on the source datum's ellipsoid), for example **reproj::reproj_xyz()**
+    or **reproj::reproj()** (which also transforms whole meshes),
+    **PROJ::proj_trans()**, **gdalraster::transform_xy()** (z kept if
+    given), and the transformations in **sf**, **terra** and other PROJ
+    based packages [all CRAN]. On a sphere you can compute it directly:
+    `x = cos(lat) * cos(lon)`, `y = cos(lat) * sin(lon)`, `z = sin(lat)`
+    (radians).
+  - Hull: **geometry::convhulln(xyz) [CRAN]** returns a 3-column triangle
+    index (Qhull triangulates facets by default). Use the hull, not
+    `delaunayn(xyz)`: Delaunay of 3D points gives tetrahedra filling the
+    ball, whose outer faces are the same hull triangles, so convhulln is
+    the direct route. tessellation, cxhull and delaunay (CGAL) [CRAN] can
+    also compute 3D hulls.
+  - Caveats: no constraint segments and no refinement; regional data (not
+    covering the globe) gets a facet spanning the uncovered part, which
+    you remove (for example by dropping facets whose normal points away
+    from the data, or with a maximum edge length). Map triangles back
+    with the same vertex index, since the hull keeps your input order.
+- Everything else here is planar, so for other approaches project your
+  data first (a local equal-area or azimuthal projection keeps shapes
+  reasonable).
 - 3D and higher Delaunay: **geometry [CRAN]** and **tessellation [CRAN]**
   (Qhull, any dimension), **delaunay [CRAN]** (CGAL, 3D and 2.5D).
 - Surfaces and volumes (remeshing, alpha shapes): Rvcg, cgalMeshes,
