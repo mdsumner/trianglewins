@@ -268,8 +268,8 @@ the licence gap, unblocks anglr</td>
 <td>laridae</td>
 <td>GPL is fine on CRAN; RcppCGAL 6.2.1 (CRAN, 5 Sep 2026) ships CGAL
 6.2.1 headers, so CRAN machines can build it with no system CGAL</td>
-<td>A decision (it is off CRAN by an earlier choice) and a build-cost
-check</td>
+<td>Decided 6 Oct 2026: goes to CRAN after cdtr; a build-cost check
+remains</td>
 </tr>
 <tr class="odd">
 <td>3</td>
@@ -321,8 +321,8 @@ header package.</p>
 route meant system headers. That has changed: RcppCGAL is current
 (6.2.1, with CGAL 6.2.1 headers unpacked at install), and delaunay,
 cgalPolygons and raybevel are on CRAN through it. laridae is header-only
-with Epick, so it needs no gmp or mpfr. Reopening the decision is the
-user's call; if it is reopened:</p>
+with Epick, so it needs no gmp or mpfr. Decided 6 October 2026: laridae
+goes to CRAN, after cdtr. What that needs:</p>
 <ul>
 <li><strong>LinkingTo: RcppCGAL, BH</strong> in DESCRIPTION, keeping
 <code>configure</code> as is (it already falls back to RcppCGAL), so
@@ -586,8 +586,8 @@ depth multiplicity.</li>
 interfaces; the spade <code>exclude_faces</code> PR; the CDT combined
 criterion discussion.</li>
 <li>anglr on cdtr, back to CRAN.</li>
-<li>laridae: decide on CRAN; if yes, RcppCGAL LinkingTo, measure build
-cost, submit.</li>
+<li>laridae (CRAN decided, after cdtr): RcppCGAL LinkingTo, measure
+build cost, submit.</li>
 <li>trowel: spatial sort, stall and attribute fixes, then vendoring and
 CRAN; in parallel, the core crate and the PyO3 binding.</li>
 </ol>

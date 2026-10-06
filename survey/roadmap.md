@@ -121,7 +121,7 @@ or the survey shows users of xy triangulation waiting on the others.
 | Order | Package | Why this position | Readiness |
 |---|---|---|---|
 | 1 | cdtr | No system dependency, permissive licence, smallest surface, fills the licence gap, unblocks anglr | Close: packaging items only |
-| 2 | laridae | GPL is fine on CRAN; RcppCGAL 6.2.1 (CRAN, 5 Sep 2026) ships CGAL 6.2.1 headers, so CRAN machines can build it with no system CGAL | A decision (it is off CRAN by an earlier choice) and a build-cost check |
+| 2 | laridae | GPL is fine on CRAN; RcppCGAL 6.2.1 (CRAN, 5 Sep 2026) ships CGAL 6.2.1 headers, so CRAN machines can build it with no system CGAL | Decided 6 Oct 2026: goes to CRAN after cdtr; a build-cost check remains |
 | 3 | trowel | Most novel, but the Rust policy is the heaviest and the performance gaps are real | Code work first, then vendoring |
 | - | trianglewins | A harness, with every backend in Suggests and Remotes; CRAN would require all Suggests to be installable from CRAN or a declared repository, and the bench needs hours and gigabytes | Stay on GitHub and r-universe |
 
@@ -159,8 +159,8 @@ The earlier decision to keep laridae off CRAN was made when the CGAL route
 meant system headers. That has changed: RcppCGAL is current (6.2.1, with
 CGAL 6.2.1 headers unpacked at install), and delaunay, cgalPolygons and
 raybevel are on CRAN through it. laridae is header-only with Epick, so it
-needs no gmp or mpfr. Reopening the decision is the user's call; if it is
-reopened:
+needs no gmp or mpfr. Decided 6 October 2026: laridae goes to CRAN, after
+cdtr. What that needs:
 
 - **LinkingTo: RcppCGAL, BH** in DESCRIPTION, keeping `configure` as is (it
   already falls back to RcppCGAL), so CRAN machines find headers without
@@ -281,7 +281,7 @@ different name.
 4. Issues offered to RCDT, tulpaMesh, RTriangle and the GEOS interfaces;
    the spade `exclude_faces` PR; the CDT combined criterion discussion.
 5. anglr on cdtr, back to CRAN.
-6. laridae: decide on CRAN; if yes, RcppCGAL LinkingTo, measure build
+6. laridae (CRAN decided, after cdtr): RcppCGAL LinkingTo, measure build
    cost, submit.
 7. trowel: spatial sort, stall and attribute fixes, then vendoring and
    CRAN; in parallel, the core crate and the PyO3 binding.
