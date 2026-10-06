@@ -80,6 +80,19 @@ solved off CRAN today.</p>
 <p>The detail behind every claim (algorithm, upstream library,
 arguments) is in the <a href="../survey/">survey</a>, and measured times
 are in the <a href="../bench/">benchmark</a>.</p>
+<p><strong>Dimension has two meanings here, and we always say
+which.</strong> <em>Geometric dimension</em> is the number of
+coordinates per vertex: xy (2), xyz (3), xyzt (4) and so on.
+<em>Topological dimension</em> is the dimension of the shape itself: 0 a
+point, 1 a segment or line, 2 a triangle or polygon, 3 a tetrahedron. A
+triangulation is made of topologically 2-dimensional cells whatever its
+coordinates: triangles in xy are a planar mesh, triangles in xyz are a
+surface (a terrain, a sphere). Delaunay of points with d coordinates
+gives d-dimensional simplices: triangles for xy, tetrahedra for xyz.
+"2.5D" means triangles built from xy only, with z carried along, so the
+surface is a single-valued function of x and y. A value carried at a
+vertex that the triangulation does not use (elevation, temperature,
+time) is an attribute, not a coordinate.</p>
 <h2 id="quick-answers">Quick answers</h2>
 <table>
 <thead>
@@ -91,15 +104,16 @@ are in the <a href="../bench/">benchmark</a>.</p>
 </thead>
 <tbody>
 <tr class="odd">
-<td>Fill polygons with triangles for drawing (rgl, WebGL, 3D)</td>
+<td>Fill polygons with triangles for drawing (rgl, WebGL, a scene in
+xyz)</td>
 <td>decido</td>
 <td>rgl::triangulate, sf::st_triangulate_constrained</td>
 </tr>
 <tr class="even">
 <td>Delaunay triangles or edges of a point set</td>
 <td>deldir</td>
-<td>geometry (big or n-D), interp, sf / terra / geos / gdalraster for
-spatial objects</td>
+<td>geometry (large, or points with more than two coordinates), interp,
+sf / terra / geos / gdalraster for spatial objects</td>
 </tr>
 <tr class="odd">
 <td>Interpolate scattered values linearly</td>
@@ -150,17 +164,18 @@ set</td>
 (PROJ "+proj=cart" via reproj, PROJ, gdalraster, sf, terra)</td>
 </tr>
 <tr class="even">
-<td>Delaunay in 3D or higher</td>
+<td>Delaunay of xyz (or more) coordinates: tetrahedra and higher
+simplices</td>
 <td>geometry, tessellation</td>
-<td>delaunay (3D, CGAL)</td>
+<td>delaunay (tetrahedra in xyz, CGAL)</td>
 </tr>
 </tbody>
 </table>
 <h2 id="1-drawing-polygons-fill-them-with-triangles">1. Drawing
 polygons: fill them with triangles</h2>
 <p>You have polygons (with holes) and need triangles to render them:
-rgl, rayrender, a WebGL or deck.gl layer, an extruded 3D model. Extra
-vertices are unwelcome and triangle shape does not matter.</p>
+rgl, rayrender, a WebGL or deck.gl layer, an extruded model in xyz.
+Extra vertices are unwelcome and triangle shape does not matter.</p>
 <ul>
 <li><strong>decido [CRAN]</strong>: <code>earcut(xy, holes)</code>.
 Mapbox's ear-cutting library; very fast, no dependencies, returns vertex
@@ -193,8 +208,10 @@ system dependencies; triangles, Voronoi (Dirichlet) tiles, clipping to a
 rectangle, tile summaries. Used by spatstat and ggforce, so the answers
 agree with those.</li>
 <li><strong>geometry::delaunayn() [CRAN]</strong>: Qhull. Fast on large
-point sets and the one to use in 3 or more dimensions. Returns an index
-matrix. tessellation (also Qhull) adds richer output and plotting.</li>
+point sets and the one to use for points with three or more coordinates
+(output is tetrahedra for xyz, higher simplices beyond). Returns an
+index matrix. tessellation (also Qhull) adds richer output and
+plotting.</li>
 <li><strong>interp::tri.mesh() [CRAN]</strong>: S-hull, free licence;
 pairs with interp's interpolation functions.</li>
 <li><strong>sf::st_triangulate(), terra::delaunay(),
@@ -364,22 +381,25 @@ triangulation, the same operations with exact crossings; on the
 benchmark, 1000 points were added to a world-scale mesh in 0.09 s,
 against 44 to 49 s to rebuild.</li>
 </ul>
-<h2 id="11-the-sphere-and-higher-dimensions">11. The sphere, and higher
-dimensions</h2>
+<h2
+id="11-surfaces-in-xyz-sphere-ellipsoid-and-delaunay-with-more-coordinates">11.
+Surfaces in xyz (sphere, ellipsoid), and Delaunay with more
+coordinates</h2>
 <ul>
 <li>On the sphere, with constraints or refinement: <strong>fmesher
 [CRAN]</strong> (globe and S2 meshes) and <strong>tulpaMesh
 [CRAN]</strong> (icosahedral subdivision).</li>
 <li>On the sphere or ellipsoid, points only: convert longitude and
-latitude to geocentric XYZ and take the 3D convex hull. Every point on a
-convex surface is a hull vertex, so the hull's triangular facets are a
-triangulation of the surface, and on a sphere it is exactly the
-spherical Delaunay triangulation (the empty-circumcircle test on the
-sphere is the empty-half-space test of the hull). On an ellipsoid the
-hull is still a valid triangulation of the points, only not strictly
-Delaunay in the geodesic sense.
+latitude to geocentric xyz and take the convex hull of the xyz points.
+The hull's facets are triangles: topological dimension 2 in geometric
+dimension 3. Every point on a convex surface is a hull vertex, so the
+hull's triangular facets are a triangulation of the surface, and on a
+sphere it is exactly the spherical Delaunay triangulation (the
+empty-circumcircle test on the sphere is the empty-half-space test of
+the hull). On an ellipsoid the hull is still a valid triangulation of
+the points, only not strictly Delaunay in the geodesic sense.
 <ul>
-<li>XYZ: any PROJ interface with the target <code>"+proj=cart"</code>
+<li>xyz: any PROJ interface with the target <code>"+proj=cart"</code>
 (geocentric on the source datum's ellipsoid), for example
 <strong>reproj::reproj_xyz()</strong> or
 <strong>reproj::reproj()</strong> (which also transforms whole meshes),
@@ -392,24 +412,28 @@ PROJ based packages [all CRAN]. On a sphere you can compute it directly:
 (radians).</li>
 <li>Hull: <strong>geometry::convhulln(xyz) [CRAN]</strong> returns a
 3-column triangle index (Qhull triangulates facets by default). Use the
-hull, not <code>delaunayn(xyz)</code>: Delaunay of 3D points gives
-tetrahedra filling the ball, whose outer faces are the same hull
-triangles, so convhulln is the direct route. tessellation, cxhull and
-delaunay (CGAL) [CRAN] can also compute 3D hulls.</li>
+hull, not <code>delaunayn(xyz)</code>: Delaunay of xyz points gives
+tetrahedra (topological dimension 3) filling the ball, whose outer faces
+are the same hull triangles, so convhulln is the direct route.
+tessellation, cxhull and delaunay (CGAL) [CRAN] can also compute hulls
+of xyz points.</li>
 <li>Caveats: no constraint segments and no refinement; regional data
 (not covering the globe) gets a facet spanning the uncovered part, which
 you remove (for example by dropping facets whose normal points away from
 the data, or with a maximum edge length). Map triangles back with the
 same vertex index, since the hull keeps your input order.</li>
 </ul></li>
-<li>Everything else here is planar, so for other approaches project your
-data first (a local equal-area or azimuthal projection keeps shapes
-reasonable).</li>
-<li>3D and higher Delaunay: <strong>geometry [CRAN]</strong> and
-<strong>tessellation [CRAN]</strong> (Qhull, any dimension),
-<strong>delaunay [CRAN]</strong> (CGAL, 3D and 2.5D).</li>
-<li>Surfaces and volumes (remeshing, alpha shapes): Rvcg, cgalMeshes,
-alphashape3d, TDA [CRAN]; these are outside this guide.</li>
+<li>Everything else here triangulates xy coordinates, so for other
+approaches project your data to xy first (a local equal-area or
+azimuthal projection keeps shapes reasonable).</li>
+<li>Delaunay of points with xyz or more coordinates (tetrahedra and
+higher simplices): <strong>geometry [CRAN]</strong> and
+<strong>tessellation [CRAN]</strong> (Qhull, any number of coordinates),
+<strong>delaunay [CRAN]</strong> (CGAL: tetrahedra in xyz, and 2.5D
+triangles built from xy with z carried).</li>
+<li>Surface meshes (triangles in xyz) and volume meshes (tetrahedra):
+remeshing, alpha shapes: Rvcg, cgalMeshes, alphashape3d, TDA [CRAN];
+these are outside this guide.</li>
 </ul>
 <h2 id="things-that-decide-the-choice-before-the-algorithm-does">Things
 that decide the choice before the algorithm does</h2>

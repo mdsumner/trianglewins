@@ -10,6 +10,11 @@ hypertidy/laridae main, hypertidy/trowel main, mdsumner/trianglewins);
 claims about other packages come from their source on the CRAN mirrors and
 GitHub, or from PyPI metadata, and are marked (upstream docs) where they
 rest on documentation alone.
+"Dimension" is used in two senses, kept apart as in the
+[survey](../survey/): geometric dimension is the number of coordinates per
+vertex (xy, xyz, xyzt), topological dimension is that of the shape (0
+point, 1 segment, 2 triangle, 3 tetrahedron). All three packages make
+topologically 2-dimensional meshes from xy coordinates.
 
 ## In short
 
@@ -104,10 +109,10 @@ Ranked by reach (how many users and packages benefit) over cost.
     before CRAN only if it is simple, since it only matters for small
     inputs called many times.
 
-Deliberately not on the list: 3D, periodic and conforming/Gabriel modes in
+Deliberately not on the list: tetrahedral meshing of xyz, periodic and conforming/Gabriel modes in
 laridae (PLAN.md section 3.4), and the sphere. fmesher and tulpaMesh
 already cover the sphere for statistical meshes; nothing in the benchmark
-or the survey shows planar users waiting on the others.
+or the survey shows users of xy triangulation waiting on the others.
 
 ## 3. CRAN: order and what blocks each
 
@@ -220,18 +225,18 @@ the lowest-friction invitation.
 | Python package (PyPI version) | Upstream | What it does | Overlap with this project |
 |---|---|---|---|
 | triangle (20250106) | Shewchuk's Triangle | CDT, refinement, attributes; dict input `vertices`, `segments`, `holes`, `regions` | Same table shape as the contract. PyPI metadata says LGPL-3.0, but the Triangle C code it builds carries Shewchuk's non-commercial terms, the same situation as RTriangle |
-| meshpy (2026.1.1) | Triangle and TetGen | quality 2D and 3D meshing | Triangle licence again; TetGen is AGPL (upstream docs) |
-| scipy.spatial.Delaunay (1.18.1) | Qhull | point Delaunay, n-D | as R's geometry; no constraints |
+| meshpy (2026.1.1) | Triangle and TetGen | quality triangle meshing in xy (Triangle) and tetrahedral meshing in xyz (TetGen) | Triangle licence again; TetGen is AGPL (upstream docs) |
+| scipy.spatial.Delaunay (1.18.1) | Qhull | point Delaunay, any number of coordinates | as R's geometry; no constraints |
 | matplotlib.tri (3.11.2) | Qhull for Delaunay; accepts any triangle array | plotting, linear and cubic interpolation, uniform subdivision | Contract output plugs straight into `Triangulation(x, y, triangles)` |
 | shapely 2.1 (2.1.2) | GEOS | `delaunay_triangles`, `constrained_delaunay_triangles` | Same GEOS polygon triangulation as sf (no Steiner, per polygon) |
 | mapbox-earcut (2.1.0) | earcut.hpp | ear cutting | Same as decido |
 | PythonCDT (GitHub artem-ogre/PythonCDT, not on PyPI) | CDT | CDT, by the CDT author | Same library as cdtr; whether it exposes 2.0's refinement and depths was not checked |
 | cgal (cgal-swig-bindings, 5.6, February 2024) | CGAL 5.6 | includes a Mesh_2 module (`Delaunay_mesher_2`) | laridae's engine, two CGAL releases behind on PyPI |
-| pygalmesh (0.10.7) | CGAL | mostly 3D mesh generation | GPL |
+| pygalmesh (0.10.7) | CGAL | mostly tetrahedral and surface meshing in xyz | GPL |
 | jigsawpy (GitHub dengwirda/jigsaw-python, not on PyPI) | JIGSAW | sizing-field driven Delaunay refinement | laridae's sizing field is the same idea |
 | pydelatin (0.3.0) | hmm | greedy-insertion TIN | Same as terrainmeshr |
 | dmsh (0.3.8) | own | DistMesh-style | Same family as geometry::distmesh2d |
-| trimesh, manifold3d, pyvista | earcut, Triangle, VTK | 3D tooling that triangulates polygons on the side | consumers |
+| trimesh, manifold3d, pyvista | earcut, Triangle, VTK | tooling for meshes in xyz that triangulates polygons on the side | consumers |
 
 Facts here come from PyPI metadata and the projects' repositories on this
 date; behaviour was not run. Note that the PyPI names `spade`, `pyspade`

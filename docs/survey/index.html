@@ -72,12 +72,26 @@ in R: a survey of packages and where their algorithms come from</h1>
 <p>6 October 2026. Companion to the trianglewins benchmark and to the
 project notes on laridae, cdtr and trowel (state-of-three.md). Covers
 every R package found (CRAN, GitHub, r-universe) that triangulates
-points, polygons or segment sets in the plane, classified by algorithm,
-upstream code, intended use, input form, constraints, and control over
-the output. Facts were checked against package source (CRAN mirrors at
-github.com/cran, and the authors' GitHub repos) on this date; versions
-are the current CRAN or GitHub ones. Where a claim comes from upstream
-documentation rather than the R source it is marked (upstream docs).</p>
+points, polygons or segment sets with xy coordinates, classified by
+algorithm, upstream code, intended use, input form, constraints, and
+control over the output. Facts were checked against package source (CRAN
+mirrors at github.com/cran, and the authors' GitHub repos) on this date;
+versions are the current CRAN or GitHub ones. Where a claim comes from
+upstream documentation rather than the R source it is marked (upstream
+docs).</p>
+<p><strong>Dimension has two meanings here, and we always say
+which.</strong> <em>Geometric dimension</em> is the number of
+coordinates per vertex: xy (2), xyz (3), xyzt (4) and so on.
+<em>Topological dimension</em> is the dimension of the shape itself: 0 a
+point, 1 a segment or line, 2 a triangle or polygon, 3 a tetrahedron. A
+triangulation is made of topologically 2-dimensional cells whatever its
+coordinates: triangles in xy are a planar mesh, triangles in xyz are a
+surface (a terrain, a sphere). Delaunay of points with d coordinates
+gives d-dimensional simplices: triangles for xy, tetrahedra for xyz.
+"2.5D" means triangles built from xy only, with z carried along, so the
+surface is a single-valued function of x and y. A value carried at a
+vertex that the triangulation does not use (elevation, temperature,
+time) is an attribute, not a coordinate.</p>
 <h2 id="1-the-algorithm-families">1. The algorithm families</h2>
 <p>Each package below falls into one (sometimes two) of these. The
 families differ in what they promise about the output, which matters
@@ -94,8 +108,9 @@ convex hull triangulated with the empty-circumcircle property.
 Algorithms seen in R: incremental insertion (Lee-Schachter,
 Bowyer-Watson, Guibas-Stolfi quad-edge), radial sweep (S-hull),
 Fortune's sweepline (Voronoi first, Delaunay as the dual), Quickhull
-(lift to a paraboloid, take the lower hull; works in n dimensions),
-Delaunator (sweep-hull variant).</li>
+(lift to a paraboloid, take the lower hull; works for points with any
+number of coordinates d, giving d-dimensional simplices), Delaunator
+(sweep-hull variant).</li>
 <li><strong>Constrained Delaunay (CDT).</strong> Points plus segments;
 the segments are forced to be edges, the rest is "as Delaunay as
 possible". No new vertices except, in some libraries, at segment
@@ -185,7 +200,7 @@ hole ring</td>
 </tbody>
 </table>
 <p>Consumers of decido: silicate, anglr (TRI), raybevel and rayvertex
-(tylermorganwall, 3D extrusion and roofs).</p>
+(tylermorganwall, extruded and roof models: triangles in xyz).</p>
 <h2 id="3-point-delaunay-unconstrained">3. Point Delaunay
 (unconstrained)</h2>
 <table>
@@ -222,7 +237,8 @@ alphahull::delvor</td>
 <tr class="odd">
 <td>geometry::delaunayn() (CRAN 0.5.2, GPL-3)</td>
 <td>Qhull, vendored</td>
-<td>Quickhull on lifted points, n-D</td>
+<td>Quickhull on lifted points; any number of coordinates d, giving
+d-simplices (triangles for xy, tetrahedra for xyz)</td>
 <td>n x d matrix</td>
 <td>Qhull option string (<code>"Qt Qbb Qc"</code> etc.)</td>
 <td>index matrix (simplices)</td>
@@ -230,7 +246,8 @@ alphahull::delvor</td>
 <tr class="even">
 <td>tessellation::delaunay() (CRAN 2.3.0, GPL-3, S. Laurent)</td>
 <td>Qhull, own C</td>
-<td>Quickhull, 2D/3D/n-D</td>
+<td>Quickhull; xy, xyz or more coordinates, giving triangles, tetrahedra
+or higher simplices</td>
 <td>matrix</td>
 <td>degenerate handling options</td>
 <td>rich list (simplices, facets, edges), rgl plots</td>
@@ -306,7 +323,8 @@ alphahull::delvor</td>
 <td>LAS/LAZ point clouds in a streaming pipeline</td>
 <td><code>max_edge</code> trims long triangles, <code>filter</code>,
 attribute for z</td>
-<td>2.5D TIN used by DTM/CHM stages, optional file</td>
+<td>2.5D TIN (triangles from xy, z carried) used by DTM/CHM stages,
+optional file</td>
 </tr>
 <tr class="even">
 <td>lidR (CRAN 4.3.3) internal C_delaunay / interpolate_delaunay</td>
@@ -322,7 +340,8 @@ incremental Delaunay (hporro, MIT) for spike-free and PTD</td>
 <p>Notes. None of these accept segments. GEOS, terra and sf return
 geometry, not an index, so topology must be rebuilt by matching
 coordinates. deldir and the GEOS family are the de facto point-Delaunay
-engines in the spatial stack; Qhull is the n-D one.</p>
+engines in the spatial stack; Qhull is the one for points with more than
+two coordinates.</p>
 <h2 id="4-constrained-delaunay-without-refinement">4. Constrained
 Delaunay, without refinement</h2>
 <table>
@@ -367,7 +386,8 @@ non-free)</td>
 <td>CGAL Constrained_Delaunay_triangulation_2 via RcppCGAL; needs gmp,
 mpfr</td>
 <td>points matrix, <code>constraints</code> 2-col index matrix; also
-2.5D (<code>elevation</code>) and 3D</td>
+2.5D (<code>elevation</code>: triangles from xy, z carried) and Delaunay
+of xyz points (tetrahedra)</td>
 <td>yes</td>
 <td>CGAL nesting level, odd = inside (parity)</td>
 <td>list with mesh, edges; mesh2d() to rgl</td>
@@ -522,7 +542,7 @@ polygon</td>
 <code>extend</code>, <code>min_angle</code>, <code>max_area</code>,
 <code>max_steiner</code>; adaptive refine by indicator</td>
 <td>tulpa_mesh with FEM matrices; sphere by icosahedral subdivision; 1D
-and graph meshes</td>
+meshes (segments, topological dimension 1) on lines and graphs</td>
 </tr>
 <tr class="even">
 <td>geometry::distmesh2d(), distmeshnd()</td>
@@ -537,12 +557,12 @@ segments</td>
 </tbody>
 </table>
 <p>Notes. Triangle is the reference implementation of Ruppert/Chew
-refinement and is behind every mature 2D quality mesher in R except
-fmesher and tulpaMesh; its licence forbids commercial use, which is why
-anglr, sfdct and RTriangle carry CC BY-NC-SA. fmesher is the most
-capable CRAN option for statistical (SPDE) meshes: two-zone sizing,
-near-point merging, sphere meshes, CRS awareness. tulpaMesh is new
-(2026) and is the nearest relative of cdtr: same CDT library, with
+refinement and is behind every mature quality mesher of triangles in xy
+in R except fmesher and tulpaMesh; its licence forbids commercial use,
+which is why anglr, sfdct and RTriangle carry CC BY-NC-SA. fmesher is
+the most capable CRAN option for statistical (SPDE) meshes: two-zone
+sizing, near-point merging, sphere meshes, CRS awareness. tulpaMesh is
+new (2026) and is the nearest relative of cdtr: same CDT library, with
 refinement written on top of it rather than using CDT's own.</p>
 <h2 id="6-terrain-and-raster-derived-tins">6. Terrain and raster-derived
 TINs</h2>
@@ -678,7 +698,7 @@ users</td>
 </tr>
 <tr class="odd">
 <td>Qhull (C)</td>
-<td>Quickhull, n-D Delaunay</td>
+<td>Quickhull, Delaunay for any number of coordinates</td>
 <td>geometry, tessellation</td>
 </tr>
 <tr class="even">
@@ -842,8 +862,9 @@ baseline.</li>
 </ol>
 <h2 id="11-out-of-scope-but-adjacent">11. Out of scope but adjacent</h2>
 <ul>
-<li>3D surface and volume meshes: Rvcg (VCGlib), cgalMeshes (CGAL), TDA
-(alpha complexes via GUDHI/CGAL), alphashape3d (geometry/Qhull).</li>
+<li>Surface meshes (triangles in xyz) and volume meshes (tetrahedra in
+xyz): Rvcg (VCGlib), cgalMeshes (CGAL), TDA (alpha complexes via
+GUDHI/CGAL), alphashape3d (geometry/Qhull).</li>
 <li>Alpha shapes and hulls built on Delaunay: alphahull (interp),
 concaveman.</li>
 <li>External programs: RSAGA (SAGA), fasterRaster (GRASS v.delaunay),

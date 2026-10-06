@@ -13,12 +13,25 @@ The detail behind every claim (algorithm, upstream library, arguments) is
 in the [survey](../survey/), and measured times are in the
 [benchmark](../bench/).
 
+**Dimension has two meanings here, and we always say which.**
+*Geometric dimension* is the number of coordinates per vertex: xy (2),
+xyz (3), xyzt (4) and so on. *Topological dimension* is the dimension of
+the shape itself: 0 a point, 1 a segment or line, 2 a triangle or polygon,
+3 a tetrahedron. A triangulation is made of topologically 2-dimensional
+cells whatever its coordinates: triangles in xy are a planar mesh,
+triangles in xyz are a surface (a terrain, a sphere). Delaunay of points
+with d coordinates gives d-dimensional simplices: triangles for xy,
+tetrahedra for xyz. "2.5D" means triangles built from xy only, with z
+carried along, so the surface is a single-valued function of x and y. A
+value carried at a vertex that the triangulation does not use (elevation,
+temperature, time) is an attribute, not a coordinate.
+
 ## Quick answers
 
 | You want to | Try first [CRAN] | Also consider |
 |---|---|---|
-| Fill polygons with triangles for drawing (rgl, WebGL, 3D) | decido | rgl::triangulate, sf::st_triangulate_constrained |
-| Delaunay triangles or edges of a point set | deldir | geometry (big or n-D), interp, sf / terra / geos / gdalraster for spatial objects |
+| Fill polygons with triangles for drawing (rgl, WebGL, a scene in xyz) | decido | rgl::triangulate, sf::st_triangulate_constrained |
+| Delaunay triangles or edges of a point set | deldir | geometry (large, or points with more than two coordinates), interp, sf / terra / geos / gdalraster for spatial objects |
 | Interpolate scattered values linearly | interp | geometry::tsearch, lidR / lasR for point clouds |
 | A TIN from a height grid | terrainmeshr | lidR / lasR from LiDAR points |
 | A mesh for a statistical model (SPDE, INLA, TMB) | fmesher | tulpaMesh |
@@ -28,12 +41,12 @@ in the [survey](../survey/), and measured times are in the
 | Mesh density that varies over space | fmesher | geometry::distmesh2d; [GitHub] laridae |
 | Add or remove points and segments after building | nothing on CRAN | [GitHub] trowel, laridae |
 | A mesh on the sphere | fmesher | tulpaMesh; for points only, geometry::convhulln on geocentric XYZ (PROJ "+proj=cart" via reproj, PROJ, gdalraster, sf, terra) |
-| Delaunay in 3D or higher | geometry, tessellation | delaunay (3D, CGAL) |
+| Delaunay of xyz (or more) coordinates: tetrahedra and higher simplices | geometry, tessellation | delaunay (tetrahedra in xyz, CGAL) |
 
 ## 1. Drawing polygons: fill them with triangles
 
 You have polygons (with holes) and need triangles to render them: rgl,
-rayrender, a WebGL or deck.gl layer, an extruded 3D model. Extra vertices
+rayrender, a WebGL or deck.gl layer, an extruded model in xyz. Extra vertices
 are unwelcome and triangle shape does not matter.
 
 - **decido [CRAN]**: `earcut(xy, holes)`. Mapbox's ear-cutting library;
@@ -65,7 +78,8 @@ neighbour ideas or plotting.
   triangles, Voronoi (Dirichlet) tiles, clipping to a rectangle, tile
   summaries. Used by spatstat and ggforce, so the answers agree with those.
 - **geometry::delaunayn() [CRAN]**: Qhull. Fast on large point sets and
-  the one to use in 3 or more dimensions. Returns an index
+  the one to use for points with three or more coordinates (output is
+  tetrahedra for xyz, higher simplices beyond). Returns an index
   matrix. tessellation (also Qhull) adds richer output and plotting.
 - **interp::tri.mesh() [CRAN]**: S-hull, free licence; pairs with
   interp's interpolation functions.
@@ -220,20 +234,22 @@ interactive tool, a simulation that moves a boundary, streaming data).
   were added to a world-scale mesh in 0.09 s, against 44 to 49 s to
   rebuild.
 
-## 11. The sphere, and higher dimensions
+## 11. Surfaces in xyz (sphere, ellipsoid), and Delaunay with more coordinates
 
 - On the sphere, with constraints or refinement: **fmesher [CRAN]**
   (globe and S2 meshes) and **tulpaMesh [CRAN]** (icosahedral
   subdivision).
 - On the sphere or ellipsoid, points only: convert longitude and latitude
-  to geocentric XYZ and take the 3D convex hull. Every point on a convex
+  to geocentric xyz and take the convex hull of the xyz points. The hull's
+  facets are triangles: topological dimension 2 in geometric dimension 3.
+  Every point on a convex
   surface is a hull vertex, so the hull's triangular facets are a
   triangulation of the surface, and on a sphere it is exactly the
   spherical Delaunay triangulation (the empty-circumcircle test on the
   sphere is the empty-half-space test of the hull). On an ellipsoid the
   hull is still a valid triangulation of the points, only not strictly
   Delaunay in the geodesic sense.
-  - XYZ: any PROJ interface with the target `"+proj=cart"` (geocentric
+  - xyz: any PROJ interface with the target `"+proj=cart"` (geocentric
     on the source datum's ellipsoid), for example **reproj::reproj_xyz()**
     or **reproj::reproj()** (which also transforms whole meshes),
     **PROJ::proj_trans()**, **gdalraster::transform_xy()** (z kept if
@@ -243,21 +259,24 @@ interactive tool, a simulation that moves a boundary, streaming data).
     (radians).
   - Hull: **geometry::convhulln(xyz) [CRAN]** returns a 3-column triangle
     index (Qhull triangulates facets by default). Use the hull, not
-    `delaunayn(xyz)`: Delaunay of 3D points gives tetrahedra filling the
-    ball, whose outer faces are the same hull triangles, so convhulln is
+    `delaunayn(xyz)`: Delaunay of xyz points gives tetrahedra (topological
+    dimension 3) filling the ball, whose outer faces are the same hull triangles, so convhulln is
     the direct route. tessellation, cxhull and delaunay (CGAL) [CRAN] can
-    also compute 3D hulls.
+    also compute hulls of xyz points.
   - Caveats: no constraint segments and no refinement; regional data (not
     covering the globe) gets a facet spanning the uncovered part, which
     you remove (for example by dropping facets whose normal points away
     from the data, or with a maximum edge length). Map triangles back
     with the same vertex index, since the hull keeps your input order.
-- Everything else here is planar, so for other approaches project your
-  data first (a local equal-area or azimuthal projection keeps shapes
+- Everything else here triangulates xy coordinates, so for other
+  approaches project your data to xy first (a local equal-area or azimuthal projection keeps shapes
   reasonable).
-- 3D and higher Delaunay: **geometry [CRAN]** and **tessellation [CRAN]**
-  (Qhull, any dimension), **delaunay [CRAN]** (CGAL, 3D and 2.5D).
-- Surfaces and volumes (remeshing, alpha shapes): Rvcg, cgalMeshes,
+- Delaunay of points with xyz or more coordinates (tetrahedra and higher
+  simplices): **geometry [CRAN]** and **tessellation [CRAN]** (Qhull, any
+  number of coordinates), **delaunay [CRAN]** (CGAL: tetrahedra in xyz,
+  and 2.5D triangles built from xy with z carried).
+- Surface meshes (triangles in xyz) and volume meshes (tetrahedra):
+  remeshing, alpha shapes: Rvcg, cgalMeshes,
   alphashape3d, TDA [CRAN]; these are outside this guide.
 
 ## Things that decide the choice before the algorithm does

@@ -3,12 +3,25 @@
 6 October 2026. Companion to the trianglewins benchmark and to the project
 notes on laridae, cdtr and trowel (state-of-three.md). Covers every R package found
 (CRAN, GitHub, r-universe) that triangulates points, polygons or segment
-sets in the plane, classified by algorithm, upstream code, intended use,
+sets with xy coordinates, classified by algorithm, upstream code, intended use,
 input form, constraints, and control over the output. Facts were checked
 against package source (CRAN mirrors at github.com/cran, and the authors'
 GitHub repos) on this date; versions are the current CRAN or GitHub ones.
 Where a claim comes from upstream documentation rather than the R source it
 is marked (upstream docs).
+
+**Dimension has two meanings here, and we always say which.**
+*Geometric dimension* is the number of coordinates per vertex: xy (2),
+xyz (3), xyzt (4) and so on. *Topological dimension* is the dimension of
+the shape itself: 0 a point, 1 a segment or line, 2 a triangle or polygon,
+3 a tetrahedron. A triangulation is made of topologically 2-dimensional
+cells whatever its coordinates: triangles in xy are a planar mesh,
+triangles in xyz are a surface (a terrain, a sphere). Delaunay of points
+with d coordinates gives d-dimensional simplices: triangles for xy,
+tetrahedra for xyz. "2.5D" means triangles built from xy only, with z
+carried along, so the surface is a single-valued function of x and y. A
+value carried at a vertex that the triangulation does not use (elevation,
+temperature, time) is an attribute, not a coordinate.
 
 ## 1. The algorithm families
 
@@ -27,7 +40,8 @@ speed.
   incremental insertion (Lee-Schachter, Bowyer-Watson, Guibas-Stolfi
   quad-edge), radial sweep (S-hull), Fortune's sweepline (Voronoi first,
   Delaunay as the dual), Quickhull (lift to a paraboloid, take the lower
-  hull; works in n dimensions), Delaunator (sweep-hull variant).
+  hull; works for points with any number of coordinates d, giving
+  d-dimensional simplices), Delaunator (sweep-hull variant).
 - **Constrained Delaunay (CDT).** Points plus segments; the segments are
   forced to be edges, the rest is "as Delaunay as possible". No new
   vertices except, in some libraries, at segment crossings. Holes and
@@ -60,7 +74,7 @@ speed.
 | interleave (CRAN, dcooley) | earcut.hpp via `geometries` | internal `rcpp_earcut` | holes | none | used for interleaved vertex buffers, not a user API |
 
 Consumers of decido: silicate, anglr (TRI), raybevel and rayvertex
-(tylermorganwall, 3D extrusion and roofs).
+(tylermorganwall, extruded and roof models: triangles in xyz).
 
 ## 3. Point Delaunay (unconstrained)
 
@@ -68,8 +82,8 @@ Consumers of decido: silicate, anglr (TRI), raybevel and rayvertex
 |---|---|---|---|---|---|
 | deldir::deldir() (CRAN 2.0-4, GPL) | own Fortran (Turner) | incremental, Lee and Schachter's second algorithm | x, y (z, id carried) | rectangular window `rw`, dummy points, `eps` duplicate tolerance | delsgs/dirsgs segment tables; triang.list(), tile.list() |
 | interp::tri.mesh() (CRAN 1.1-6, GPL) | S-hull (Sinclair) in C++, written as a free replacement for tripack | radial sweep then flips | x, y | `duplicate`, `jitter` | `triSht` object; used by interp::interp, alphahull::delvor |
-| geometry::delaunayn() (CRAN 0.5.2, GPL-3) | Qhull, vendored | Quickhull on lifted points, n-D | n x d matrix | Qhull option string (`"Qt Qbb Qc"` etc.) | index matrix (simplices) |
-| tessellation::delaunay() (CRAN 2.3.0, GPL-3, S. Laurent) | Qhull, own C | Quickhull, 2D/3D/n-D | matrix | degenerate handling options | rich list (simplices, facets, edges), rgl plots |
+| geometry::delaunayn() (CRAN 0.5.2, GPL-3) | Qhull, vendored | Quickhull on lifted points; any number of coordinates d, giving d-simplices (triangles for xy, tetrahedra for xyz) | n x d matrix | Qhull option string (`"Qt Qbb Qc"` etc.) | index matrix (simplices) |
+| tessellation::delaunay() (CRAN 2.3.0, GPL-3, S. Laurent) | Qhull, own C | Quickhull; xy, xyz or more coordinates, giving triangles, tetrahedra or higher simplices | matrix | degenerate handling options | rich list (simplices, facets, edges), rgl plots |
 | rvoronoi::delaunay() (GitHub coolbutuseless, MIT) | Steven Fortune's C sweepline | Fortune sweep | x, y | none | triangles, optional polygons and areas |
 | voronoifortune::voronoi() (CRAN, GPL-3, Paradis) | port of Fortune's early 1990s C | Fortune sweep | coordinate matrix | none | Voronoi and Delaunay lists |
 | sf::st_triangulate() (CRAN 1.1-3) | GEOS DelaunayTriangulationBuilder | incremental quad-edge (upstream docs) | any sf geometry; uses its vertices only | `dTolerance` snapping, `bOnlyEdges` | GEOMETRYCOLLECTION of POLYGON (or MULTILINESTRING) |
@@ -78,13 +92,13 @@ Consumers of decido: silicate, anglr (TRI), raybevel and rayvertex
 | gdalraster::g_delaunay_triangulation() (CRAN 2.7.0) | GEOS through GDAL's OGR geometry API | as above | WKB (raw or list of raw) or WKT; GEOS >= 3.4 | `tolerance`, `only_edges` | WKB or WKT GEOMETRYCOLLECTION |
 | spatstat.geom::delaunay() | deldir | as deldir | ppp point pattern | none | tess of triangles |
 | ggforce geom_delaunay_* | deldir | as deldir | ggplot aesthetics | none | ggplot layers |
-| lasR triangulate() stage (GitHub/r-universe r-lidar) | Delaunator (C++ port), vendored | sweep-hull | LAS/LAZ point clouds in a streaming pipeline | `max_edge` trims long triangles, `filter`, attribute for z | 2.5D TIN used by DTM/CHM stages, optional file |
+| lasR triangulate() stage (GitHub/r-universe r-lidar) | Delaunator (C++ port), vendored | sweep-hull | LAS/LAZ point clouds in a streaming pipeline | `max_edge` trims long triangles, `filter`, attribute for z | 2.5D TIN (triangles from xy, z carried) used by DTM/CHM stages, optional file |
 | lidR (CRAN 4.3.3) internal C_delaunay / interpolate_delaunay | boost::polygon Voronoi on integer (scaled) coordinates; a vendored incremental Delaunay (hporro, MIT) for spike-free and PTD | Voronoi dual (exact on integers); incremental | LAS objects | `trim` max edge | used for TIN DTM, CHM, ground classification |
 
 Notes. None of these accept segments. GEOS, terra and sf return geometry,
 not an index, so topology must be rebuilt by matching coordinates. deldir
 and the GEOS family are the de facto point-Delaunay engines in the spatial
-stack; Qhull is the n-D one.
+stack; Qhull is the one for points with more than two coordinates.
 
 ## 4. Constrained Delaunay, without refinement
 
@@ -93,7 +107,7 @@ stack; Qhull is the n-D one.
 | tripack::tri.mesh() + add.constraint() (CRAN 1.3-9.4, ACM licence, non-free) | Renka TRIPACK, ACM TOMS 751, Fortran | x, y; constraint curves as closed polygons | closed constraint curves, region on one side excluded | by curve orientation | `tri` object, voronoi.mosaic |
 | akima (CRAN 0.6-3.6, ACM licence) | Renka's triangulation inside Akima's ACM 761 Fortran | x, y, z | none exposed | none | interpolation only, triangulation internal |
 | RCDT::delaunay() (CRAN 1.3.0, GPL-3, S. Laurent) | artem-ogre/CDT (MPL-2.0) via RcppArmadillo | points matrix, `edges` 2-col index matrix | yes, index pairs | CDT eraseOuterTrianglesAndHoles (parity) | list: mesh (rgl mesh3d), edges, constraint edges, area |
-| delaunay::delaunay() (CRAN 2.0.0, GPL-3, S. Laurent) | CGAL Constrained_Delaunay_triangulation_2 via RcppCGAL; needs gmp, mpfr | points matrix, `constraints` 2-col index matrix; also 2.5D (`elevation`) and 3D | yes | CGAL nesting level, odd = inside (parity) | list with mesh, edges; mesh2d() to rgl |
+| delaunay::delaunay() (CRAN 2.0.0, GPL-3, S. Laurent) | CGAL Constrained_Delaunay_triangulation_2 via RcppCGAL; needs gmp, mpfr | points matrix, `constraints` 2-col index matrix; also 2.5D (`elevation`: triangles from xy, z carried) and Delaunay of xyz points (tetrahedra) | yes | CGAL nesting level, odd = inside (parity) | list with mesh, edges; mesh2d() to rgl |
 | sf::st_triangulate_constrained() (GEOS >= 3.10) | GEOS ConstrainedDelaunayTriangulator: ear clipping then Delaunay edge flips (upstream docs) | POLYGON/MULTIPOLYGON only | polygon rings only; each polygon on its own | holes joined to shell; no outside | GEOMETRYCOLLECTION of triangles |
 | geos::geos_constrained_delaunay_triangles() | GEOS, same | polygons | as above | as above | geos geometry |
 | terra::delaunay(constrained = TRUE) | GEOS, same | SpatVector polygons | as above | as above | SpatVector |
@@ -120,11 +134,11 @@ outside by parity.
 | anglr::DEL(), DEL0() (GitHub/r-universe, archived from CRAN) | RTriangle (cdtr backend on a parked branch) | sf/sp/silicate | segments from paths | `max_area` | DEL/DEL0 relational tables, plot3d/mesh3d |
 | retistruct (davidcsterratt) | RTriangle | its own outline objects | outline | area/angle | internal (RTriangle was split out of this package) |
 | fmesher::fm_mesh_2d(), fm_rcdt_2d() (CRAN 0.8.0, MPL-2.0, Lindgren) | own C++ (ex-INLA), after Hjelle and Daehlen, Triangulations and Applications (2006) | loc matrix, sf/sp, fm_segm boundary and interior segments, crs | boundary and interior segments | `max.edge` (inner, outer), `min.angle`, `cutoff` (merge near points), `offset` (extension zone), `max.n`, `quality.spec` per vertex, `globe`/sphere meshes, `lattice` | fm_mesh_2d with vertex/triangle tables, crs, FEM matrices |
-| tulpaMesh::tulpa_mesh(), refine_mesh() (CRAN 0.1.3, MIT, Colling) | artem-ogre/CDT plus its own Ruppert refinement with off-centres (Ungor 2009) in mesh.cpp | coords matrix/data.frame/formula; boundary as matrix or sf polygon | boundary | `max_edge` (inner, outer), `cutoff`, `extend`, `min_angle`, `max_area`, `max_steiner`; adaptive refine by indicator | tulpa_mesh with FEM matrices; sphere by icosahedral subdivision; 1D and graph meshes |
+| tulpaMesh::tulpa_mesh(), refine_mesh() (CRAN 0.1.3, MIT, Colling) | artem-ogre/CDT plus its own Ruppert refinement with off-centres (Ungor 2009) in mesh.cpp | coords matrix/data.frame/formula; boundary as matrix or sf polygon | boundary | `max_edge` (inner, outer), `cutoff`, `extend`, `min_angle`, `max_area`, `max_steiner`; adaptive refine by indicator | tulpa_mesh with FEM matrices; sphere by icosahedral subdivision; 1D meshes (segments, topological dimension 1) on lines and graphs |
 | geometry::distmesh2d(), distmeshnd() | own R port of Persson and Strang DistMesh, Qhull per iteration | signed distance fn `fd`, size fn `fh`, `h0`, bbox, fixed points `pfix` | domain via distance function; fixed points only, no exact segments | element size function, tolerances, iterations | points and triangle index matrix |
 
 Notes. Triangle is the reference implementation of Ruppert/Chew refinement
-and is behind every mature 2D quality mesher in R except fmesher and
+and is behind every mature quality mesher of triangles in xy in R except fmesher and
 tulpaMesh; its licence forbids commercial use, which is why anglr, sfdct
 and RTriangle carry CC BY-NC-SA. fmesher is the most capable CRAN option
 for statistical (SPDE) meshes: two-zone sizing, near-point merging, sphere
@@ -157,7 +171,7 @@ using CDT's own.
 | spade (Rust, MIT/Apache) | dynamic CDT, refinement | trowel |
 | fmesher core (C++, MPL-2.0) | CDT with refinement, sphere | fmesher, and through it INLA, inlabru, sdmTMB and other SPDE users |
 | GEOS (C++, LGPL) | point Delaunay (quad-edge), polygon CDT (ear clip + flip) | sf, geos, terra (direct); gdalraster (via GDAL OGR) |
-| Qhull (C) | Quickhull, n-D Delaunay | geometry, tessellation |
+| Qhull (C) | Quickhull, Delaunay for any number of coordinates | geometry, tessellation |
 | mapbox earcut (C++ / JS, ISC) | ear cutting | decido, interleave (via geometries), rearcut; via decido: silicate, anglr, raybevel |
 | Renka TRIPACK / Akima (Fortran, ACM licence) | incremental Delaunay, constraint curves | tripack, akima |
 | S-hull (Sinclair) | radial sweep Delaunay | interp, and through it alphahull |
@@ -222,7 +236,8 @@ done; attributes interpolated onto new vertices.
 
 ## 11. Out of scope but adjacent
 
-- 3D surface and volume meshes: Rvcg (VCGlib), cgalMeshes (CGAL), TDA
+- Surface meshes (triangles in xyz) and volume meshes (tetrahedra in
+  xyz): Rvcg (VCGlib), cgalMeshes (CGAL), TDA
   (alpha complexes via GUDHI/CGAL), alphashape3d (geometry/Qhull).
 - Alpha shapes and hulls built on Delaunay: alphahull (interp), concaveman.
 - External programs: RSAGA (SAGA), fasterRaster (GRASS v.delaunay),

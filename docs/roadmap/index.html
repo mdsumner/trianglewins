@@ -78,7 +78,12 @@ checked against their repositories on this date (hypertidy/cdtr main,
 hypertidy/laridae main, hypertidy/trowel main, mdsumner/trianglewins);
 claims about other packages come from their source on the CRAN mirrors
 and GitHub, or from PyPI metadata, and are marked (upstream docs) where
-they rest on documentation alone.</p>
+they rest on documentation alone. "Dimension" is used in two senses,
+kept apart as in the <a href="../survey/">survey</a>: geometric
+dimension is the number of coordinates per vertex (xy, xyz, xyzt),
+topological dimension is that of the shape (0 point, 1 segment, 2
+triangle, 3 tetrahedron). All three packages make topologically
+2-dimensional meshes from xy coordinates.</p>
 <h2 id="in-short">In short</h2>
 <ol type="1">
 <li><strong>Write the contract down before anything goes to
@@ -233,11 +238,11 @@ binding</strong> (section 5).</li>
 code; worth fixing before CRAN only if it is simple, since it only
 matters for small inputs called many times.</li>
 </ol>
-<p>Deliberately not on the list: 3D, periodic and conforming/Gabriel
-modes in laridae (PLAN.md section 3.4), and the sphere. fmesher and
-tulpaMesh already cover the sphere for statistical meshes; nothing in
-the benchmark or the survey shows planar users waiting on the
-others.</p>
+<p>Deliberately not on the list: tetrahedral meshing of xyz, periodic
+and conforming/Gabriel modes in laridae (PLAN.md section 3.4), and the
+sphere. fmesher and tulpaMesh already cover the sphere for statistical
+meshes; nothing in the benchmark or the survey shows users of xy
+triangulation waiting on the others.</p>
 <h2 id="3-cran-order-and-what-blocks-each">3. CRAN: order and what
 blocks each</h2>
 <h3 id="order">Order</h3>
@@ -457,13 +462,14 @@ the same situation as RTriangle</td>
 <tr class="even">
 <td>meshpy (2026.1.1)</td>
 <td>Triangle and TetGen</td>
-<td>quality 2D and 3D meshing</td>
+<td>quality triangle meshing in xy (Triangle) and tetrahedral meshing in
+xyz (TetGen)</td>
 <td>Triangle licence again; TetGen is AGPL (upstream docs)</td>
 </tr>
 <tr class="odd">
 <td>scipy.spatial.Delaunay (1.18.1)</td>
 <td>Qhull</td>
-<td>point Delaunay, n-D</td>
+<td>point Delaunay, any number of coordinates</td>
 <td>as R's geometry; no constraints</td>
 </tr>
 <tr class="even">
@@ -502,7 +508,7 @@ was not checked</td>
 <tr class="odd">
 <td>pygalmesh (0.10.7)</td>
 <td>CGAL</td>
-<td>mostly 3D mesh generation</td>
+<td>mostly tetrahedral and surface meshing in xyz</td>
 <td>GPL</td>
 </tr>
 <tr class="even">
@@ -526,7 +532,8 @@ was not checked</td>
 <tr class="odd">
 <td>trimesh, manifold3d, pyvista</td>
 <td>earcut, Triangle, VTK</td>
-<td>3D tooling that triangulates polygons on the side</td>
+<td>tooling for meshes in xyz that triangulates polygons on the
+side</td>
 <td>consumers</td>
 </tr>
 </tbody>
