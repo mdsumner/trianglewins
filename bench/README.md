@@ -1,6 +1,6 @@
 # bench: triangulation at scale
 
-The performance benchmark behind the Pages site (`docs/index.html`). Inputs
+The performance benchmark behind the Pages site (`docs/bench/index.html`). Inputs
 are country boundaries from geoBoundaries CGAZ ADM0, the GeoParquet that
 `sds::CGAZ()` points to, made into vertex and segment tables at sizes from
 23 thousand to 6.8 million vertices, plus point clouds sampled from them.
@@ -10,7 +10,7 @@ are country boundaries from geoBoundaries CGAZ ADM0, the GeoParquet that
 | `cgaz_pslg.py` | CGAZ GeoParquet to `<dataset>.bin` (vertices and segments) and `datasets.csv`. Needs pyarrow, shapely, numpy |
 | `bench.R` | one job: read a dataset, run one backend on one scenario, time it, measure the output |
 | `run.R` | every dataset x backend x scenario, each in its own R process with a timeout and a memory cap; appends to `results/bench.csv` and resumes where it stopped |
-| `site.R`, `site-template.html`, `findings.html` | build `docs/index.html` from the results |
+| `site.R`, `site-template.html`, `findings.html` | build `docs/bench/index.html` from the results |
 
 ```sh
 curl -LO https://github.com/mdsumner/geoboundaries/releases/download/latest/geoBoundariesCGAZ_ADM0.parquet

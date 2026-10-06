@@ -16,9 +16,16 @@ results as skipped, not as a failure. It also serves as laridae's
 acceptance test.
 
 
-The performance benchmark at scale (geoBoundaries country boundaries from
-`sds::CGAZ()`, 23 thousand to 6.8 million vertices) is published at
-https://mdsumner.github.io/trianglewins/ and its code is in [bench/](bench/).
+The site at https://mdsumner.github.io/trianglewins/ indexes two pages:
+
+- the performance benchmark at scale (geoBoundaries country boundaries from
+  `sds::CGAZ()`, 23 thousand to 6.8 million vertices), at
+  https://mdsumner.github.io/trianglewins/bench/, code in [bench/](bench/);
+- a survey of R packages that triangulate points, polygons or segment sets
+  (algorithm, upstream library, input, constraints, output control), at
+  https://mdsumner.github.io/trianglewins/survey/, source in
+  [survey/](survey/r-triangulation-survey.md), rendered by
+  `sh survey/build.sh` (pandoc).
 
 ## What it measures
 

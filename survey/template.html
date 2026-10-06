@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>trianglewins</title>
-<meta name="description" content="Constrained triangulation in R: a benchmark of laridae, cdtr, trowel and RTriangle, and a survey of R triangulation packages.">
+<title>Triangulation in R</title>
+<meta name="description" content="A survey of R packages that triangulate points, polygons and segment sets: algorithm, upstream library, input, constraints and output control.">
 <style>
 :root {
   color-scheme: light;
@@ -62,38 +62,19 @@ th:first-child, td:first-child { min-width: 13em; }
 tr:last-child td { border-bottom: none; }
 th { color: var(--text-secondary); font-weight: 600; }
 </style>
-<style>
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 20px; }
-.card { display: block; background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
-  padding: 16px; text-decoration: none; color: var(--text-primary); }
-.card:hover { border-color: var(--link); }
-.card h2 { margin: 0 0 6px; font-size: 17px; color: var(--link); }
-.card p { margin: 0; color: var(--text-secondary); font-size: 14px; }
-p.lede { color: var(--text-secondary); margin: 0 0 8px; max-width: 760px; }
-</style>
 </head>
 <body>
 <main>
-<h1>trianglewins</h1>
-<p class="lede">Constrained triangulation in R: the same inputs through every backend, judged
-by code that belongs to none of them. Backends are laridae (CGAL), cdtr (CDT), trowel (spade)
-and RTriangle (Triangle).</p>
-<div class="cards">
-<a class="card" href="bench/">
-<h2>Benchmark at scale</h2>
-<p>Times, memory and mesh quality on geoBoundaries country polygons, from 23 thousand to
-6.8 million vertices: constrained, area and quality refinement, point Delaunay, and edits to a
-live mesh.</p>
-</a>
-<a class="card" href="survey/">
-<h2>Survey of R triangulation packages</h2>
-<p>About 35 packages classified by algorithm (ear cutting, Delaunay, constrained, quality
-refinement), upstream library, input form, constraints and output control, with a lineage
-table and a capability matrix.</p>
-</a>
-</div>
-<p class="muted" style="margin-top:28px">Source:
-<a href="https://github.com/mdsumner/trianglewins">mdsumner/trianglewins</a>.</p>
+<p class="muted"><a href="../">trianglewins</a> / survey</p>
+$body$
 </main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
 </body>
 </html>

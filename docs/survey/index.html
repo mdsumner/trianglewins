@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triangulation in R</title>
+<meta name="description" content="A survey of R packages that triangulate points, polygons and segment sets: algorithm, upstream library, input, constraints and output control.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--grid); min-width: 9em; }
+th:first-child, td:first-child { min-width: 13em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../">trianglewins</a> / survey</p>
+<h1
+id="triangulation-in-r-a-survey-of-packages-and-where-their-algorithms-come-from">Triangulation
+in R: a survey of packages and where their algorithms come from</h1>
+<p>6 October 2026. Companion to the trianglewins benchmark and to the
+project notes on laridae, cdtr and trowel (state-of-three.md). Covers
+every R package found (CRAN, GitHub, r-universe) that triangulates
+points, polygons or segment sets in the plane, classified by algorithm,
+upstream code, intended use, input form, constraints, and control over
+the output. Facts were checked against package source (CRAN mirrors at
+github.com/cran, and the authors' GitHub repos) on this date; versions
+are the current CRAN or GitHub ones. Where a claim comes from upstream
+documentation rather than the R source it is marked (upstream docs).</p>
+<h2 id="1-the-algorithm-families">1. The algorithm families</h2>
+<p>Each package below falls into one (sometimes two) of these. The
+families differ in what they promise about the output, which matters
+more than speed.</p>
+<ul>
+<li><strong>Ear cutting (ear clipping).</strong> Input is a polygon
+(rings, holes). Output uses only the input vertices, every triangle lies
+inside the polygon, no quality guarantee (long slivers are normal), no
+Delaunay property. O(n^2) worst case; Mapbox earcut adds z-order hashing
+to make it fast in practice. Holes are bridged into the outer ring
+before cutting. Cannot take points or loose segments, only rings.</li>
+<li><strong>Point Delaunay.</strong> Input is points only. Output is the
+convex hull triangulated with the empty-circumcircle property.
+Algorithms seen in R: incremental insertion (Lee-Schachter,
+Bowyer-Watson, Guibas-Stolfi quad-edge), radial sweep (S-hull),
+Fortune's sweepline (Voronoi first, Delaunay as the dual), Quickhull
+(lift to a paraboloid, take the lower hull; works in n dimensions),
+Delaunator (sweep-hull variant).</li>
+<li><strong>Constrained Delaunay (CDT).</strong> Points plus segments;
+the segments are forced to be edges, the rest is "as Delaunay as
+possible". No new vertices except, in some libraries, at segment
+crossings. Holes and outside are removed after the fact by seeds, parity
+or nesting level.</li>
+<li><strong>Conforming Delaunay.</strong> Segments are split with
+Steiner points until every piece is a true Delaunay edge. Output is
+fully Delaunay.</li>
+<li><strong>Quality refinement (Ruppert, Chew, off-centres).</strong>
+Starts from a CDT and inserts Steiner points (circumcentres or
+off-centres, plus segment midpoints when an encroached segment is found)
+until triangles meet a minimum angle and/or maximum area or edge length.
+Some add a size function or a Steiner budget.</li>
+<li><strong>Mesh smoothing / force-based (DistMesh).</strong> Points are
+moved by a spring analogy and re-triangulated (point Delaunay) each
+iteration, against a signed distance function for the domain. No exact
+constraint edges.</li>
+<li><strong>Terrain simplification (greedy insertion).</strong> Input is
+a height grid; vertices are added where the error is worst, the
+triangulation is Delaunay. Output is a TIN approximating the grid.</li>
+<li><strong>Polygon decomposition.</strong> A polygon is cut into
+triangles (or convex pieces) by a geometric library, usually via a CDT
+of its boundary.</li>
+</ul>
+<h2 id="2-ear-cutting">2. Ear cutting</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Package::function</th>
+<th>Upstream code</th>
+<th>Input</th>
+<th>Holes / constraints</th>
+<th>Output control</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>decido::earcut() (CRAN 0.4.0, MIT)</td>
+<td>mapbox earcut.hpp (C++ port of earcut.js), vendored</td>
+<td>x,y matrix of one polygon, <code>holes</code> = start index of each
+hole ring</td>
+<td>holes yes; no loose segments, no points</td>
+<td>none</td>
+<td>integer vector of vertex indices, 3 per triangle</td>
+</tr>
+<tr class="even">
+<td>rearcut (GitHub hypertidy, MIT)</td>
+<td>mapbox earcut.js run in V8</td>
+<td>x, y, holes</td>
+<td>holes</td>
+<td>none</td>
+<td>index vector. Superseded by decido</td>
+</tr>
+<tr class="odd">
+<td>silicate::TRI(), TRI0() (CRAN 0.7.1)</td>
+<td>decido</td>
+<td>sf/sp/silicate models (PATH, SC)</td>
+<td>polygon holes via ring structure</td>
+<td>none</td>
+<td>TRI/TRI0 tables (vertex, triangle, object link)</td>
+</tr>
+<tr class="even">
+<td>rgl::triangulate() (CRAN 1.3.36)</td>
+<td>own R/C ear clipping (refs Eberly)</td>
+<td>x,y(,z) polygon, rings separated by NA</td>
+<td>holes and islands by nesting (vertex order ignored)</td>
+<td><code>partial</code> keeps going on failure</td>
+<td>3 x n index matrix</td>
+</tr>
+<tr class="odd">
+<td>tigers::triangulate() (CRAN, GPL-3, Paradis)</td>
+<td>own R implementation, Toussaint (1991)</td>
+<td>x,y of one simple polygon</td>
+<td>none</td>
+<td><code>method</code> 1 or 2</td>
+<td>index matrix</td>
+</tr>
+<tr class="even">
+<td>interleave (CRAN, dcooley)</td>
+<td>earcut.hpp via <code>geometries</code></td>
+<td>internal <code>rcpp_earcut</code></td>
+<td>holes</td>
+<td>none</td>
+<td>used for interleaved vertex buffers, not a user API</td>
+</tr>
+</tbody>
+</table>
+<p>Consumers of decido: silicate, anglr (TRI), raybevel and rayvertex
+(tylermorganwall, 3D extrusion and roofs).</p>
+<h2 id="3-point-delaunay-unconstrained">3. Point Delaunay
+(unconstrained)</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Package::function</th>
+<th>Upstream code</th>
+<th>Algorithm</th>
+<th>Input</th>
+<th>Output control</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>deldir::deldir() (CRAN 2.0-4, GPL)</td>
+<td>own Fortran (Turner)</td>
+<td>incremental, Lee and Schachter's second algorithm</td>
+<td>x, y (z, id carried)</td>
+<td>rectangular window <code>rw</code>, dummy points, <code>eps</code>
+duplicate tolerance</td>
+<td>delsgs/dirsgs segment tables; triang.list(), tile.list()</td>
+</tr>
+<tr class="even">
+<td>interp::tri.mesh() (CRAN 1.1-6, GPL)</td>
+<td>S-hull (Sinclair) in C++, written as a free replacement for
+tripack</td>
+<td>radial sweep then flips</td>
+<td>x, y</td>
+<td><code>duplicate</code>, <code>jitter</code></td>
+<td><code>triSht</code> object; used by interp::interp,
+alphahull::delvor</td>
+</tr>
+<tr class="odd">
+<td>geometry::delaunayn() (CRAN 0.5.2, GPL-3)</td>
+<td>Qhull, vendored</td>
+<td>Quickhull on lifted points, n-D</td>
+<td>n x d matrix</td>
+<td>Qhull option string (<code>"Qt Qbb Qc"</code> etc.)</td>
+<td>index matrix (simplices)</td>
+</tr>
+<tr class="even">
+<td>tessellation::delaunay() (CRAN 2.3.0, GPL-3, S. Laurent)</td>
+<td>Qhull, own C</td>
+<td>Quickhull, 2D/3D/n-D</td>
+<td>matrix</td>
+<td>degenerate handling options</td>
+<td>rich list (simplices, facets, edges), rgl plots</td>
+</tr>
+<tr class="odd">
+<td>rvoronoi::delaunay() (GitHub coolbutuseless, MIT)</td>
+<td>Steven Fortune's C sweepline</td>
+<td>Fortune sweep</td>
+<td>x, y</td>
+<td>none</td>
+<td>triangles, optional polygons and areas</td>
+</tr>
+<tr class="even">
+<td>voronoifortune::voronoi() (CRAN, GPL-3, Paradis)</td>
+<td>port of Fortune's early 1990s C</td>
+<td>Fortune sweep</td>
+<td>coordinate matrix</td>
+<td>none</td>
+<td>Voronoi and Delaunay lists</td>
+</tr>
+<tr class="odd">
+<td>sf::st_triangulate() (CRAN 1.1-3)</td>
+<td>GEOS DelaunayTriangulationBuilder</td>
+<td>incremental quad-edge (upstream docs)</td>
+<td>any sf geometry; uses its vertices only</td>
+<td><code>dTolerance</code> snapping, <code>bOnlyEdges</code></td>
+<td>GEOMETRYCOLLECTION of POLYGON (or MULTILINESTRING)</td>
+</tr>
+<tr class="even">
+<td>geos::geos_delaunay_triangles(), _edges() (CRAN 0.2.5, MIT)</td>
+<td>GEOS</td>
+<td>as above</td>
+<td>any geos/wk geometry</td>
+<td><code>tolerance</code></td>
+<td>geos geometry</td>
+</tr>
+<tr class="odd">
+<td>terra::delaunay() (CRAN 1.9-50)</td>
+<td>GEOS (GEOSDelaunayTriangulation_r)</td>
+<td>as above</td>
+<td>SpatVector</td>
+<td><code>tolerance</code>, <code>as.lines</code></td>
+<td>SpatVector</td>
+</tr>
+<tr class="even">
+<td>spatstat.geom::delaunay()</td>
+<td>deldir</td>
+<td>as deldir</td>
+<td>ppp point pattern</td>
+<td>none</td>
+<td>tess of triangles</td>
+</tr>
+<tr class="odd">
+<td>ggforce geom_delaunay_*</td>
+<td>deldir</td>
+<td>as deldir</td>
+<td>ggplot aesthetics</td>
+<td>none</td>
+<td>ggplot layers</td>
+</tr>
+<tr class="even">
+<td>lasR triangulate() stage (GitHub/r-universe r-lidar)</td>
+<td>Delaunator (C++ port), vendored</td>
+<td>sweep-hull</td>
+<td>LAS/LAZ point clouds in a streaming pipeline</td>
+<td><code>max_edge</code> trims long triangles, <code>filter</code>,
+attribute for z</td>
+<td>2.5D TIN used by DTM/CHM stages, optional file</td>
+</tr>
+<tr class="odd">
+<td>lidR (CRAN 4.3.3) internal C_delaunay / interpolate_delaunay</td>
+<td>boost::polygon Voronoi on integer (scaled) coordinates; a vendored
+incremental Delaunay (hporro, MIT) for spike-free and PTD</td>
+<td>Voronoi dual (exact on integers); incremental</td>
+<td>LAS objects</td>
+<td><code>trim</code> max edge</td>
+<td>used for TIN DTM, CHM, ground classification</td>
+</tr>
+</tbody>
+</table>
+<p>Notes. None of these accept segments. GEOS, terra and sf return
+geometry, not an index, so topology must be rebuilt by matching
+coordinates. deldir and the GEOS family are the de facto point-Delaunay
+engines in the spatial stack; Qhull is the n-D one.</p>
+<h2 id="4-constrained-delaunay-without-refinement">4. Constrained
+Delaunay, without refinement</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Package::function</th>
+<th>Upstream code</th>
+<th>Input</th>
+<th>Constraints</th>
+<th>Holes / outside</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>tripack::tri.mesh() + add.constraint() (CRAN 1.3-9.4, ACM licence,
+non-free)</td>
+<td>Renka TRIPACK, ACM TOMS 751, Fortran</td>
+<td>x, y; constraint curves as closed polygons</td>
+<td>closed constraint curves, region on one side excluded</td>
+<td>by curve orientation</td>
+<td><code>tri</code> object, voronoi.mosaic</td>
+</tr>
+<tr class="even">
+<td>akima (CRAN 0.6-3.6, ACM licence)</td>
+<td>Renka's triangulation inside Akima's ACM 761 Fortran</td>
+<td>x, y, z</td>
+<td>none exposed</td>
+<td>none</td>
+<td>interpolation only, triangulation internal</td>
+</tr>
+<tr class="odd">
+<td>RCDT::delaunay() (CRAN 1.3.0, GPL-3, S. Laurent)</td>
+<td>artem-ogre/CDT (MPL-2.0) via RcppArmadillo</td>
+<td>points matrix, <code>edges</code> 2-col index matrix</td>
+<td>yes, index pairs</td>
+<td>CDT eraseOuterTrianglesAndHoles (parity)</td>
+<td>list: mesh (rgl mesh3d), edges, constraint edges, area</td>
+</tr>
+<tr class="even">
+<td>delaunay::delaunay() (CRAN 2.0.0, GPL-3, S. Laurent)</td>
+<td>CGAL Constrained_Delaunay_triangulation_2 via RcppCGAL; needs gmp,
+mpfr</td>
+<td>points matrix, <code>constraints</code> 2-col index matrix; also
+2.5D (<code>elevation</code>) and 3D</td>
+<td>yes</td>
+<td>CGAL nesting level, odd = inside (parity)</td>
+<td>list with mesh, edges; mesh2d() to rgl</td>
+</tr>
+<tr class="odd">
+<td>sf::st_triangulate_constrained() (GEOS &gt;= 3.10)</td>
+<td>GEOS ConstrainedDelaunayTriangulator: ear clipping then Delaunay
+edge flips (upstream docs)</td>
+<td>POLYGON/MULTIPOLYGON only</td>
+<td>polygon rings only; each polygon on its own</td>
+<td>holes joined to shell; no outside</td>
+<td>GEOMETRYCOLLECTION of triangles</td>
+</tr>
+<tr class="even">
+<td>geos::geos_constrained_delaunay_triangles()</td>
+<td>GEOS, same</td>
+<td>polygons</td>
+<td>as above</td>
+<td>as above</td>
+<td>geos geometry</td>
+</tr>
+<tr class="odd">
+<td>terra::delaunay(constrained = TRUE)</td>
+<td>GEOS, same</td>
+<td>SpatVector polygons</td>
+<td>as above</td>
+<td>as above</td>
+<td>SpatVector</td>
+</tr>
+<tr class="even">
+<td>cgalPolygons (CRAN 0.1.1, GPL-3)
+<code>$convexParts(method = "triangle")</code></td>
+<td>CGAL Polygon_triangulation_decomposition_2</td>
+<td>R6 polygon (with holes)</td>
+<td>polygon boundary</td>
+<td>holes</td>
+<td>list of triangles as coordinate matrices</td>
+</tr>
+<tr class="odd">
+<td>spatstat.geom::triangulate.owin()</td>
+<td>deldir, recursive: Delaunay of window vertices, intersect each
+triangle with the window, recurse on non-triangles</td>
+<td>owin window</td>
+<td>window edges respected by construction</td>
+<td>holes</td>
+<td>tess of triangles</td>
+</tr>
+</tbody>
+</table>
+<p>Notes. GEOS's "constrained" Delaunay is a polygon triangulation (no
+Steiner points, no loose segments, no shared topology between polygons),
+so a coverage is triangulated polygon by polygon and shared edges are
+not matched. RCDT and delaunay are the only CRAN packages that take an
+arbitrary segment index (a PSLG) without refinement. Both decide inside
+and outside by parity.</p>
+<h2
+id="5-quality-meshing-constrained--conforming-delaunay-with-refinement">5.
+Quality meshing (constrained / conforming Delaunay with refinement)</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Package::function</th>
+<th>Upstream code</th>
+<th>Input</th>
+<th>Constraints</th>
+<th>Output control</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>RTriangle::pslg() + triangulate() (CRAN 1.6-0.15, CC BY-NC-SA,
+Sterratt)</td>
+<td>Shewchuk Triangle 1.6, vendored</td>
+<td><code>pslg(P, PB, PA, S, SB, H)</code>: points, boundary markers,
+point attributes, segments, hole seed points</td>
+<td>segments; crossing segments are split</td>
+<td><code>a</code> max area, <code>q</code> min angle, <code>Y</code> no
+Steiner on boundary, <code>j</code> jettison unused, <code>D</code>
+conforming Delaunay, <code>S</code> max Steiner</td>
+<td><code>triangulation</code> list: P, T, S, E, PB, PA, EB, neighbours;
+attributes interpolated onto Steiner points</td>
+</tr>
+<tr class="even">
+<td>fdaPDE::create.mesh.2D(), refine.mesh.2D() (CRAN 1.1-24, GPL-3)</td>
+<td>Triangle, vendored in src/C_Libraries (licence of triangle.c still
+non-commercial)</td>
+<td>nodes, nodesattributes, segments, holes</td>
+<td>segments</td>
+<td><code>minimum_angle</code>, <code>maximum_area</code>,
+<code>delaunay</code>; quadratic elements (<code>order = 2</code>)</td>
+<td>mesh.2D object for FEM</td>
+</tr>
+<tr class="odd">
+<td>sfdct::ct_triangulate() (GitHub/r-universe hypertidy, archived from
+CRAN)</td>
+<td>RTriangle</td>
+<td>sf / sfc / sfg</td>
+<td>polygon and line edges</td>
+<td><code>trim</code>, plus RTriangle <code>a</code>, <code>q</code>,
+... via <code>...</code></td>
+<td>sf GEOMETRYCOLLECTIONs of triangles</td>
+</tr>
+<tr class="even">
+<td>anglr::DEL(), DEL0() (GitHub/r-universe, archived from CRAN)</td>
+<td>RTriangle (cdtr backend on a parked branch)</td>
+<td>sf/sp/silicate</td>
+<td>segments from paths</td>
+<td><code>max_area</code></td>
+<td>DEL/DEL0 relational tables, plot3d/mesh3d</td>
+</tr>
+<tr class="odd">
+<td>retistruct (davidcsterratt)</td>
+<td>RTriangle</td>
+<td>its own outline objects</td>
+<td>outline</td>
+<td>area/angle</td>
+<td>internal (RTriangle was split out of this package)</td>
+</tr>
+<tr class="even">
+<td>fmesher::fm_mesh_2d(), fm_rcdt_2d() (CRAN 0.8.0, MPL-2.0,
+Lindgren)</td>
+<td>own C++ (ex-INLA), after Hjelle and Daehlen, Triangulations and
+Applications (2006)</td>
+<td>loc matrix, sf/sp, fm_segm boundary and interior segments, crs</td>
+<td>boundary and interior segments</td>
+<td><code>max.edge</code> (inner, outer), <code>min.angle</code>,
+<code>cutoff</code> (merge near points), <code>offset</code> (extension
+zone), <code>max.n</code>, <code>quality.spec</code> per vertex,
+<code>globe</code>/sphere meshes, <code>lattice</code></td>
+<td>fm_mesh_2d with vertex/triangle tables, crs, FEM matrices</td>
+</tr>
+<tr class="odd">
+<td>tulpaMesh::tulpa_mesh(), refine_mesh() (CRAN 0.1.3, MIT,
+Colling)</td>
+<td>artem-ogre/CDT plus its own Ruppert refinement with off-centres
+(Ungor 2009) in mesh.cpp</td>
+<td>coords matrix/data.frame/formula; boundary as matrix or sf
+polygon</td>
+<td>boundary</td>
+<td><code>max_edge</code> (inner, outer), <code>cutoff</code>,
+<code>extend</code>, <code>min_angle</code>, <code>max_area</code>,
+<code>max_steiner</code>; adaptive refine by indicator</td>
+<td>tulpa_mesh with FEM matrices; sphere by icosahedral subdivision; 1D
+and graph meshes</td>
+</tr>
+<tr class="even">
+<td>geometry::distmesh2d(), distmeshnd()</td>
+<td>own R port of Persson and Strang DistMesh, Qhull per iteration</td>
+<td>signed distance fn <code>fd</code>, size fn <code>fh</code>,
+<code>h0</code>, bbox, fixed points <code>pfix</code></td>
+<td>domain via distance function; fixed points only, no exact
+segments</td>
+<td>element size function, tolerances, iterations</td>
+<td>points and triangle index matrix</td>
+</tr>
+</tbody>
+</table>
+<p>Notes. Triangle is the reference implementation of Ruppert/Chew
+refinement and is behind every mature 2D quality mesher in R except
+fmesher and tulpaMesh; its licence forbids commercial use, which is why
+anglr, sfdct and RTriangle carry CC BY-NC-SA. fmesher is the most
+capable CRAN option for statistical (SPDE) meshes: two-zone sizing,
+near-point merging, sphere meshes, CRS awareness. tulpaMesh is new
+(2026) and is the nearest relative of cdtr: same CDT library, with
+refinement written on top of it rather than using CDT's own.</p>
+<h2 id="6-terrain-and-raster-derived-tins">6. Terrain and raster-derived
+TINs</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Package::function</th>
+<th>Upstream code</th>
+<th>Algorithm</th>
+<th>Input</th>
+<th>Output control</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>terrainmeshr::triangulate_matrix() (CRAN 1.0.1, MIT)</td>
+<td>Fogleman's hmm (C++)</td>
+<td>Garland and Heckbert greedy insertion, Delaunay</td>
+<td>height matrix</td>
+<td>max error, max triangles</td>
+<td>triangle vertex table</td>
+</tr>
+<tr class="even">
+<td>lasR, lidR</td>
+<td>see section 3</td>
+<td>point Delaunay with max-edge trim</td>
+<td>point clouds</td>
+<td><code>max_edge</code></td>
+<td>rasters derived from TIN</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7-this-projects-packages-for-comparison">7. This project's
+packages, for comparison</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Package</th>
+<th>Upstream code</th>
+<th>Algorithm</th>
+<th>Input</th>
+<th>Constraints</th>
+<th>Output control</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>cdtr (hypertidy/cdtr, branch cpp11)</td>
+<td>artem-ogre/CDT (MPL-2.0) via cpp11</td>
+<td>CDT, conforming mode, CDT's own refinement (one criterion per
+pass)</td>
+<td>x, y, s0, s1 index vectors; <code>cdt_pslg()</code> from RTriangle
+pslg</td>
+<td>segments, crossings resolved</td>
+<td><code>max_area</code>, <code>min_angle</code>,
+<code>max_steiner</code>, data-driven <code>min_edge_length</code>;
+<code>unrefined</code> report; attributes on Steiner vertices</td>
+<td>contract tables: vertices with origin, triangles with depth,
+segments</td>
+</tr>
+<tr class="even">
+<td>trowel (hypertidy/trowel)</td>
+<td>spade 2.15 (Rust, MIT/Apache) via extendr</td>
+<td>live CDT handle; insert and remove points and segments; spade
+refinement</td>
+<td>same tables, incremental</td>
+<td>segments, crossings spliced into chains</td>
+<td><code>min_angle</code>, <code>max_area</code>,
+<code>max_steiner</code></td>
+<td>same tables, stable ids across edits</td>
+</tr>
+<tr class="odd">
+<td>laridae (hypertidy/laridae, off CRAN by decision)</td>
+<td>CGAL Constrained_triangulation_plus_2 + Delaunay_mesher_2 via
+cpp11</td>
+<td>fully dynamic CDT with exact predicates; Delaunay mesher with seeds
+and stepping</td>
+<td>x, y, s0, s1, PA; lari_add_points/segments</td>
+<td>segments, crossings exact</td>
+<td><code>min_angle</code>, <code>max_area</code>,
+<code>min_edge_length</code>, sizing function or grid
+(<code>size_fun</code>, <code>grid_x/y/z</code>), seeds,
+<code>max_steiner</code>, <code>lari_step()</code></td>
+<td>same tables, <code>lari_depth()</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-lineage-which-upstream-library-sits-under-which-package">8.
+Lineage: which upstream library sits under which package</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Upstream library (language, licence)</th>
+<th>Algorithm class</th>
+<th>R packages using it</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Shewchuk Triangle (C, non-commercial)</td>
+<td>CDT, conforming, Ruppert/Chew refinement</td>
+<td>RTriangle, fdaPDE (vendored), via RTriangle: sfdct, anglr,
+retistruct</td>
+</tr>
+<tr class="even">
+<td>artem-ogre/CDT (C++, MPL-2.0)</td>
+<td>CDT, conforming, simple refinement</td>
+<td>RCDT, tulpaMesh, cdtr</td>
+</tr>
+<tr class="odd">
+<td>CGAL (C++, GPL/LGPL parts)</td>
+<td>CDT, dynamic CDT, Delaunay mesher, decomposition</td>
+<td>delaunay, cgalPolygons, laridae (also raybevel for straight
+skeletons; RcppCGAL ships headers)</td>
+</tr>
+<tr class="even">
+<td>spade (Rust, MIT/Apache)</td>
+<td>dynamic CDT, refinement</td>
+<td>trowel</td>
+</tr>
+<tr class="odd">
+<td>fmesher core (C++, MPL-2.0)</td>
+<td>CDT with refinement, sphere</td>
+<td>fmesher, and through it INLA, inlabru, sdmTMB and other SPDE
+users</td>
+</tr>
+<tr class="even">
+<td>GEOS (C++, LGPL)</td>
+<td>point Delaunay (quad-edge), polygon CDT (ear clip + flip)</td>
+<td>sf, geos, terra</td>
+</tr>
+<tr class="odd">
+<td>Qhull (C)</td>
+<td>Quickhull, n-D Delaunay</td>
+<td>geometry, tessellation</td>
+</tr>
+<tr class="even">
+<td>mapbox earcut (C++ / JS, ISC)</td>
+<td>ear cutting</td>
+<td>decido, interleave (via geometries), rearcut; via decido: silicate,
+anglr, raybevel</td>
+</tr>
+<tr class="odd">
+<td>Renka TRIPACK / Akima (Fortran, ACM licence)</td>
+<td>incremental Delaunay, constraint curves</td>
+<td>tripack, akima</td>
+</tr>
+<tr class="even">
+<td>S-hull (Sinclair)</td>
+<td>radial sweep Delaunay</td>
+<td>interp, and through it alphahull</td>
+</tr>
+<tr class="odd">
+<td>Turner's deldir (Fortran)</td>
+<td>Lee-Schachter incremental</td>
+<td>deldir, spatstat.geom, ggforce, interp (imports)</td>
+</tr>
+<tr class="even">
+<td>Fortune sweepline (C)</td>
+<td>Voronoi / Delaunay</td>
+<td>rvoronoi, voronoifortune</td>
+</tr>
+<tr class="odd">
+<td>Delaunator (C++ port)</td>
+<td>sweep-hull Delaunay</td>
+<td>lasR</td>
+</tr>
+<tr class="even">
+<td>boost::polygon (C++, BSL)</td>
+<td>exact integer Voronoi</td>
+<td>lidR</td>
+</tr>
+<tr class="odd">
+<td>hmm (C++, MIT)</td>
+<td>greedy-insertion TIN</td>
+<td>terrainmeshr</td>
+</tr>
+<tr class="even">
+<td>own code</td>
+<td>various</td>
+<td>rgl (ear clipping), tigers (ear clipping), geometry::distmesh2d
+(DistMesh)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-capability-matrix-against-the-project-contract">9. Capability
+matrix against the project contract</h2>
+<p>Contract (from state-of-three.md): vertex and segment tables in;
+vertex (with origin), triangle (with depth) and segment tables out;
+refinement by min angle, max area, Steiner budget and edge floor,
+reporting what was not done; attributes interpolated onto new
+vertices.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Capability</th>
+<th>Who has it</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Arbitrary PSLG (index segments, not just rings)</td>
+<td>RTriangle, fdaPDE, RCDT, delaunay, fmesher, tulpaMesh (boundary
+only), cdtr, trowel, laridae</td>
+</tr>
+<tr class="even">
+<td>Crossing segments resolved by inserting intersection vertices</td>
+<td>RTriangle, CDT-based (RCDT, tulpaMesh, cdtr), CGAL plus (laridae),
+spade (trowel). Not GEOS (polygons must be valid)</td>
+</tr>
+<tr class="odd">
+<td>Steiner points for quality (angle/area)</td>
+<td>RTriangle, fdaPDE, fmesher, tulpaMesh, cdtr, trowel, laridae</td>
+</tr>
+<tr class="even">
+<td>Steiner budget</td>
+<td>RTriangle (<code>S</code>), tulpaMesh, cdtr, trowel, laridae;
+fmesher has <code>max.n</code></td>
+</tr>
+<tr class="odd">
+<td>Size as a function of position</td>
+<td>laridae (size_fun / grid), fmesher (per-vertex quality.spec,
+inner/outer max.edge), geometry::distmesh2d (<code>fh</code>), tulpaMesh
+(indicator-driven refine_mesh)</td>
+</tr>
+<tr class="even">
+<td>Attributes interpolated onto new vertices</td>
+<td>RTriangle (PA), fdaPDE (nodesattributes), cdtr, trowel, laridae</td>
+</tr>
+<tr class="odd">
+<td>Inside/outside by depth rather than parity or seeds</td>
+<td>cdtr, trowel, laridae only. Others: hole seed points (Triangle,
+fdaPDE), parity (RCDT, delaunay), nesting by orientation (rgl, decido,
+GEOS)</td>
+</tr>
+<tr class="even">
+<td>Origin of each vertex (input / crossing / Steiner)</td>
+<td>cdtr, trowel, laridae. RTriangle exposes it only indirectly (vertex
+index beyond input count, boundary markers)</td>
+</tr>
+<tr class="odd">
+<td>Report of what refinement could not do</td>
+<td>cdtr (<code>unrefined</code>), laridae; Triangle silently stops</td>
+</tr>
+<tr class="even">
+<td>Incremental editing (insert/remove after build)</td>
+<td>trowel, laridae. Nothing on CRAN</td>
+</tr>
+<tr class="odd">
+<td>Sphere</td>
+<td>fmesher (globe, S2 meshes), tulpaMesh (icosahedral)</td>
+</tr>
+<tr class="even">
+<td>Works from sf directly</td>
+<td>sf, geos, terra (GEOS family), fmesher, tulpaMesh (boundary), sfdct,
+anglr, silicate</td>
+</tr>
+<tr class="odd">
+<td>Exact predicates</td>
+<td>CGAL (delaunay, laridae), CDT uses robust predicates (Lenthe), spade
+robust, Triangle adaptive exact predicates, boost::polygon exact on
+integers</td>
+</tr>
+</tbody>
+</table>
+<h2 id="10-observations-for-this-project">10. Observations for this
+project</h2>
+<ol type="1">
+<li>Licence is the main reason RTriangle is not the answer: everything
+that wants Ruppert refinement on CRAN without a non-commercial clause
+today goes through fmesher or tulpaMesh. cdtr, trowel and laridae close
+that gap with segment-level control those two do not offer (they are
+aimed at SPDE meshes, with a boundary and points, not a general PSLG
+with provenance).</li>
+<li>tulpaMesh is worth reading before improving cdtr's refinement: it
+runs its own Ruppert-with-off-centres loop over CDT (src/mesh.cpp,
+<code>cpp_ruppert_refine</code>) instead of CDT's one-criterion-per-call
+refinement, which is the combined angle+area criterion that
+state-of-three.md lists as an upstream wish for CDT.</li>
+<li>Every other library decides inside/outside by parity, seeds or ring
+orientation. Depth as a topological count is unique to this project's
+three packages, and is the reason a coverage (shared boundaries) works
+here and not elsewhere (GEOS triangulates each polygon alone; RCDT and
+delaunay use parity, which by state-of-three.md lesson 4 cannot express
+a coverage; inferred, not run).</li>
+<li>Nothing on CRAN offers a persistent, editable triangulation; trowel
+and laridae are alone in that.</li>
+<li>The GEOS functions are commonly mistaken for general constrained
+Delaunay. They are polygon triangulations without Steiner points, a
+useful baseline for the harness (trianglewins) alongside decido.</li>
+<li>For harness breadth, the cheap additions are RCDT and delaunay (same
+PSLG input shape, no refinement), fmesher and tulpaMesh (refinement,
+different controls), and sf::st_triangulate_constrained as the polygon
+baseline.</li>
+</ol>
+<h2 id="11-out-of-scope-but-adjacent">11. Out of scope but adjacent</h2>
+<ul>
+<li>3D surface and volume meshes: Rvcg (VCGlib), cgalMeshes (CGAL), TDA
+(alpha complexes via GUDHI/CGAL), alphashape3d (geometry/Qhull).</li>
+<li>Alpha shapes and hulls built on Delaunay: alphahull (interp),
+concaveman.</li>
+<li>External programs: RSAGA (SAGA), fasterRaster (GRASS v.delaunay),
+qgisprocess (QGIS algorithms).</li>
+<li>rgeos::gDelaunayTriangulation (GEOS) retired from CRAN in 2023; sf,
+geos and terra replace it.</li>
+<li>Packages that only consume a mesh (INLA, inlabru, sdmTMB, stelfi,
+sspm, rayrender, rayvertex) are not listed separately; their engine is
+named in the lineage table.</li>
+</ul>
+<h2 id="method">Method</h2>
+<p>Package metadata and function signatures read from the CRAN mirrors
+at github.com/cran/<pkg> and from GitHub repos (hypertidy/rearcut,
+silicate, anglr, cdtr, trowel; coolbutuseless/rvoronoi;
+emmanuelparadis/voronoifortune, tigers; r-lidar/lasR) on 6 October 2026;
+package discovery via the r-universe search API ("triangulation",
+"delaunay", "earcut") and web search. Algorithm attributions come from
+the packages' DESCRIPTION, Rd references and vendored source headers,
+except the GEOS internals, marked (upstream docs). No package was run
+for this survey; measured behaviour is in the trianglewins harness.</p>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>

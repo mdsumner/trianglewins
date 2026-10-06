@@ -1,4 +1,4 @@
-## Build docs/index.html (the GitHub Pages site) from bench/results/bench.csv
+## Build docs/bench/index.html (the GitHub Pages site) from bench/results/bench.csv
 ## and bench/results/datasets.csv. Charts are drawn in the page by a small
 ## inline script from the embedded rows; no external libraries.
 ##   Rscript bench/site.R
@@ -19,7 +19,7 @@ html <- sub("__DATASETS__", json_ds, html, fixed = TRUE)
 findings <- if (file.exists("bench/findings.html")) readLines("bench/findings.html") else "<li>Run in progress.</li>"
 html <- sub("__FINDINGS__", paste(findings, collapse = "\n"), html, fixed = TRUE)
 html <- sub("__META__", paste(meta, collapse = "\n"), html, fixed = TRUE)
-dir.create("docs", showWarnings = FALSE)
-writeLines(html, "docs/index.html")
+dir.create("docs/bench", recursive = TRUE, showWarnings = FALSE)
+writeLines(html, "docs/bench/index.html")
 file.create("docs/.nojekyll")
-cat("wrote docs/index.html\n")
+cat("wrote docs/bench/index.html\n")
