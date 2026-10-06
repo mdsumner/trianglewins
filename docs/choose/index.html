@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choosing a triangulation package</title>
+<meta name="description" content="Which R package to try for each kind of triangulation problem, CRAN first.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--grid); min-width: 9em; }
+th:first-child, td:first-child { min-width: 13em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../">trianglewins</a> / choosing a package</p>
+<h1 id="choosing-a-triangulation-package-in-r">Choosing a triangulation
+package in R</h1>
+<p>6 October 2026. A guide for R users who need triangles and want to
+know what to try first. It is organised by the problem you are solving,
+not by package. Within each problem, CRAN packages come first, marked
+<strong>[CRAN]</strong>; packages installed from GitHub or r-universe
+follow, marked <strong>[GitHub]</strong>. CRAN is the first choice
+because it installs everywhere with <code>install.packages()</code> and
+is checked against current R, but several problems (editing a mesh,
+refinement with a free licence for a general segment set) are only
+solved off CRAN today.</p>
+<p>The detail behind every claim (algorithm, upstream library,
+arguments) is in the <a href="../survey/">survey</a>, and measured times
+are in the <a href="../bench/">benchmark</a>.</p>
+<h2 id="quick-answers">Quick answers</h2>
+<table>
+<thead>
+<tr class="header">
+<th>You want to</th>
+<th>Try first [CRAN]</th>
+<th>Also consider</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Fill polygons with triangles for drawing (rgl, WebGL, 3D)</td>
+<td>decido</td>
+<td>rgl::triangulate, sf::st_triangulate_constrained</td>
+</tr>
+<tr class="even">
+<td>Delaunay triangles or edges of a point set</td>
+<td>deldir</td>
+<td>geometry (big or n-D), interp, sf / terra / geos / gdalraster for
+spatial objects</td>
+</tr>
+<tr class="odd">
+<td>Interpolate scattered values linearly</td>
+<td>interp</td>
+<td>geometry::tsearch, lidR / lasR for point clouds</td>
+</tr>
+<tr class="even">
+<td>A TIN from a height grid</td>
+<td>terrainmeshr</td>
+<td>lidR / lasR from LiDAR points</td>
+</tr>
+<tr class="odd">
+<td>A mesh for a statistical model (SPDE, INLA, TMB)</td>
+<td>fmesher</td>
+<td>tulpaMesh</td>
+</tr>
+<tr class="even">
+<td>A mesh for finite elements on a polygon</td>
+<td>fmesher, fdaPDE</td>
+<td>RTriangle, tulpaMesh</td>
+</tr>
+<tr class="odd">
+<td>Triangulate polygons, lines and points with every segment kept</td>
+<td>RCDT</td>
+<td>RTriangle (refinement, non-commercial licence), delaunay (CGAL);
+[GitHub] cdtr</td>
+</tr>
+<tr class="even">
+<td>Good-shaped triangles (min angle, max area) on a general segment
+set</td>
+<td>RTriangle</td>
+<td>[GitHub] cdtr, laridae, trowel</td>
+</tr>
+<tr class="odd">
+<td>Mesh density that varies over space</td>
+<td>fmesher</td>
+<td>geometry::distmesh2d; [GitHub] laridae</td>
+</tr>
+<tr class="even">
+<td>Add or remove points and segments after building</td>
+<td>nothing on CRAN</td>
+<td>[GitHub] trowel, laridae</td>
+</tr>
+<tr class="odd">
+<td>A mesh on the sphere</td>
+<td>fmesher</td>
+<td>tulpaMesh</td>
+</tr>
+<tr class="even">
+<td>Delaunay in 3D or higher</td>
+<td>geometry, tessellation</td>
+<td>delaunay (3D, CGAL)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="1-drawing-polygons-fill-them-with-triangles">1. Drawing
+polygons: fill them with triangles</h2>
+<p>You have polygons (with holes) and need triangles to render them:
+rgl, rayrender, a WebGL or deck.gl layer, an extruded 3D model. Extra
+vertices are unwelcome and triangle shape does not matter.</p>
+<ul>
+<li><strong>decido [CRAN]</strong>: <code>earcut(xy, holes)</code>.
+Mapbox's ear-cutting library; very fast, no dependencies, returns vertex
+indices so the triangles share your original coordinates. One polygon
+(with its holes) per call. Used by silicate, anglr and raybevel.</li>
+<li><strong>rgl::triangulate() [CRAN]</strong>: ear clipping with rings
+separated by NA; works out holes and islands from nesting, so ring order
+and direction do not matter. Good when you are already in rgl.</li>
+<li><strong>sf::st_triangulate_constrained() [CRAN]</strong> (also geos,
+terra with <code>constrained = TRUE</code>, gdalraster): GEOS ear
+clipping followed by Delaunay flips, so triangles are better shaped than
+plain ear cutting. Returns triangle polygons, not indices, so you
+rebuild the index by matching coordinates. Needs GEOS 3.10 or
+later.</li>
+<li><strong>silicate::TRI() [CRAN]</strong>: decido applied to every
+feature of an sf object, returning shared vertex and triangle
+tables.</li>
+</ul>
+<p>Why not Delaunay here: a point Delaunay ignores the polygon edges,
+and a constrained Delaunay mesher is more than you need unless you also
+want good-shaped triangles.</p>
+<h2 id="2-points-to-triangles-neighbours-graphs-voronoi">2. Points to
+triangles: neighbours, graphs, Voronoi</h2>
+<p>You have points and want the Delaunay triangulation (or its edges, or
+the dual Voronoi tiles) for neighbour graphs, spatial statistics,
+natural neighbour ideas or plotting.</p>
+<ul>
+<li><strong>deldir [CRAN]</strong>: the standard. Pure Fortran, no
+system dependencies; triangles, Voronoi (Dirichlet) tiles, clipping to a
+rectangle, tile summaries. Used by spatstat and ggforce, so the answers
+agree with those.</li>
+<li><strong>geometry::delaunayn() [CRAN]</strong>: Qhull. Fast on large
+point sets and the one to use in 3 or more dimensions. Returns an index
+matrix. tessellation (also Qhull) adds richer output and plotting.</li>
+<li><strong>interp::tri.mesh() [CRAN]</strong>: S-hull, free licence;
+pairs with interp's interpolation functions.</li>
+<li><strong>sf::st_triangulate(), terra::delaunay(),
+geos::geos_delaunay_triangles(), gdalraster::g_delaunay_triangulation()
+[CRAN]</strong>: all GEOS. Use whichever matches the objects you already
+have (sf, SpatVector, geos, WKB). Output is geometry, not an index.</li>
+<li><strong>spatstat.geom::delaunay() [CRAN]</strong>: deldir, for ppp
+point patterns.</li>
+<li><strong>voronoifortune [CRAN]</strong>, <strong>rvoronoi
+[GitHub]</strong>: Fortune's sweepline, when Voronoi is what you mainly
+want.</li>
+</ul>
+<p>Duplicates: deldir drops duplicated points (and reports which were
+kept), interp has <code>duplicate =</code>, Qhull merges them by option;
+check what your package does before counting triangles.</p>
+<h2 id="3-interpolating-scattered-values">3. Interpolating scattered
+values</h2>
+<p>You have values at irregular points and want a surface (linear on
+triangles).</p>
+<ul>
+<li><strong>interp::interp() [CRAN]</strong>: linear and Akima spline
+interpolation on a Delaunay triangulation, under a free licence. Prefer
+it to akima and tripack, whose ACM licence is not free.</li>
+<li><strong>geometry::tsearch() [CRAN]</strong>: finds the containing
+triangle and barycentric weights for query points, if you want to do the
+interpolation yourself from geometry::delaunayn().</li>
+<li><strong>lidR [CRAN]</strong> and <strong>lasR [GitHub,
+r-universe]</strong>: for LiDAR. Both build a Delaunay TIN of ground
+points (with a maximum edge to trim the hull) and rasterise it into a
+DTM or canopy model; lasR streams large collections of tiles.</li>
+<li>RTriangle and the [GitHub] mesh packages (cdtr, trowel, laridae)
+carry point attributes onto any new vertices, which helps when the mesh
+has been refined and you still need values at every vertex.</li>
+</ul>
+<h2 id="4-a-tin-from-a-raster">4. A TIN from a raster</h2>
+<ul>
+<li><strong>terrainmeshr [CRAN]</strong>: Garland and Heckbert greedy
+insertion; adds vertices where the error is largest until a tolerance or
+a triangle budget is met.</li>
+<li>For point clouds rather than grids, see lidR and lasR above.</li>
+</ul>
+<h2 id="5-a-mesh-for-a-spatial-statistical-model">5. A mesh for a
+spatial statistical model</h2>
+<p>You are fitting an SPDE model (INLA, inlabru, sdmTMB, tulpa) and need
+a mesh covering the data with a buffer.</p>
+<ul>
+<li><strong>fmesher [CRAN]</strong>: the default and the most complete.
+<code>fm_mesh_2d()</code> takes points, sf or sp boundaries and interior
+segments, with <code>max.edge = c(inner, outer)</code> for a fine study
+area and coarse buffer, <code>cutoff</code> to merge near points,
+<code>min.angle</code>, and meshes on the sphere. Free licence
+(MPL-2.0), no system dependencies. Use it when INLA or inlabru is your
+model engine, since they expect its mesh objects.</li>
+<li><strong>tulpaMesh [CRAN]</strong>: newer (2026), on the CDT library
+with its own Ruppert refinement; similar controls
+(<code>max_edge</code>, <code>cutoff</code>, <code>min_angle</code>,
+<code>max_area</code>, <code>max_steiner</code>), sf boundaries,
+adaptive refinement from an indicator, sphere meshes, and finite element
+matrices. Worth trying if you are not tied to INLA.</li>
+</ul>
+<h2 id="6-a-mesh-for-finite-elements-on-a-domain">6. A mesh for finite
+elements on a domain</h2>
+<p>You have a polygonal domain (with holes, maybe internal boundaries)
+and want well-shaped triangles to solve a PDE.</p>
+<ul>
+<li><strong>fmesher [CRAN]</strong>: as above; it also computes FEM
+matrices.</li>
+<li><strong>fdaPDE [CRAN]</strong>:
+<code>create.mesh.2D(nodes, segments, holes)</code> and
+<code>refine.mesh.2D(minimum_angle, maximum_area)</code>. Use it if
+fdaPDE is your solver. Its mesher is a copy of Triangle.</li>
+<li><strong>RTriangle [CRAN]</strong>: Shewchuk's Triangle, the
+reference quality mesher (minimum angle <code>q</code>, maximum area
+<code>a</code>, conforming Delaunay <code>D</code>, Steiner limit
+<code>S</code>, holes, boundary markers, attributes). Its licence
+forbids commercial use (CC BY-NC-SA).</li>
+<li><strong>geometry::distmesh2d() [CRAN]</strong>: DistMesh. Describe
+the domain by a signed distance function and the size by a function;
+produces very even meshes on smooth domains. No exact boundary segments,
+so not for data with fixed edges.</li>
+<li><strong>tulpaMesh [CRAN]</strong>: as above.</li>
+</ul>
+<h2
+id="7-triangulating-polygons-lines-and-points-together-keeping-every-edge">7.
+Triangulating polygons, lines and points together, keeping every
+edge</h2>
+<p>You have a planar straight-line graph: polygon boundaries, perhaps
+shared between neighbours (a coverage), contour lines, roads, sample
+points. You want triangles whose edges include every input segment, and
+you want to know which triangle lies in which polygon.</p>
+<ul>
+<li><strong>RCDT [CRAN]</strong>: the CDT library; points plus an index
+matrix of edges, crossing edges handled, outside and holes removed by
+parity. No refinement. Free licence, no system dependencies. The
+simplest correct CRAN choice for a constrained triangulation without new
+points.</li>
+<li><strong>RTriangle [CRAN]</strong>: the same, plus refinement, plus
+attributes; holes must be given as seed points. Refuses duplicated
+vertices, so merge shared vertices first. Non-commercial licence.</li>
+<li><strong>delaunay [CRAN]</strong>: CGAL's constrained Delaunay; needs
+the gmp and mpfr system libraries. Inside and outside by nesting
+parity.</li>
+<li><strong>sf::st_triangulate_constrained() [CRAN]</strong> and the
+other GEOS interfaces: only for valid polygons, one polygon at a time;
+shared edges between neighbours are not matched and loose lines and
+points are not allowed.</li>
+<li><strong>cdtr [GitHub]</strong>
+(<code>remotes::install_github("hypertidy/cdtr@cpp11")</code>): CDT with
+refinement and the same vertex/segment/triangle tables in and out, a
+depth for every triangle (how many boundaries lie between it and the
+outside), the origin of every vertex, and attribute interpolation. No
+system dependencies. Use it when you need to know where each triangle
+sits in a coverage, or need refinement without Triangle's licence.</li>
+<li><strong>sfdct, anglr [GitHub]</strong>: convenience wrappers that
+take sf objects to RTriangle; same licence.</li>
+</ul>
+<p>Parity versus depth: parity (odd inside, even outside) works for
+nested rings but not for a coverage of neighbouring polygons. If your
+input is a coverage, use cdtr, trowel or laridae, or label triangles
+yourself with a point-in-polygon test of each centroid.</p>
+<h2 id="8-good-shaped-triangles-on-a-general-segment-set">8. Good-shaped
+triangles on a general segment set</h2>
+<p>Quality refinement (a minimum angle, a maximum area) on arbitrary
+constraints, not just a domain boundary.</p>
+<ul>
+<li><strong>RTriangle [CRAN]</strong>: fastest and most mature; licence
+permitting, start here. It may stop short of the angle bound on
+intricate coastlines without telling you.</li>
+<li><strong>fmesher, tulpaMesh [CRAN]</strong>: if your constraints fit
+their model (boundary plus interior segments) and their controls.</li>
+<li><strong>cdtr [GitHub]</strong>: refinement by area and angle with a
+Steiner budget and an edge-length floor, and a report of what it could
+not refine.</li>
+<li><strong>laridae [GitHub]</strong>: CGAL's mesher, with exact
+arithmetic, seeds, and refinement one step at a time. Needs CGAL 6
+headers. GPL.</li>
+<li><strong>trowel [GitHub]</strong>: spade (Rust) refinement on a live
+mesh; needs a Rust toolchain.</li>
+</ul>
+<h2 id="9-mesh-density-that-varies-over-space">9. Mesh density that
+varies over space</h2>
+<ul>
+<li><strong>fmesher [CRAN]</strong>: two zones (inner, outer) via
+<code>max.edge</code>, and per vertex control through
+<code>quality.spec</code>.</li>
+<li><strong>geometry::distmesh2d() [CRAN]</strong>: any size function
+<code>fh(p)</code>.</li>
+<li><strong>tulpaMesh [CRAN]</strong>: adaptive refinement from a
+per-triangle indicator (for example a model's error).</li>
+<li><strong>laridae [GitHub]</strong>: a sizing field as an R function
+of position or as a grid, for example finer triangles where a raster is
+steep.</li>
+</ul>
+<h2 id="10-editing-a-mesh-after-it-is-built">10. Editing a mesh after it
+is built</h2>
+<p>Adding a point, a segment, or removing them, without starting over
+(an interactive tool, a simulation that moves a boundary, streaming
+data).</p>
+<ul>
+<li>Nothing on CRAN keeps a mesh you can edit. With any CRAN package you
+rebuild from scratch; that is fine for small inputs.</li>
+<li><strong>trowel [GitHub]</strong>: a persistent mesh with stable
+vertex and segment ids across insertions and removals; inserting into a
+100 thousand vertex mesh takes tens of microseconds. Needs Rust.</li>
+<li><strong>laridae [GitHub]</strong>: CGAL's fully dynamic constrained
+triangulation, the same operations with exact crossings; on the
+benchmark, 1000 points were added to a world-scale mesh in 0.09 s,
+against 44 to 49 s to rebuild.</li>
+</ul>
+<h2 id="11-the-sphere-and-higher-dimensions">11. The sphere, and higher
+dimensions</h2>
+<ul>
+<li>On the sphere: <strong>fmesher [CRAN]</strong> (globe and S2 meshes)
+and <strong>tulpaMesh [CRAN]</strong> (icosahedral subdivision).
+Everything else here is planar, so project your data first.</li>
+<li>3D and higher Delaunay: <strong>geometry [CRAN]</strong> and
+<strong>tessellation [CRAN]</strong> (Qhull, any dimension),
+<strong>delaunay [CRAN]</strong> (CGAL, 3D and 2.5D).</li>
+<li>Surfaces and volumes (remeshing, alpha shapes): Rvcg, cgalMeshes,
+alphashape3d, TDA [CRAN]; these are outside this guide.</li>
+</ul>
+<h2 id="things-that-decide-the-choice-before-the-algorithm-does">Things
+that decide the choice before the algorithm does</h2>
+<ul>
+<li><strong>Licence.</strong> RTriangle, fdaPDE's mesher, sfdct and
+anglr carry Triangle's non-commercial terms. tripack and akima are under
+the ACM licence (not free); interp replaces both. Everything else named
+here is GPL, LGPL, MIT or MPL.</li>
+<li><strong>Installation.</strong> No system dependencies: decido,
+deldir, geometry, interp, RCDT, fmesher, tulpaMesh, RTriangle,
+terrainmeshr, cdtr. GDAL and GEOS: sf, terra, gdalraster (geos instead
+bundles GEOS through the libgeos package). gmp and mpfr: delaunay,
+cgalPolygons. Rust toolchain: trowel. CGAL 6 headers: laridae.</li>
+<li><strong>Index or geometry out.</strong> The GEOS family returns
+triangle polygons. Everything else returns vertex indices, which you
+need for meshes, graphs, interpolation and rendering.</li>
+<li><strong>Duplicates and crossings.</strong> RTriangle refuses
+duplicated vertices; CDT packages (RCDT, cdtr) and CGAL (delaunay,
+laridae) split crossing segments at their intersection; GEOS needs valid
+polygons.</li>
+<li><strong>Inside and outside.</strong> Ear cutting and GEOS work from
+ring nesting; RTriangle and fdaPDE need hole seed points; RCDT and
+delaunay use parity; cdtr, trowel and laridae report depth and leave the
+choice to you.</li>
+</ul>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>

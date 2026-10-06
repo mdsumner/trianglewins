@@ -75,6 +75,7 @@ Consumers of decido: silicate, anglr (TRI), raybevel and rayvertex
 | sf::st_triangulate() (CRAN 1.1-3) | GEOS DelaunayTriangulationBuilder | incremental quad-edge (upstream docs) | any sf geometry; uses its vertices only | `dTolerance` snapping, `bOnlyEdges` | GEOMETRYCOLLECTION of POLYGON (or MULTILINESTRING) |
 | geos::geos_delaunay_triangles(), _edges() (CRAN 0.2.5, MIT) | GEOS | as above | any geos/wk geometry | `tolerance` | geos geometry |
 | terra::delaunay() (CRAN 1.9-50) | GEOS (GEOSDelaunayTriangulation_r) | as above | SpatVector | `tolerance`, `as.lines` | SpatVector |
+| gdalraster::g_delaunay_triangulation() (CRAN 2.7.0) | GEOS through GDAL's OGR geometry API | as above | WKB (raw or list of raw) or WKT; GEOS >= 3.4 | `tolerance`, `only_edges` | WKB or WKT GEOMETRYCOLLECTION |
 | spatstat.geom::delaunay() | deldir | as deldir | ppp point pattern | none | tess of triangles |
 | ggforce geom_delaunay_* | deldir | as deldir | ggplot aesthetics | none | ggplot layers |
 | lasR triangulate() stage (GitHub/r-universe r-lidar) | Delaunator (C++ port), vendored | sweep-hull | LAS/LAZ point clouds in a streaming pipeline | `max_edge` trims long triangles, `filter`, attribute for z | 2.5D TIN used by DTM/CHM stages, optional file |
@@ -96,10 +97,13 @@ stack; Qhull is the n-D one.
 | sf::st_triangulate_constrained() (GEOS >= 3.10) | GEOS ConstrainedDelaunayTriangulator: ear clipping then Delaunay edge flips (upstream docs) | POLYGON/MULTIPOLYGON only | polygon rings only; each polygon on its own | holes joined to shell; no outside | GEOMETRYCOLLECTION of triangles |
 | geos::geos_constrained_delaunay_triangles() | GEOS, same | polygons | as above | as above | geos geometry |
 | terra::delaunay(constrained = TRUE) | GEOS, same | SpatVector polygons | as above | as above | SpatVector |
+| gdalraster::g_delaunay_triangulation(constrained = TRUE) | GEOS through OGR; needs GDAL >= 3.12 and GEOS >= 3.10 | WKB/WKT polygons | as above | as above | WKB or WKT |
 | cgalPolygons (CRAN 0.1.1, GPL-3) `$convexParts(method = "triangle")` | CGAL Polygon_triangulation_decomposition_2 | R6 polygon (with holes) | polygon boundary | holes | list of triangles as coordinate matrices |
 | spatstat.geom::triangulate.owin() | deldir, recursive: Delaunay of window vertices, intersect each triangle with the window, recurse on non-triangles | owin window | window edges respected by construction | holes | tess of triangles |
 
-Notes. GEOS's "constrained" Delaunay is a polygon triangulation (no Steiner
+Notes. There are four interfaces to the same GEOS code: sf, geos, terra and
+gdalraster (the last through GDAL's OGR layer, so its GEOS version is the one
+GDAL was built with). GEOS's "constrained" Delaunay is a polygon triangulation (no Steiner
 points, no loose segments, no shared topology between polygons), so a
 coverage is triangulated polygon by polygon and shared edges are not
 matched. RCDT and delaunay are the only CRAN packages that take an
@@ -152,7 +156,7 @@ using CDT's own.
 | CGAL (C++, GPL/LGPL parts) | CDT, dynamic CDT, Delaunay mesher, decomposition | delaunay, cgalPolygons, laridae (also raybevel for straight skeletons; RcppCGAL ships headers) |
 | spade (Rust, MIT/Apache) | dynamic CDT, refinement | trowel |
 | fmesher core (C++, MPL-2.0) | CDT with refinement, sphere | fmesher, and through it INLA, inlabru, sdmTMB and other SPDE users |
-| GEOS (C++, LGPL) | point Delaunay (quad-edge), polygon CDT (ear clip + flip) | sf, geos, terra |
+| GEOS (C++, LGPL) | point Delaunay (quad-edge), polygon CDT (ear clip + flip) | sf, geos, terra (direct); gdalraster (via GDAL OGR) |
 | Qhull (C) | Quickhull, n-D Delaunay | geometry, tessellation |
 | mapbox earcut (C++ / JS, ISC) | ear cutting | decido, interleave (via geometries), rearcut; via decido: silicate, anglr, raybevel |
 | Renka TRIPACK / Akima (Fortran, ACM licence) | incremental Delaunay, constraint curves | tripack, akima |
@@ -184,7 +188,7 @@ done; attributes interpolated onto new vertices.
 | Report of what refinement could not do | cdtr (`unrefined`), laridae; Triangle silently stops |
 | Incremental editing (insert/remove after build) | trowel, laridae. Nothing on CRAN |
 | Sphere | fmesher (globe, S2 meshes), tulpaMesh (icosahedral) |
-| Works from sf directly | sf, geos, terra (GEOS family), fmesher, tulpaMesh (boundary), sfdct, anglr, silicate |
+| Works from sf directly | sf, geos, terra, gdalraster via WKB (GEOS family), fmesher, tulpaMesh (boundary), sfdct, anglr, silicate |
 | Exact predicates | CGAL (delaunay, laridae), CDT uses robust predicates (Lenthe), spade robust, Triangle adaptive exact predicates, boost::polygon exact on integers |
 
 ## 10. Observations for this project

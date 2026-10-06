@@ -16,16 +16,19 @@ results as skipped, not as a failure. It also serves as laridae's
 acceptance test.
 
 
-The site at https://mdsumner.github.io/trianglewins/ indexes two pages:
+The site at https://mdsumner.github.io/trianglewins/ indexes three pages:
 
+- a guide for R users choosing a triangulation package, by kind of
+  problem, CRAN first, at https://mdsumner.github.io/trianglewins/choose/,
+  source in [survey/choosing-a-package.md](survey/choosing-a-package.md);
 - the performance benchmark at scale (geoBoundaries country boundaries from
   `sds::CGAZ()`, 23 thousand to 6.8 million vertices), at
   https://mdsumner.github.io/trianglewins/bench/, code in [bench/](bench/);
 - a survey of R packages that triangulate points, polygons or segment sets
   (algorithm, upstream library, input, constraints, output control), at
   https://mdsumner.github.io/trianglewins/survey/, source in
-  [survey/](survey/r-triangulation-survey.md), rendered by
-  `sh survey/build.sh` (pandoc).
+  [survey/](survey/r-triangulation-survey.md), both rendered
+  by `sh survey/build.sh` (pandoc).
 
 ## What it measures
 

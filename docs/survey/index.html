@@ -276,6 +276,14 @@ alphahull::delvor</td>
 <td>SpatVector</td>
 </tr>
 <tr class="even">
+<td>gdalraster::g_delaunay_triangulation() (CRAN 2.7.0)</td>
+<td>GEOS through GDAL's OGR geometry API</td>
+<td>as above</td>
+<td>WKB (raw or list of raw) or WKT; GEOS &gt;= 3.4</td>
+<td><code>tolerance</code>, <code>only_edges</code></td>
+<td>WKB or WKT GEOMETRYCOLLECTION</td>
+</tr>
+<tr class="odd">
 <td>spatstat.geom::delaunay()</td>
 <td>deldir</td>
 <td>as deldir</td>
@@ -283,7 +291,7 @@ alphahull::delvor</td>
 <td>none</td>
 <td>tess of triangles</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>ggforce geom_delaunay_*</td>
 <td>deldir</td>
 <td>as deldir</td>
@@ -291,7 +299,7 @@ alphahull::delvor</td>
 <td>none</td>
 <td>ggplot layers</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>lasR triangulate() stage (GitHub/r-universe r-lidar)</td>
 <td>Delaunator (C++ port), vendored</td>
 <td>sweep-hull</td>
@@ -300,7 +308,7 @@ alphahull::delvor</td>
 attribute for z</td>
 <td>2.5D TIN used by DTM/CHM stages, optional file</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>lidR (CRAN 4.3.3) internal C_delaunay / interpolate_delaunay</td>
 <td>boost::polygon Voronoi on integer (scaled) coordinates; a vendored
 incremental Delaunay (hporro, MIT) for spike-free and PTD</td>
@@ -390,6 +398,14 @@ edge flips (upstream docs)</td>
 <td>SpatVector</td>
 </tr>
 <tr class="even">
+<td>gdalraster::g_delaunay_triangulation(constrained = TRUE)</td>
+<td>GEOS through OGR; needs GDAL &gt;= 3.12 and GEOS &gt;= 3.10</td>
+<td>WKB/WKT polygons</td>
+<td>as above</td>
+<td>as above</td>
+<td>WKB or WKT</td>
+</tr>
+<tr class="odd">
 <td>cgalPolygons (CRAN 0.1.1, GPL-3)
 <code>$convexParts(method = "triangle")</code></td>
 <td>CGAL Polygon_triangulation_decomposition_2</td>
@@ -398,7 +414,7 @@ edge flips (upstream docs)</td>
 <td>holes</td>
 <td>list of triangles as coordinate matrices</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>spatstat.geom::triangulate.owin()</td>
 <td>deldir, recursive: Delaunay of window vertices, intersect each
 triangle with the window, recurse on non-triangles</td>
@@ -409,12 +425,14 @@ triangle with the window, recurse on non-triangles</td>
 </tr>
 </tbody>
 </table>
-<p>Notes. GEOS's "constrained" Delaunay is a polygon triangulation (no
-Steiner points, no loose segments, no shared topology between polygons),
-so a coverage is triangulated polygon by polygon and shared edges are
-not matched. RCDT and delaunay are the only CRAN packages that take an
-arbitrary segment index (a PSLG) without refinement. Both decide inside
-and outside by parity.</p>
+<p>Notes. There are four interfaces to the same GEOS code: sf, geos,
+terra and gdalraster (the last through GDAL's OGR layer, so its GEOS
+version is the one GDAL was built with). GEOS's "constrained" Delaunay
+is a polygon triangulation (no Steiner points, no loose segments, no
+shared topology between polygons), so a coverage is triangulated polygon
+by polygon and shared edges are not matched. RCDT and delaunay are the
+only CRAN packages that take an arbitrary segment index (a PSLG) without
+refinement. Both decide inside and outside by parity.</p>
 <h2
 id="5-quality-meshing-constrained--conforming-delaunay-with-refinement">5.
 Quality meshing (constrained / conforming Delaunay with refinement)</h2>
@@ -656,7 +674,7 @@ users</td>
 <tr class="even">
 <td>GEOS (C++, LGPL)</td>
 <td>point Delaunay (quad-edge), polygon CDT (ear clip + flip)</td>
-<td>sf, geos, terra</td>
+<td>sf, geos, terra (direct); gdalraster (via GDAL OGR)</td>
 </tr>
 <tr class="odd">
 <td>Qhull (C)</td>
@@ -781,8 +799,8 @@ index beyond input count, boundary markers)</td>
 </tr>
 <tr class="even">
 <td>Works from sf directly</td>
-<td>sf, geos, terra (GEOS family), fmesher, tulpaMesh (boundary), sfdct,
-anglr, silicate</td>
+<td>sf, geos, terra, gdalraster via WKB (GEOS family), fmesher,
+tulpaMesh (boundary), sfdct, anglr, silicate</td>
 </tr>
 <tr class="odd">
 <td>Exact predicates</td>
