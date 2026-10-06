@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>trianglewins</title>
-<meta name="description" content="Constrained triangulation in R: a guide to choosing a package, a benchmark of laridae, cdtr, trowel and RTriangle, and a survey of R triangulation packages.">
+<meta name="description" content="Constrained triangulation in R: a survey of R triangulation packages, a benchmark of laridae, cdtr, trowel and RTriangle, and a guide to choosing a package.">
 <style>
 :root {
   color-scheme: light;
@@ -79,10 +79,11 @@ p.lede { color: var(--text-secondary); margin: 0 0 8px; max-width: 760px; }
 by code that belongs to none of them. Backends are laridae (CGAL), cdtr (CDT), trowel (spade)
 and RTriangle (Triangle).</p>
 <div class="cards">
-<a class="card" href="choose/">
-<h2>Choosing a package</h2>
-<p>For R users: what to try for each kind of problem, from filling polygons for drawing to
-quality meshes, statistical meshes and editable meshes. CRAN packages first.</p>
+<a class="card" href="survey/">
+<h2>Survey of R triangulation packages</h2>
+<p>About 35 packages classified by algorithm (ear cutting, Delaunay, constrained, quality
+refinement), upstream library, input form, constraints and output control, with a lineage
+table and a capability matrix.</p>
 </a>
 <a class="card" href="bench/">
 <h2>Benchmark at scale</h2>
@@ -90,11 +91,10 @@ quality meshes, statistical meshes and editable meshes. CRAN packages first.</p>
 6.8 million vertices: constrained, area and quality refinement, point Delaunay, and edits to a
 live mesh.</p>
 </a>
-<a class="card" href="survey/">
-<h2>Survey of R triangulation packages</h2>
-<p>About 35 packages classified by algorithm (ear cutting, Delaunay, constrained, quality
-refinement), upstream library, input form, constraints and output control, with a lineage
-table and a capability matrix.</p>
+<a class="card" href="choose/">
+<h2>Choosing a package</h2>
+<p>For R users: what to try for each kind of problem, from filling polygons for drawing to
+quality meshes, statistical meshes and editable meshes. CRAN packages first.</p>
 </a>
 </div>
 <p class="muted" style="margin-top:28px">Source:
