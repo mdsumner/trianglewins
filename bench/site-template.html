@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>trianglewins benchmark</title>
+<meta name="description" content="Constrained triangulation at scale: laridae, cdtr, trowel and RTriangle on geoBoundaries country polygons.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --critical: #c62b2b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --critical: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --critical: #e66767;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 6px; }
+p.lede { color: var(--text-secondary); margin: 0 0 20px; max-width: 760px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: var(--series-1); }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 14px; font-size: 13px; color: var(--text-secondary); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.panel h3 { font-size: 14px; margin: 0 0 2px; font-weight: 600; }
+.panel .sub { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { fill: var(--text-muted); font-size: 11px; }
+svg .lbl { fill: var(--text-secondary); font-size: 11px; }
+.tip {
+  position: fixed; pointer-events: none; z-index: 10; display: none;
+  background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  max-width: 280px;
+}
+.tip b { font-weight: 600; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 12px; }
+select { font: inherit; font-size: 13px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2), th:nth-child(3), td:nth-child(3) { text-align: left; }
+th { color: var(--text-secondary); font-weight: 600; }
+td.bad { color: var(--critical); }
+.findings li { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<main>
+<h1>trianglewins: triangulation at scale</h1>
+<p class="lede">Four constrained Delaunay backends for R on country boundaries from geoBoundaries
+(<code>sds::CGAZ()</code>), from Kosovo (23 thousand vertices) to the whole world (6.8 million).
+Times are medians of repeated runs, each job in its own R process.</p>
+<p class="muted" id="meta"></p>
+
+<h2>Findings</h2>
+<ul class="findings" id="findings">
+__FINDINGS__
+</ul>
+
+<h2>Time against input size</h2>
+<p class="muted">Seconds (log scale) against input vertices (log scale), polygon datasets only.
+Constrained: the triangulation of the vertices and segments, outside removed. Area: refined until no
+triangle exceeds bounding box area / 100000. Quality: the same area bound plus a 20 degree minimum
+angle. A run that timed out or ran out of memory has no point.</p>
+<div class="legend" id="legend"></div>
+<div class="grid" id="time-panels"></div>
+
+<h2>Delaunay of points</h2>
+<p class="muted">Points sampled from the world's boundary vertices, no segments, meshed over their convex hull.</p>
+<div class="grid" id="point-panels"></div>
+
+<h2>Editing a mesh: 1000 new points</h2>
+<p class="muted">laridae and trowel add 1000 points to a live constrained mesh (only the insert is timed).
+cdtr and RTriangle have no handle, so the time is a rebuild with the points included.</p>
+<div class="grid" id="insert-panels"></div>
+
+<h2>Peak memory</h2>
+<p class="muted">Peak resident memory of the job's R process (MB, log scale), including the input tables.</p>
+<div class="grid" id="mem-panels"></div>
+
+<h2>All runs</h2>
+<div class="controls">
+  <select id="f-dataset"><option value="">all datasets</option></select>
+  <select id="f-scenario"><option value="">all scenarios</option></select>
+  <select id="f-backend"><option value="">all backends</option></select>
+</div>
+<div class="card tablewrap"><table id="tbl"></table></div>
+
+<h2>Datasets</h2>
+<div class="card tablewrap"><table id="dstbl"></table></div>
+
+<h2>Method</h2>
+<p>Inputs come from <code>sds::CGAZ()</code>, the geoBoundaries CGAZ ADM0 GeoParquet (CC BY 4.0). Rings are converted by
+<code>bench/cgaz_pslg.py</code> into a vertex table and a segment table: exactly repeated vertices are merged and repeated
+segments dropped, so shared borders appear once (except <code>southern_africa_rings</code>, which keeps every ring in full).
+Coordinates are longitude and latitude, triangulated as planar. Each backend is called through the same adapter as the
+rest of trianglewins, so times include reading the result tables back into R. Every refinement has a Steiner budget of
+100000 vertices. The area and angle columns are computed from the output; segment preservation and the empty-circle test
+run on inputs up to 50000 vertices. Code: <code>bench/</code> in
+<a href="https://github.com/mdsumner/trianglewins">mdsumner/trianglewins</a>.</p>
+</main>
+<div class="tip" id="tip"></div>
+<script>
+const ROWS = __ROWS__;
+const DATASETS = __DATASETS__;
+const META = __META__;
+const BACKENDS = ["laridae", "cdtr", "trowel", "RTriangle"];
+const COLOR = { laridae: "var(--series-1)", cdtr: "var(--series-2)", trowel: "var(--series-3)", RTriangle: "var(--series-4)" };
+const LIB = { laridae: "CGAL", cdtr: "CDT", trowel: "spade", RTriangle: "Triangle" };
+const tip = document.getElementById("tip");
+const fmt = (v, d = 3) => v == null ? "" : (Math.abs(v) >= 1000 ? Math.round(v).toLocaleString("en") : Number(v.toPrecision(d)).toString());
+const fmtT = s => s == null ? "" : (s < 1 ? fmt(s * 1000) + " ms" : fmt(s) + " s");
+const pct = v => v == null ? "" : (100 * v).toFixed(v >= 0.9995 ? 0 : 1) + "%";
+const dsInfo = Object.fromEntries(DATASETS.map(d => [d.name, d]));
+
+if (META && META.run) {
+  document.getElementById("meta").textContent = META.run;
+}
+document.getElementById("legend").innerHTML = BACKENDS.map(b =>
+  `<span><i style="background:${COLOR[b]}"></i>${b} (${LIB[b]})</span>`).join("");
+
+function logTicks(lo, hi) {
+  const out = [];
+  for (let e = Math.floor(Math.log10(lo)); e <= Math.ceil(Math.log10(hi)); e++) out.push(Math.pow(10, e));
+  return out;
+}
+function tickLabel(v, unit) {
+  if (unit === "s") return v < 1 ? (v * 1000) + " ms" : v + " s";
+  if (v >= 1e6) return (v / 1e6) + "M";
+  if (v >= 1e3) return (v / 1e3) + "k";
+  return String(v);
+}
+
+// one log-log panel: series = {backend: [{x, y, row}]}
+function panel(el, title, sub, series, opts) {
+  const W = 340, H = 230, m = { l: 46, r: 64, t: 10, b: 30 };
+  const pts = Object.values(series).flat();
+  const div = document.createElement("div");
+  div.className = "card panel";
+  div.innerHTML = `<h3>${title}</h3><div class="sub">${sub}</div>`;
+  el.appendChild(div);
+  if (!pts.length) { div.insertAdjacentHTML("beforeend", `<p class="muted">no completed runs</p>`); return; }
+  let xlo = Math.min(...pts.map(p => p.x)), xhi = Math.max(...pts.map(p => p.x));
+  let ylo = Math.min(...pts.map(p => p.y)), yhi = Math.max(...pts.map(p => p.y));
+  xlo = Math.pow(10, Math.floor(Math.log10(xlo) * 2) / 2); xhi = Math.pow(10, Math.ceil(Math.log10(xhi) * 2) / 2);
+  ylo = Math.pow(10, Math.floor(Math.log10(ylo))); yhi = Math.pow(10, Math.ceil(Math.log10(yhi)));
+  const X = v => m.l + (Math.log10(v) - Math.log10(xlo)) / (Math.log10(xhi) - Math.log10(xlo)) * (W - m.l - m.r);
+  const Y = v => H - m.b - (Math.log10(v) - Math.log10(ylo)) / (Math.log10(yhi) - Math.log10(ylo)) * (H - m.t - m.b);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}">`;
+  for (const t of logTicks(ylo, yhi)) {
+    if (t < ylo || t > yhi) continue;
+    s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--grid)"/>`;
+    s += `<text x="${m.l - 6}" y="${Y(t) + 4}" text-anchor="end">${tickLabel(t, opts.yunit)}</text>`;
+  }
+  for (const t of logTicks(xlo, xhi)) {
+    if (t < xlo || t > xhi) continue;
+    s += `<text x="${X(t)}" y="${H - m.b + 16}" text-anchor="middle">${tickLabel(t)}</text>`;
+  }
+  s += `<line x1="${m.l}" x2="${W - m.r}" y1="${H - m.b}" y2="${H - m.b}" stroke="var(--border)"/>`;
+  const ends = [];
+  for (const b of BACKENDS) {
+    const p = (series[b] || []).slice().sort((a, c) => a.x - c.x);
+    if (!p.length) continue;
+    if (p.length > 1) s += `<polyline fill="none" stroke="${COLOR[b]}" stroke-width="2" stroke-linejoin="round" points="${p.map(q => X(q.x) + "," + Y(q.y)).join(" ")}"/>`;
+    for (const q of p) {
+      s += `<circle cx="${X(q.x)}" cy="${Y(q.y)}" r="4" fill="${COLOR[b]}" stroke="var(--surface-1)" stroke-width="2"/>`;
+    }
+    const last = p[p.length - 1];
+    ends.push({ b, x: X(last.x), y: Y(last.y) });
+  }
+  // direct labels at line ends, nudged apart
+  ends.sort((a, c) => a.y - c.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 12) ends[i].y = ends[i - 1].y + 12;
+  for (const e of ends) s += `<text class="lbl" x="${e.x + 8}" y="${e.y + 4}">${e.b}</text>`;
+  // hit targets
+  for (const b of BACKENDS) for (const q of (series[b] || [])) {
+    s += `<circle class="hit" cx="${X(q.x)}" cy="${Y(q.y)}" r="10" fill="transparent" data-b="${b}" data-i="${ROWS.indexOf(q.row)}"/>`;
+  }
+  s += `</svg>`;
+  div.insertAdjacentHTML("beforeend", s);
+  div.querySelectorAll(".hit").forEach(c => {
+    c.addEventListener("mousemove", ev => {
+      const r = ROWS[+c.dataset.i];
+      tip.innerHTML = `<b>${r.backend}</b> on <b>${r.dataset}</b><br>${r.scenario}: ${fmtT(r.time_s)}` +
+        (r.n_triangles != null ? `<br>${fmt(r.n_triangles)} triangles` : "") +
+        (r.peak_mb != null ? `<br>peak ${fmt(r.peak_mb)} MB` : "") +
+        `<br><span class="muted">${fmt(r.n_in)} input vertices</span>`;
+      tip.style.display = "block";
+      tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 290) + "px";
+      tip.style.top = (ev.clientY + 14) + "px";
+    });
+    c.addEventListener("mouseleave", () => tip.style.display = "none");
+  });
+}
+
+function seriesFor(filter, yfield) {
+  const out = {};
+  for (const r of ROWS) {
+    if (r.status !== "ok" || !filter(r) || r[yfield] == null || r[yfield] <= 0) continue;
+    (out[r.backend] = out[r.backend] || []).push({ x: r.n_in, y: r[yfield], row: r });
+  }
+  return out;
+}
+const isPoly = r => dsInfo[r.dataset] && dsInfo[r.dataset].kind === "segments" && r.dataset !== "southern_africa_rings";
+const isPts = r => dsInfo[r.dataset] && dsInfo[r.dataset].kind === "points";
+const SCEN = { constrained: "Constrained", area: "Area refinement", quality: "Area and angle refinement" };
+for (const sc of ["constrained", "area", "quality"]) {
+  panel(document.getElementById("time-panels"), SCEN[sc], "seconds by input vertices",
+        seriesFor(r => r.scenario === sc && isPoly(r), "time_s"), { yunit: "s" });
+  panel(document.getElementById("point-panels"), SCEN[sc], "seconds by number of points",
+        seriesFor(r => r.scenario === sc && isPts(r), "time_s"), { yunit: "s" });
+}
+panel(document.getElementById("insert-panels"), "Add 1000 points", "seconds by input vertices",
+      seriesFor(r => r.scenario === "insert_1k" && isPoly(r), "time_s"), { yunit: "s" });
+panel(document.getElementById("mem-panels"), "Constrained", "peak MB by input vertices",
+      seriesFor(r => r.scenario === "constrained" && isPoly(r), "peak_mb"), {});
+panel(document.getElementById("mem-panels"), "Area and angle refinement", "peak MB by input vertices",
+      seriesFor(r => r.scenario === "quality" && isPoly(r), "peak_mb"), {});
+
+// tables
+const order = DATASETS.map(d => d.name);
+const fD = document.getElementById("f-dataset"), fS = document.getElementById("f-scenario"), fB = document.getElementById("f-backend");
+for (const d of order) fD.insertAdjacentHTML("beforeend", `<option>${d}</option>`);
+for (const s of ["constrained", "area", "quality", "insert_1k"]) fS.insertAdjacentHTML("beforeend", `<option>${s}</option>`);
+for (const b of BACKENDS) fB.insertAdjacentHTML("beforeend", `<option>${b}</option>`);
+function drawTable() {
+  const rows = ROWS.filter(r => (!fD.value || r.dataset === fD.value) && (!fS.value || r.scenario === fS.value) &&
+                                (!fB.value || r.backend === fB.value))
+    .sort((a, c) => order.indexOf(a.dataset) - order.indexOf(c.dataset) ||
+                    ["constrained", "area", "quality", "insert_1k"].indexOf(a.scenario) - ["constrained", "area", "quality", "insert_1k"].indexOf(c.scenario) ||
+                    BACKENDS.indexOf(a.backend) - BACKENDS.indexOf(c.backend));
+  let h = `<tr><th>dataset</th><th>scenario</th><th>backend</th><th>time</th><th>triangles</th><th>vertices out</th>` +
+          `<th>area ok</th><th>angle ok</th><th>min angle</th><th>segments kept</th><th>peak MB</th><th>status</th></tr>`;
+  for (const r of rows) {
+    const bad = r.status !== "ok";
+    h += `<tr><td>${r.dataset}</td><td>${r.scenario}</td><td>${r.backend}</td><td>${fmtT(r.time_s)}</td>` +
+         `<td>${fmt(r.n_triangles)}</td><td>${fmt(r.n_vertices)}</td><td>${pct(r.area_ok)}</td><td>${pct(r.angle_ok)}</td>` +
+         `<td>${r.angle_min == null ? "" : r.angle_min.toFixed(2)}</td><td>${pct(r.segs_kept)}</td><td>${fmt(r.peak_mb)}</td>` +
+         `<td class="${bad ? "bad" : ""}">${bad ? r.status + (r.message ? ": " + r.message : "") : "ok"}</td></tr>`;
+  }
+  document.getElementById("tbl").innerHTML = h;
+}
+[fD, fS, fB].forEach(e => e.addEventListener("change", drawTable));
+drawTable();
+let dh = `<tr><th>name</th><th>kind</th><th>countries</th><th>vertices</th><th>segments</th><th style="text-align:left">note</th></tr>`;
+for (const d of DATASETS) dh += `<tr><td>${d.name}</td><td>${d.kind}</td><td>${d.countries}</td><td>${fmt(d.vertices)}</td><td>${fmt(d.segments)}</td><td style="text-align:left">${d.note}</td></tr>`;
+document.getElementById("dstbl").innerHTML = dh;
+</script>
+</body>
+</html>
