@@ -259,10 +259,12 @@ or an error. A pipeline that expects triangles should test for
 this.</li>
 <li><strong>Attributes are not coordinates until you say so.</strong>
 Elevation, time or temperature carried on vertices (point attributes in
-RTriangle, cdtr, trowel and laridae) are interpolated onto new vertices
-but play no part in where vertices go. Making them coordinates (xyz,
-xyt) changes the problem: a triangulation in xy becomes either a surface
-in xyz or, via Delaunay, a set of tetrahedra.</li>
+RTriangle, cdtr, trowel and laridae; see <a
+href="../interpolation/">Interpolation on triangles</a>) are
+interpolated onto new vertices but play no part in where vertices go.
+Making them coordinates (xyz, xyt) changes the problem: a triangulation
+in xy becomes either a surface in xyz or, via Delaunay, a set of
+tetrahedra.</li>
 <li><strong>"Dimension" in array tools is an axis.</strong> A stars
 object with x, y and time "dimensions" is a 3-axis array; its cells are
 still topologically 2-dimensional pixels repeated through time.</li>

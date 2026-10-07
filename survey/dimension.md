@@ -96,7 +96,8 @@ When someone says 2.5D, ask whether z can be recovered from x and y
    pipeline that expects triangles should test for this.
 5. **Attributes are not coordinates until you say so.** Elevation, time
    or temperature carried on vertices (point attributes in RTriangle, cdtr,
-   trowel and laridae) are interpolated onto new vertices but play no
+   trowel and laridae; see [Interpolation on triangles](../interpolation/))
+   are interpolated onto new vertices but play no
    part in where vertices go. Making them coordinates (xyz, xyt) changes
    the problem: a triangulation in xy becomes either a surface in xyz or,
    via Delaunay, a set of tetrahedra.

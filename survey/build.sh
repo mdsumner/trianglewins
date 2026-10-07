@@ -16,5 +16,7 @@ render choosing-a-package.md choose "Choosing a triangulation package" "choosing
   "Which R package to try for each kind of triangulation problem, CRAN first."
 render dimension.md dimension "On dimension" "on dimension" \
   "Coordinate dimension versus topological dimension: how GIS, geometry, graphics, finite elements and array tools use the word, and where it matters for triangulation."
+render interpolation.md interpolation "Interpolation on triangles" "interpolation" \
+  "Linear interpolation on triangulations: what it promises, how the mesh decides the answer, and which R tools do each job."
 render roadmap.md roadmap "Roadmap for R and Python" roadmap \
   "Development steps, CRAN order and blockers for cdtr, laridae and trowel, and what this work can offer other R and Python triangulation packages."

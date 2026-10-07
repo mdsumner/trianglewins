@@ -100,7 +100,8 @@ before counting triangles.
 ## 3. Interpolating scattered values
 
 You have values at irregular points and want a surface (linear on
-triangles).
+triangles). What that interpolation promises, and how the mesh changes
+the answer, is in [Interpolation on triangles](../interpolation/).
 
 - **interp::interp() [CRAN]**: linear and Akima spline interpolation on a
   Delaunay triangulation, under a free licence. Prefer it to akima and

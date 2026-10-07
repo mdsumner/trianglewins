@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interpolation on triangles</title>
+<meta name="description" content="Linear interpolation on triangulations: what it promises, how the mesh decides the answer, and which R tools do each job.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--grid); min-width: 9em; }
+th:first-child, td:first-child { min-width: 13em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../">trianglewins</a> / interpolation</p>
+<h1 id="interpolation-on-triangles">Interpolation on triangles</h1>
+<p>7 October 2026. A triangulation is most often built to carry values:
+a height at each vertex, a temperature, a source pixel coordinate.
+Between the vertices those values have to be filled in, and that is
+interpolation. This note covers what the word means in the different
+places it turns up, what linear interpolation on triangles does and does
+not promise, how the mesh itself (its shape, its constraints, its new
+vertices) decides the answer, and which R tools do each job. It follows
+the vocabulary of <a href="../dimension/">On dimension</a>: coordinates
+are xy or xyz, and a value carried at a vertex is an attribute, not a
+coordinate.</p>
+<h2 id="what-interpolation-means-depending-on-who-says-it">What
+"interpolation" means, depending on who says it</h2>
+<ul>
+<li><strong>Scattered data to a surface.</strong> Values measured at
+irregular points, wanted everywhere (on a grid or at other points). The
+classic use of a Delaunay triangulation, and the main subject here.</li>
+<li><strong>Resampling a grid.</strong> Values on one grid, wanted on
+another (nearest, bilinear, cubic in GDAL, terra, stars). Bilinear is
+the grid cousin of triangle-linear but not the same thing: it is not
+linear inside a cell, and splitting each cell into two triangles gives a
+different answer that depends on which diagonal is used.</li>
+<li><strong>Attributes onto new vertices.</strong> A mesher adds
+vertices (Steiner points for quality, intersection points where segments
+cross) and has to give them attribute values. Triangle, cdtr, trowel and
+laridae do this; it is part of this project's contract.</li>
+<li><strong>Interpolating a map.</strong> A mesh stores a coordinate
+transformation at its vertices (display position to source pixel,
+longitude and latitude to projected xy) and interpolates it across each
+triangle. Texture reprojection and GDAL's approximate transformer work
+this way. Here the "attribute" is itself a pair of coordinates, and the
+question is how small the triangles must be for the straight-line
+approximation to stay within a tolerance.</li>
+<li><strong>Areal interpolation.</strong> Moving totals or densities
+between two sets of polygons (<code>sf::st_interpolate_aw()</code>). No
+point values are interpolated at all; the name is shared, the problem is
+not.</li>
+<li><strong>Interpolation versus approximation.</strong> An interpolant
+passes exactly through the data; a smoother (thin plate spline with a
+penalty, kriging with a nugget, a GAM) does not. Triangle-linear is
+always exact at the vertices.</li>
+<li><strong>Interpolation versus extrapolation.</strong> Triangle
+methods stop at the convex hull (or at the mesh boundary). Outside it
+they return NA unless told to extrapolate
+(<code>interp(extrap = TRUE)</code>), fall back to the nearest value
+(GDAL's linear gridder, within its radius), or do something else.</li>
+</ul>
+<h2 id="linear-interpolation-on-a-triangle">Linear interpolation on a
+triangle</h2>
+<p>Inside a triangle with vertex values v1, v2, v3, the value at a point
+p is w1 v1 + w2 v2 + w3 v3, where w1, w2, w3 are p's barycentric
+coordinates (non-negative inside the triangle, summing to 1). The result
+is the plane through the three vertices. Across the whole mesh this
+gives a piecewise linear surface (a TIN when the attribute is
+elevation).</p>
+<p>What it promises:</p>
+<ul>
+<li>exact for any plane (a + b x + c y);</li>
+<li>continuous everywhere, but with a gradient that is constant in each
+triangle and jumps across every edge (slope and aspect come out
+faceted);</li>
+<li>no overshoot: every interpolated value lies between the minimum and
+maximum of the data, so no new peaks, pits or negative
+concentrations.</li>
+</ul>
+<p>What it does not promise: smoothness, or the same answer on a
+different triangulation of the same points. Four points of a square can
+be split along either diagonal, and the value at the centre differs.
+Among all triangulations of a point set, the Delaunay triangulation
+gives the piecewise linear surface of least roughness, for any data
+(Rippa, 1990), which is the main reason to use Delaunay for
+interpolation rather than any other triangulation of the same
+points.</p>
+<h2 id="how-big-and-what-shape-the-triangles-must-be">How big and what
+shape the triangles must be</h2>
+<p>Along an edge of length h, linear interpolation of a smooth function
+errs by at most h^2 / 8 times the largest second derivative along the
+edge. So the error falls with the square of the edge length, and a
+tolerance translates into a target edge length (or maximum area)
+wherever the curvature is known. That is what a sizing field is for:
+laridae takes a maximum area as a function of position or as a grid, so
+triangles can be small where the surface bends and large where it is
+flat.</p>
+<p>Shape matters too, but not in the way the usual refinement criterion
+suggests. The error in the value depends mainly on size; the error in
+the gradient depends on the largest angle, and blows up as a triangle
+flattens towards 180 degrees (the maximum angle condition, Babuska and
+Aziz, 1976). Small angles on their own are harmless for interpolation. A
+minimum angle bound still helps, because it also caps the largest angle
+(a 20 degree minimum allows at most 140), but a long thin triangle
+aligned with a ridge can be a good interpolating triangle, and isotropic
+meshers such as Triangle, CDT, CGAL and spade will spend extra triangles
+avoiding it.</p>
+<h2 id="the-mesh-decides-the-answer">The mesh decides the answer</h2>
+<ol type="1">
+<li><strong>Constraints say where edges lie, not where values
+jump.</strong> Putting a breakline, a coastline or a road into a
+constrained triangulation stops triangles from straddling it, so values
+are not averaged across it. But the interpolated surface is still
+continuous across the line. For a real discontinuity (a cliff, a fault,
+land and sea values on either side of a coast) the vertices on the line
+need two values, one per side; in the table form used here that means
+two vertex rows at the same xy, one belonging to each side's
+triangles.</li>
+<li><strong>Contours make flat triangles.</strong> Triangulating contour
+lines as constraints connects many triangles whose three vertices lie on
+the same contour, so they are flat and the surface becomes terraced,
+with ridges and valleys cut off. Refinement helps only if the new
+Steiner vertices get better values than linear interpolation from the
+flat triangle gives them, which by definition they do not; fixing it
+needs extra information (spot heights, a stream network, or an
+interpolant that uses more than one triangle). The trianglewins measures
+count flat triangles for this reason.</li>
+<li><strong>New vertices inherit interpolated values.</strong> When a
+mesher adds a Steiner vertex, its attribute is linearly interpolated
+from the triangle it falls in. Triangle does this as it inserts each
+vertex; cdtr matches Triangle to 1e-12; trowel interpolates from the
+mesh as it was before refinement. Refinement therefore never adds
+information: it reshapes the triangles of the same piecewise linear
+surface. Where the attribute is a measurement, adding Steiner points
+cannot make the interpolation more accurate, only make later operations
+(rendering, finite elements) better behaved.</li>
+<li><strong>Crossings can have two answers.</strong> Where two
+constraint segments cross, the new vertex lies on both, and linear
+interpolation along each can give a different value (a road crossing a
+contour, two survey lines measured at different times). A mesher has to
+pick one, average them, or keep both as separate attributes. The project
+contract says attributes are linearly interpolated but does not yet say
+along which segment; it is worth settling before the contract is written
+down.</li>
+<li><strong>Inside and outside matter.</strong> Interpolating across a
+hole (a lake in a terrain) or across the gap between two polygons of a
+coverage mixes values that should not mix. Remove those triangles (by
+depth, seeds or parity) before interpolating, and expect NA there.</li>
+</ol>
+<h2 id="linear-in-which-coordinates">Linear in which coordinates?</h2>
+<p>Barycentric weights are computed in the coordinates the triangulation
+was built in. Triangles built from longitude and latitude interpolate
+linearly in degrees; the same points triangulated in a projected CRS
+give different triangles and different weights, and on the sphere
+(geocentric xyz, convex hull facets) different again. For short edges
+the differences are small; across a continent, near a pole or across the
+antimeridian they are not. Pick the coordinates in which "straight
+between the vertices" means what you want, triangulate there, and carry
+the attribute.</p>
+<p>The same holds for a 2.5D terrain: the interpolation is linear over
+the xy footprint, so on steep slopes the surface triangles are larger
+than their footprint suggests, and a sizing field set in xy undercounts
+the real surface.</p>
+<h2 id="interpolating-a-map-the-reprojection-mesh">Interpolating a map:
+the reprojection mesh</h2>
+<p>When the attribute is a coordinate transformation, the error that
+matters is in the output: how far from its true position a feature is
+drawn. Test a point inside each triangle (an edge midpoint or the
+centroid), push it through the exact transformation, compare with the
+interpolated position, and split the triangle if the distance exceeds
+the tolerance. The h^2 / 8 bound above turns into a sizing field from
+the transformation's second derivatives. Rims, poles and seams (the
+antimeridian, a projection's horizon) are where the curvature is
+extreme, and they are better inserted as constraint segments than
+discovered by refinement. GDAL's approximate transformer applies the
+same idea one dimension down, along scanlines (its default error
+threshold is 0.125 pixels).</p>
+<h2 id="r-tools-by-job">R tools, by job</h2>
+<p>CRAN packages first; [GitHub] marks the rest.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Job</th>
+<th>Try</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Scattered points to a grid, linear</td>
+<td><code>interp::interp(method = "linear")</code></td>
+<td>S-hull Delaunay, free licence; <code>extrap</code>,
+<code>duplicate</code> arguments; replaces akima</td>
+</tr>
+<tr class="even">
+<td>Scattered points to a grid, smoother</td>
+<td><code>interp::interp(method = "akima")</code>;
+<code>interpolation::interpfun(method = "sibson")</code></td>
+<td>Akima's bicubic on triangles; Sibson natural neighbour via CGAL,
+exact for quadratics of the form a + bx + cy + d(x^2 + y^2)</td>
+</tr>
+<tr class="odd">
+<td>Same, without triangles</td>
+<td><code>gstat::idw()</code>, <code>gstat::krige()</code>,
+<code>fields::Tps()</code>, <code>MBA::mba.surf()</code>,
+<code>terra::interpIDW()</code></td>
+<td>inverse distance, kriging, thin plate spline, multilevel B-splines;
+kriging and splines can smooth rather than interpolate</td>
+</tr>
+<tr class="even">
+<td>Gridding inside the GDAL world</td>
+<td><code>sf::gdal_utils("grid", ...)</code> with
+<code>-a linear</code>;
+<code>terra::interpNear(interpolate = TRUE)</code></td>
+<td>GDAL's linear gridder triangulates and interpolates barycentrically,
+falling back to the nearest value or nodata outside (upstream docs)</td>
+</tr>
+<tr class="odd">
+<td>Values at arbitrary points from a mesh</td>
+<td><code>geometry::tsearch()</code> (triangle and barycentric weights);
+<code>interp::interpp()</code>; <code>fmesher::fm_basis()</code>,
+<code>fm_evaluate()</code></td>
+<td>fm_basis returns the sparse matrix of barycentric weights, so many
+evaluations are one matrix product</td>
+</tr>
+<tr class="even">
+<td>Rasterise a TIN</td>
+<td>lidR, lasR (terrain and canopy models);
+<code>guerrilla::grid_barycentric()</code> [GitHub]</td>
+<td>guerrilla (hypertidy) tours the methods side by side with the
+arithmetic visible: barycentric, IDW, TPS, kriging, GAM, Voronoi,
+GDAL</td>
+</tr>
+<tr class="odd">
+<td>Attributes onto Steiner and crossing vertices</td>
+<td>RTriangle (<code>PA</code>), cdtr
+<code>cdt_triangulate_attr()</code> [GitHub], trowel, laridae
+[GitHub]</td>
+<td>linear from the containing triangle; see "The mesh decides the
+answer" above</td>
+</tr>
+<tr class="even">
+<td>Polygon totals between zone sets</td>
+<td><code>sf::st_interpolate_aw()</code></td>
+<td>areal interpolation, not point interpolation</td>
+</tr>
+</tbody>
+</table>
+<h2 id="short-version">Short version</h2>
+<ul>
+<li>Linear on triangles is exact at the data, never overshoots, and is
+faceted; Delaunay is the least rough choice of triangles for it.</li>
+<li>Size controls the value error (h squared), the largest angle
+controls the gradient error; long thin triangles along a feature are
+fine.</li>
+<li>Constraints place edges but do not create jumps; a jump needs two
+values at the same place.</li>
+<li>Steiner points add triangles, not information.</li>
+<li>The weights are linear in the coordinates you triangulated in:
+choose them on purpose.</li>
+</ul>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>
