@@ -31,6 +31,13 @@ carried at a vertex is an attribute, not a coordinate.
   "attribute" is itself a pair of coordinates, and the question is how
   small the triangles must be for the straight-line approximation to stay
   within a tolerance.
+- **Density estimation.** Counting points rather than interpolating
+  values: a kernel density surface is a smoother, not an interpolant, and
+  needs no triangles (`MASS::kde2d()`, `spatstat.explore::density.ppp()`
+  in planar coordinates; geodensity [GitHub, brownag] computes Gaussian
+  kernels with great-circle distances on a longitude and latitude grid,
+  in Rust). It meets this note only in the question of which coordinates
+  distances are measured in, below.
 - **Areal interpolation.** Moving totals or densities between two sets of
   polygons (`sf::st_interpolate_aw()`). No point values are interpolated at
   all; the name is shared, the problem is not.
@@ -115,7 +122,11 @@ Triangle, CDT, CGAL and spade will spend extra triangles avoiding it.
    reshapes the triangles of the same piecewise linear surface. Where the
    attribute is a measurement, adding Steiner points cannot make the
    interpolation more accurate, only make later operations (rendering,
-   finite elements) better behaved.
+   finite elements) better behaved. The exception is an attribute you can
+   compute anywhere, such as a coordinate transformation or a raster you
+   can sample: then a new vertex should be evaluated, not interpolated,
+   and refinement does add information. A mesher contract needs both
+   modes.
 4. **Crossings can have two answers.** Where two constraint segments
    cross, the new vertex lies on both, and linear interpolation along
    each can give a different value (a road crossing a contour, two survey
@@ -138,6 +149,14 @@ convex hull facets) different again. For short edges the differences are
 small; across a continent, near a pole or across the antimeridian they
 are not. Pick the coordinates in which "straight between the vertices"
 means what you want, triangulate there, and carry the attribute.
+
+Getting into those coordinates is rarely the hard part. Transforming
+the points to a suitable projection (or to geocentric xyz), working
+there, and transforming the result back is one call each way with PROJ.
+Building spherical distance into a method instead (as geodensity does for
+kernel density) saves that step, and matters mainly when no single
+projection covers the data well: global extents, the poles, data spanning
+the antimeridian.
 
 The same holds for a 2.5D terrain: the interpolation is linear over the xy
 footprint, so on steep slopes the surface triangles are larger than their
@@ -181,6 +200,7 @@ CRAN packages first; [GitHub] marks the rest.
   the gradient error; long thin triangles along a feature are fine.
 - Constraints place edges but do not create jumps; a jump needs two
   values at the same place.
-- Steiner points add triangles, not information.
+- Steiner points add triangles, not information, unless the attribute
+  can be evaluated exactly at the new vertex.
 - The weights are linear in the coordinates you triangulated in: choose
   them on purpose.
