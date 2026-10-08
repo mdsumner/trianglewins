@@ -225,11 +225,17 @@ between the vertices" means what you want, triangulate there, and carry
 the attribute.</p>
 <p>Getting into those coordinates is rarely the hard part. Transforming
 the points to a suitable projection (or to geocentric xyz), working
-there, and transforming the result back is one call each way with PROJ.
-Building spherical distance into a method instead (as geodensity does
-for kernel density) saves that step, and matters mainly when no single
-projection covers the data well: global extents, the poles, data
-spanning the antimeridian.</p>
+there, and transforming the result back is one call each way with PROJ,
+and cheaper still when the transformation object is created once and
+reused (<code>PROJ::proj_trans_create()</code>). geographiclib [CRAN]
+vectorises the projection parameters themselves, so every point or
+feature can have its own centre in one call
+(<code>azeq_fwd(x, lon0, lat0)</code>, <code>tm_fwd(x, lon0)</code>): a
+local projection per feature costs no more than a global one. Building
+spherical distance into a method instead (as geodensity does for kernel
+density) saves that step, and matters mainly when no single projection
+covers the data well: global extents, the poles, data spanning the
+antimeridian.</p>
 <p>The same holds for a 2.5D terrain: the interpolation is linear over
 the xy footprint, so on steep slopes the surface triangles are larger
 than their footprint suggests, and a sizing field set in xy undercounts

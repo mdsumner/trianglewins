@@ -408,10 +408,11 @@ the points, only not strictly Delaunay in the geodesic sense.
 <strong>reproj::reproj_xyz()</strong> or
 <strong>reproj::reproj()</strong> (which also transforms whole meshes),
 <strong>PROJ::proj_trans()</strong>,
-<strong>gdalraster::transform_xy()</strong> (z kept if given), and the
-transformations in <strong>sf</strong>, <strong>terra</strong> and other
-PROJ based packages [all CRAN]. On a sphere you can compute it directly:
-<code>x = cos(lat) * cos(lon)</code>,
+<strong>gdalraster::transform_xy()</strong> (z kept if given),
+<strong>geographiclib::geocentric_fwd()</strong> (no PROJ needed), and
+the transformations in <strong>sf</strong>, <strong>terra</strong> and
+other PROJ based packages [all CRAN]. On a sphere you can compute it
+directly: <code>x = cos(lat) * cos(lon)</code>,
 <code>y = cos(lat) * sin(lon)</code>, <code>z = sin(lat)</code>
 (radians).</li>
 <li>Hull: <strong>geometry::convhulln(xyz) [CRAN]</strong> returns a

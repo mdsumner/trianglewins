@@ -256,7 +256,7 @@ interactive tool, a simulation that moves a boundary, streaming data).
     on the source datum's ellipsoid), for example **reproj::reproj_xyz()**
     or **reproj::reproj()** (which also transforms whole meshes),
     **PROJ::proj_trans()**, **gdalraster::transform_xy()** (z kept if
-    given), and the transformations in **sf**, **terra** and other PROJ
+    given), **geographiclib::geocentric_fwd()** (no PROJ needed), and the transformations in **sf**, **terra** and other PROJ
     based packages [all CRAN]. On a sphere you can compute it directly:
     `x = cos(lat) * cos(lon)`, `y = cos(lat) * sin(lon)`, `z = sin(lat)`
     (radians).

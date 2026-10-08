@@ -152,7 +152,13 @@ means what you want, triangulate there, and carry the attribute.
 
 Getting into those coordinates is rarely the hard part. Transforming
 the points to a suitable projection (or to geocentric xyz), working
-there, and transforming the result back is one call each way with PROJ.
+there, and transforming the result back is one call each way with PROJ,
+and cheaper still when the transformation object is created once and
+reused (`PROJ::proj_trans_create()`). geographiclib [CRAN] vectorises
+the projection parameters themselves, so every point or feature can have
+its own centre in one call (`azeq_fwd(x, lon0, lat0)`,
+`tm_fwd(x, lon0)`): a local projection per feature costs no more than a
+global one.
 Building spherical distance into a method instead (as geodensity does for
 kernel density) saves that step, and matters mainly when no single
 projection covers the data well: global extents, the poles, data spanning
