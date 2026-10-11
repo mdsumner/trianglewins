@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>trianglewins</title>
+<meta name="description" content="Constrained triangulation in R: a survey of R triangulation packages, a benchmark of laridae, cdtr, trowel and RTriangle, and a guide to choosing a package.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--grid); min-width: 9em; }
+th:first-child, td:first-child { min-width: 13em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; }
+</style>
+<style>
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 20px; }
+.card { display: block; background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px; text-decoration: none; color: var(--text-primary); }
+.card:hover { border-color: var(--link); }
+.card h2 { margin: 0 0 6px; font-size: 17px; color: var(--link); }
+.card p { margin: 0; color: var(--text-secondary); font-size: 14px; }
+p.lede { color: var(--text-secondary); margin: 0 0 8px; max-width: 760px; }
+</style>
+</head>
+<body>
+<main>
+<h1>trianglewins</h1>
+<p class="lede">Constrained triangulation in R: the same inputs through every backend, judged
+by code that belongs to none of them. Backends are laridae (CGAL), cdtr (CDT), trowel (spade)
+and RTriangle (Triangle).</p>
+<div class="cards">
+<a class="card" href="survey/">
+<h2>Survey of R triangulation packages</h2>
+<p>About 35 packages classified by algorithm (ear cutting, Delaunay, constrained, quality
+refinement), upstream library, input form, constraints and output control, with a lineage
+table and a capability matrix.</p>
+</a>
+<a class="card" href="bench/">
+<h2>Benchmark at scale</h2>
+<p>Times, memory and mesh quality on geoBoundaries country polygons, from 23 thousand to
+6.8 million vertices: constrained, area and quality refinement, point Delaunay, and edits to a
+live mesh.</p>
+</a>
+<a class="card" href="choose/">
+<h2>Choosing a package</h2>
+<p>For R users: what to try for each kind of problem, from filling polygons for drawing to
+quality meshes, statistical meshes and editable meshes. CRAN packages first.</p>
+</a>
+<a class="card" href="roadmap/">
+<h2>Roadmap for R and Python</h2>
+<p>Which development steps help most, the CRAN order for cdtr, laridae and trowel with what
+blocks each, the Python landscape, and what we can offer other package authors.</p>
+</a>
+<a class="card" href="dimension/">
+<h2>On dimension</h2>
+<p>Coordinate dimension (xy, xyz) versus topological dimension (point, segment, triangle,
+tetrahedron): what GIS, geometry, graphics, finite-element and array tools each mean by
+"2D", "3D" and "2.5D", and where mixing them up gives wrong meshes.</p>
+</a>
+<a class="card" href="interpolation/">
+<h2>Interpolation on triangles</h2>
+<p>What linear interpolation on a mesh promises, how triangle size, shape, constraints and new
+vertices decide the answer, the several meanings of "interpolation", and which R tools do each job.</p>
+</a>
+<a class="card" href="context/">
+<h2>Triangulation in context</h2>
+<p>Why triangles are everywhere, what earcut (decido) and the GEOS functions do and do not promise,
+what silicate and anglr tried before, and why laridae is built on CGAL, with one set of examples run
+through all three.</p>
+</a>
+</div>
+<p class="muted" style="margin-top:28px">On dimension: these pages keep coordinate dimension (coordinates per vertex: xy, xyz, xyzt) apart from topological dimension (0 point, 1 segment, 2 triangle, 3 tetrahedron); see <a href="dimension/">On dimension</a>.</p>
+<p class="muted" style="margin-top:28px">Source:
+<a href="https://github.com/mdsumner/trianglewins">mdsumner/trianglewins</a>.</p>
+</main>
+</body>
+</html>

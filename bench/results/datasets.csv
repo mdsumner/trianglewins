@@ -1,0 +1,13 @@
+name,kind,vertices,segments,countries,note
+kosovo,segments,23338,23338,XKX,"one polygon, landlocked"
+cuba,segments,24454,24454,CUB,main island plus keys
+southern_africa,segments,317523,317532,ZAF LSO SWZ NAM BWA ZWE MOZ ZMB MWI AGO,"coverage of 10 countries, shared borders"
+norway,segments,131404,131404,NOR,fjords and skerries
+indonesia,segments,253999,253999,IDN,248 islands
+canada,segments,527658,527662,CAN,arctic archipelago
+south_america,segments,634570,634587,ARG BOL BRA CHL COL ECU GUY PRY PER SUR URY VEN,"coverage of 12 countries, shared borders"
+world,segments,6777640,6777884,all,every CGAZ country
+southern_africa_rings,segments,475278,475278,ZAF LSO SWZ NAM BWA ZWE MOZ ZMB MWI AGO,the same coverage with every ring in full: shared borders twice
+points_10000,points,10000,0,all,"points sampled from CGAZ vertices, no segments"
+points_100000,points,100000,0,all,"points sampled from CGAZ vertices, no segments"
+points_1000000,points,1000000,0,all,"points sampled from CGAZ vertices, no segments"

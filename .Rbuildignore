@@ -3,3 +3,6 @@
 ^README\.Rmd$
 ^trianglewins\.Rproj$
 ^guide$
+^bench$
+^docs$
+^survey$

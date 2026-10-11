@@ -23,7 +23,7 @@ Suggests:
     testthat (>= 3.0.0),
     trowel
 Remotes:
-    hypertidy/cdtr@cpp11,
+    hypertidy/cdtr,
     hypertidy/laridae,
     hypertidy/trowel
 Config/testthat/edition: 3

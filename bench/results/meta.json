@@ -1,0 +1,1 @@
+{"run": "Run 6 October 2026 on a 4-core Intel Xeon 2.1 GHz Linux container with 16 GB memory, R 4.3.3. laridae 84ef81d (CGAL 6.1), cdtr 93af86f (cpp11 branch), trowel 32e0fe8 (spade 2.15), RTriangle 1.6-0.15. Jobs ran one at a time with a 900 s timeout and a 12 GB address-space cap."}
