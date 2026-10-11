@@ -69,25 +69,20 @@ th { color: var(--text-secondary); font-weight: 600; }
 <h1
 id="triangulation-in-context-earcut-geos-cgal-and-the-hypertidy-stack">Triangulation
 in context: earcut, GEOS, CGAL and the hypertidy stack</h1>
-<p>11 October 2026. Some background to the harness: why triangles turn
-up everywhere, what the common R routes (decido's earcut and the GEOS
-functions) do and do not promise, what silicate and anglr tried before,
-and why laridae is built on CGAL. The full list of packages is in the <a
-href="../survey/">survey</a> and the advice on picking one is in the <a
-href="../choose/">guide</a>. This page doesn't repeat either of them. It
-runs one set of small examples through three engines so the differences
-are easy to see.</p>
-<p>All figures and numbers come from <a
-href="https://github.com/mdsumner/trianglewins/blob/main/survey/context/figures.R"><code>survey/context/figures.R</code></a>,
-run on laridae 0.1.0 (7495e75), cdtr 0.1.0, decido 0.4.1, geos 0.2.5
-(GEOS 3.11.1), RTriangle 1.6-0.15 and R 4.3.3. The numbers are written
-to <code>survey/context/results.csv</code>. The page uses the vocabulary
-of <a href="../dimension/">On dimension</a>: coordinates are xy, and a
-value carried at a vertex is an attribute.</p>
+<p>11 October 2026. Why triangles turn up everywhere, what decido's
+earcut and the GEOS functions do and do not promise, what silicate and
+anglr tried before, and why laridae is built on CGAL, with one set of
+small examples run through all three. The package list and quick advice
+are in the <a href="../survey/">survey</a>.</p>
+<p>Figures and numbers come from <a
+href="https://github.com/mdsumner/trianglewins/blob/main/survey/context/figures.R"><code>survey/context/figures.R</code></a>
+(laridae 0.1.0 7495e75, cdtr 0.1.0, decido 0.4.1, geos 0.2.5 on GEOS
+3.11.1, RTriangle 1.6-0.15, R 4.3.3), which writes
+<code>survey/context/results.csv</code>.</p>
 <h2 id="why-triangles">Why triangles</h2>
 <p>Triangles are the simplest shape that tiles any polygon, and a
-triangle can carry a linear function exactly. As a result, triangulation
-sits under a lot of everyday work:</p>
+triangle carries a linear function exactly, so triangulation sits under
+a lot of everyday work:</p>
 <ul>
 <li><strong>Drawing.</strong> GPUs draw triangles and nothing else, so
 every filled map polygon in rgl, deck.gl, WebGL or a game engine is
@@ -97,8 +92,8 @@ shape doesn't matter.</li>
 grid, and 2.5D meshes where z rides along on triangles built in xy
 (lidR, lasR, terrainmeshr, anglr).</li>
 <li><strong>Interpolation.</strong> Linear interpolation of scattered
-data inside each triangle, or natural neighbour methods (interp, akima;
-see <a href="../interpolation/">Interpolation on triangles</a>).</li>
+data inside each triangle, or natural neighbour methods (interp; see <a
+href="../notes/#interpolation">Notes</a>).</li>
 <li><strong>Neighbours and Voronoi.</strong> Delaunay edges give a
 neighbour graph, and Voronoi tiles are its dual (deldir, spatstat, and
 the Voronoi functions in sf, geos and terra).</li>
@@ -117,11 +112,10 @@ interpolating across a mesh.</li>
 <li><strong>Discrete global grids.</strong> Icosahedral and HEALPix
 grids are meshes on the sphere.</li>
 </ul>
-<p>These jobs need different guarantees. Some need no new vertices, some
-need every input edge kept, some need good angles, some need a size that
-varies over the domain, and some need to edit the mesh after it is
-built. So "triangulate" names several problems, and the packages differ
-much more in what they promise than in how fast they are.</p>
+<p>These jobs need different guarantees: no new vertices, every input
+edge kept, good angles, varying size, or editing after the build.
+Packages differ much more in what they promise than in how fast they
+are.</p>
 <h2 id="a-few-words">A few words</h2>
 <ul>
 <li><strong>PSLG</strong> (planar straight line graph): vertices plus
@@ -166,9 +160,8 @@ all. Ear cutting makes no promise about triangle shape and is not
 Delaunay. On the North Carolina counties below, 38.3% of earcut's
 triangles have an angle under 10 degrees, and some are degenerate
 (minimum angle 0), because collinear vertices on a ring become flat
-ears. decido grew out of rearcut (earcut.js in V8). It is what
-silicate's <code>TRI()</code> and <code>TRI0()</code> and anglr's TRI
-use, and raybevel and rayvertex use it for extruded and roof models.</p>
+ears. It is what silicate's <code>TRI()</code> and <code>TRI0()</code>
+use.</p>
 <p><strong>GEOS (geos, sf, terra, gdalraster).</strong> GEOS has two
 functions that are easy to confuse:</p>
 <p><img src="geos-two.png"
@@ -187,21 +180,12 @@ each polygon on its own. Given the square and the polyline as one
 geometry collection, it returned the 2 triangles of the square on its
 own: the line is dropped.</li>
 </ul>
-<p>The result is geometry (a GEOMETRYCOLLECTION of triangle POLYGONs),
-not an index. To get a mesh back, the script reads the coordinates with
-<code>wk::wk_coords()</code> and matches them exactly to rebuild a
-shared vertex table. That works here because GEOS copies input
-coordinates unchanged, but vertex identity is recovered by exact
-floating-point equality, which is the weakest way to know two vertices
-are the same. The same GEOS code is reached through
-<code>sf::st_triangulate()</code> and
-<code>sf::st_triangulate_constrained()</code>,
-<code>terra::delaunay()</code> (with <code>constrained = TRUE</code>)
-and <code>gdalraster::g_delaunay_triangulation()</code>, which goes
-through GDAL's OGR layer, so the GEOS version is the one GDAL was built
-with. That makes four interfaces to one engine.
-<code>rgeos::gDelaunayTriangulation()</code> was the first; it left CRAN
-in 2023.</p>
+<p>The result is geometry (triangle POLYGONs), not an index. To get a
+mesh back, the script matches coordinates exactly to rebuild a shared
+vertex table. That works because GEOS copies input coordinates
+unchanged, but exact floating-point equality is the weakest way to know
+two vertices are the same. sf, terra and gdalraster reach the same GEOS
+code.</p>
 <p><strong>laridae (CGAL).</strong> One call each, with the same
 function: <code>lari_new(x, y, s0, s1)</code>. In the figure, triangles
 are coloured by depth, with the convex hull kept
@@ -292,10 +276,10 @@ interpolated as 2.325, which is exact.</li>
 </tr>
 </tbody>
 </table>
-<p>earcut and GEOS are the right tools for drawing and for quick
-per-polygon jobs, and they are far lighter to install. laridae is for
-when the segments matter: they have to be kept exactly, shared, allowed
-to cross, traced back to their input, refined around, or edited.</p>
+<p>earcut and GEOS are the right tools for drawing and quick per-polygon
+jobs, and far lighter to install. laridae is for when the segments
+matter: kept exactly, shared, allowed to cross, traced back to their
+input, refined around, or edited.</p>
 <h2 id="north-carolina-as-a-coverage">North Carolina as a coverage</h2>
 <p>The harness's <code>nc_rings</code> case holds sf's 100 North
 Carolina counties as 108 rings given in full: 2421 vertices and 2421
@@ -349,14 +333,13 @@ following:</p>
 <p><img src="nc-three.png"
 alt="A window on central North Carolina: earcut, GEOS and laridae&#39;s CDT, and laridae refined" /></p>
 <p>The GEOS triangles are <em>identical</em> to laridae's CDT, as sets
-of triangles, while only 32% of earcut's triangles appear in it. That is
-the expected result rather than a coincidence. For valid polygons that
-do not overlap, a constrained Delaunay triangulation of each polygon is
-the CDT of the whole, and GEOS's flips get it there. The difference
-between them is not the triangles. It is everything around them: GEOS
-needs valid polygons, works one polygon at a time, hands back geometry,
-and stops there. laridae accepts any segment set, returns one mesh with
-shared vertices and provenance, and can go on to refine and edit it.</p>
+of triangles, while only 32% of earcut's appear in it. That is expected:
+for valid, non-overlapping polygons the CDT of each polygon is the CDT
+of the whole, and GEOS's flips get there. The difference is everything
+around the triangles: GEOS needs valid polygons, works one at a time,
+returns geometry and stops. laridae takes any segment set, returns one
+mesh with shared vertices and provenance, and can refine and edit
+it.</p>
 <p>Refined with the harness's real-data setting (maximum area of the
 bounding box area / 5000, minimum angle 20 degrees), the three
 Ruppert-style engines give laridae 6280 triangles, cdtr 6525 and
@@ -380,9 +363,9 @@ to update a triangulation, add segments to a point triangulation, and
 work at the level of shared edges.</p>
 <ul>
 <li><strong>RTriangle</strong> (Shewchuk's Triangle, packaged by David
-Sterratt and split out of retistruct) is the reference Ruppert/Chew
-mesher, fast and excellent. Its licence forbids commercial use, and that
-clause carries over to every package built on it.</li>
+Sterratt) is the reference Ruppert/Chew mesher, fast and excellent, but
+its licence forbids commercial use, and that carries over to everything
+built on it.</li>
 <li><strong>sfdct</strong> (hypertidy, archived from CRAN) gave sf users
 constrained Delaunay via RTriangle.</li>
 <li><strong>silicate</strong> (CRAN; 0.7.2 accepted October 2026)
@@ -413,11 +396,11 @@ polygon;</li>
 give.</li>
 </ul>
 <p>silicate's models and verbs remain the abstraction worth keeping;
-what changes is the machinery underneath. The engines now are cdtr
-(artem-ogre/CDT, header-only, MPL-2.0), the lightweight default; laridae
-(CGAL), the full-contract engine; and trowel (spade, in Rust), a third
-live handle. All three take and return the same tables, and this harness
-judges them. Those tables are the triangle form of the hypertidy <a
+what changes is the machinery underneath: cdtr (CDT, MPL-2.0), the
+lightweight default; laridae (CGAL), the full-contract engine; and
+trowel (spade, in Rust), a third live handle. All three take and return
+the same tables, and this harness judges them. Those tables are the
+triangle form of the hypertidy <a
 href="https://github.com/hypertidy/meshcore/blob/main/docs/mesh-spec-v0.1.md">mesh
 spec v0.1</a>: input vertices first, <code>origin</code>,
 counter-clockwise triangles, 1-based rows in R, and depth counted per
@@ -491,20 +474,12 @@ come from R's RNG. laridae uses
 <code>LinkingTo: cpp11, Rcpp, RcppCGAL, BH</code>, so no system CGAL is
 needed.</li>
 </ul>
-<h2 id="choosing-briefly">Choosing, briefly</h2>
-<ul>
-<li>Drawing filled polygons: decido.</li>
-<li>Quick per-polygon triangles, or point Delaunay of spatial objects:
-the GEOS functions in geos, sf or terra.</li>
-<li>Point Delaunay and Voronoi: deldir.</li>
-<li>Meshes for SPDE models: fmesher.</li>
-<li>Meshing a general segment set with a permissive licence: cdtr (CRAN
-release in progress).</li>
-<li>The full contract (crossings, the constraint-to-input map, stable
-ids, editing, sizing fields, quality over a convex hull): laridae.</li>
-</ul>
-<p>The long version, CRAN first, is in the <a
-href="../choose/">guide</a>.</p>
+<h2 id="choosing">Choosing</h2>
+<p>Quick answers by kind of problem, CRAN first, are at the top of the
+<a href="../survey/#quick-answers">survey</a>. In short: decido to draw
+polygons, the GEOS functions for quick per-polygon jobs, deldir for
+points, fmesher for SPDE meshes, cdtr for a general segment set under a
+permissive licence, and laridae for the full contract.</p>
 <h2 id="references">References</h2>
 <ul>
 <li>CGAL: <a href="https://www.cgal.org/">https://www.cgal.org/</a>; 2D

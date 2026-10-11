@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notes: dimension and interpolation</title>
+<meta name="description" content="Coordinate versus topological dimension, triangles on the sphere, and what linear interpolation on a mesh promises.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--grid); min-width: 9em; }
+th:first-child, td:first-child { min-width: 13em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../">trianglewins</a> / notes</p>
+<h1 id="notes-dimension-and-interpolation">Notes: dimension and
+interpolation</h1>
+<p>Two words that cause most of the confusion around triangulation, and
+the wording the rest of this site uses for them.</p>
+<h2 id="dimension">Dimension</h2>
+<p>"2D" and "3D" mean different things in different communities: a "3D
+mesh" is a surface of triangles to a graphics programmer and a volume of
+tetrahedra to a finite-element analyst. Two meanings matter here.</p>
+<ul>
+<li><strong>Coordinate dimension</strong>: coordinates per vertex. xy is
+2, xyz 3, xyzm or xyzt 4.</li>
+<li><strong>Topological dimension</strong>: the dimension of the shape.
+Point 0, segment 1, triangle or polygon 2, tetrahedron 3; a
+k-dimensional cell is a k-simplex.</li>
+</ul>
+<p>The topological dimension never exceeds the coordinate dimension and
+is often smaller: a triangle in xyz is a piece of surface. A
+triangulation is always made of topologically 2-dimensional cells,
+whatever its coordinates.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Community</th>
+<th>Coordinate count</th>
+<th>Shape dimension</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>OGC, PostGIS</td>
+<td>coordinate dimension (<code>ST_CoordDim</code>); M is a measure, not
+spatial</td>
+<td><code>ST_Dimension</code></td>
+</tr>
+<tr class="even">
+<td>sf, geos (R)</td>
+<td><code>XY</code>, <code>XYZ</code>, <code>XYM</code>,
+<code>XYZM</code>; <code>geos_coordinate_dimension()</code></td>
+<td><code>st_dimension()</code>, <code>geos_dimension()</code></td>
+</tr>
+<tr class="odd">
+<td>GEOS C API</td>
+<td>"cartesian dimension"</td>
+<td>"planar dimensionality"</td>
+</tr>
+<tr class="even">
+<td>Mathematics</td>
+<td>ambient dimension</td>
+<td>intrinsic dimension; codimension is the difference</td>
+</tr>
+<tr class="odd">
+<td>CGAL, Qhull</td>
+<td><code>_2</code>, <code>_3</code> suffixes name the ambient
+dimension</td>
+<td><code>dimension()</code>, which drops for degenerate input</td>
+</tr>
+<tr class="even">
+<td>Graphics</td>
+<td>"3D" means xyz</td>
+<td>rarely named; a "3D mesh" is usually a surface</td>
+</tr>
+<tr class="odd">
+<td>Finite elements, fdaPDE</td>
+<td>spatial dimension</td>
+<td>element dimension; fdaPDE's <code>mesh.2.5D</code> is triangles in
+xyz, <code>mesh.1.5D</code> segments in xy</td>
+</tr>
+<tr class="even">
+<td>GIS terrain</td>
+<td>xyz points</td>
+<td>"2.5D": z = f(x, y)</td>
+</tr>
+<tr class="odd">
+<td>Arrays (netCDF, xarray, stars)</td>
+<td>neither: a dimension is an array axis</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>"2.5D" always means one coordinate more than the shape uses, but
+which shape varies. Here it means the terrain sense: triangles built
+from xy with z carried, so z is a function of x and y. In fdaPDE it is
+any surface in xyz.</p>
+<p>Where mixing them up goes wrong:</p>
+<ol type="1">
+<li><strong>Delaunay of xyz points is not a surface.</strong> It gives
+tetrahedra filling the hull. For a terrain, triangulate xy and carry z;
+for a sphere, take the convex hull (below).</li>
+<li><strong>Refinement bounds are measured in the coordinates the mesher
+sees.</strong> With z carried, a maximum area bounds the xy footprint,
+not the surface; in longitude and latitude, areas are in degrees squared
+and distort towards the poles.</li>
+<li><strong>Degenerate input lowers the dimension.</strong> Collinear
+points have no triangles: CGAL reports <code>dimension() == 1</code>,
+Qhull stops unless joggled.</li>
+<li><strong>Attributes are not coordinates</strong> until you make them
+so. Elevation or time carried on vertices is interpolated onto new
+vertices but plays no part in where vertices go.</li>
+</ol>
+<p>This site writes xy, xyz and so on for coordinates, names shapes
+(triangles in xy, triangles in xyz, tetrahedra in xyz), uses 2.5D only
+in the terrain sense, and avoids bare "2D" and "3D".</p>
+<h2 id="triangles-on-the-sphere">Triangles on the sphere</h2>
+<p>For points on a sphere or ellipsoid, without constraints or
+refinement: convert to geocentric xyz (<code>"+proj=cart"</code> through
+reproj, PROJ, gdalraster, sf or terra; or
+<code>x = cos(lat) cos(lon)</code>, <code>y = cos(lat) sin(lon)</code>,
+<code>z = sin(lat)</code> on a sphere) and take
+<code>geometry::convhulln(xyz)</code>. Every point of a convex surface
+is a hull vertex, so the hull's facets triangulate the surface, and on a
+sphere they are exactly the spherical Delaunay triangulation. Vertex
+order is kept, so map back by index. Regional data gets a facet spanning
+the uncovered part; drop it by facet normal or maximum edge length. With
+constraints or refinement, use fmesher or tulpaMesh, or project to a
+local planar CRS first.</p>
+<h2 id="interpolation">Interpolation</h2>
+<p>A triangulation is most often built to carry values. The word covers
+several jobs that share little: scattered data to a surface (the main
+one here); resampling a grid (bilinear is not triangle-linear, and
+splitting cells into triangles depends on the diagonal); attributes onto
+vertices a mesher adds; interpolating a coordinate transformation across
+a mesh (texture reprojection, GDAL's approximate transformer); and areal
+interpolation of totals between polygons
+(<code>sf::st_interpolate_aw()</code>), which interpolates no point
+values at all.</p>
+<h3 id="linear-on-a-triangle">Linear on a triangle</h3>
+<p>Inside a triangle the value is w1 v1 + w2 v2 + w3 v3, with
+barycentric weights. Across the mesh this is a piecewise linear surface.
+It is exact for planes, continuous, and never overshoots the data, but
+its gradient jumps across every edge and the answer depends on the
+triangulation: the centre of a square differs by diagonal. Delaunay
+gives the least rough surface of any triangulation of the same points
+(Rippa, 1990). Triangle methods stop at the hull unless told to
+extrapolate.</p>
+<h3 id="size-and-shape">Size and shape</h3>
+<p>Along an edge of length h, the error is at most h^2 / 8 times the
+largest second derivative, so a tolerance becomes a target size wherever
+the curvature is known; that is what a sizing field such as laridae's is
+for. The value error depends on size; the gradient error depends on the
+largest angle (Babuska and Aziz, 1976). Small angles alone are harmless,
+so a long thin triangle along a ridge can be a good one, though
+isotropic meshers will avoid it.</p>
+<h3 id="the-mesh-decides-the-answer">The mesh decides the answer</h3>
+<ol type="1">
+<li><strong>Constraints place edges, not jumps.</strong> A breakline
+stops triangles straddling it, but the surface is still continuous
+across it. A real discontinuity needs two vertex rows at the same xy,
+one per side.</li>
+<li><strong>Contours make flat triangles</strong> whose three vertices
+share a value, terracing the surface. Refinement cannot fix that; it
+needs extra information.</li>
+<li><strong>Steiner points add triangles, not information,</strong> when
+the attribute is a measurement: their values are interpolated from the
+triangle they fall in (Triangle, cdtr and laridae do this; trowel
+interpolates from the mesh before refinement). When the attribute can be
+computed anywhere (a transformation, a raster you can sample), new
+vertices should be evaluated instead, and refinement does add
+information.</li>
+<li><strong>Crossings can have two answers,</strong> one along each
+segment. The mesh spec does not yet say which wins.</li>
+<li><strong>Remove outside triangles first.</strong> Interpolating
+across a hole or between polygons of a coverage mixes values that should
+not mix.</li>
+</ol>
+<h3 id="linear-in-which-coordinates">Linear in which coordinates?</h3>
+<p>Barycentric weights are linear in the coordinates the mesh was built
+in. Longitude and latitude, a projected CRS and geocentric xyz give
+different triangles and different weights; the differences are small for
+short edges and large across a continent, near a pole or across the
+antimeridian. Choose the coordinates on purpose. Transforming there and
+back is one PROJ call each way, and geographiclib vectorises projection
+centres, so a local projection per feature costs no more than a global
+one.</p>
+<p>For a reprojection mesh, test a point in each triangle against the
+exact transformation and split where the error exceeds a tolerance;
+rims, poles and seams are better inserted as constraints than found by
+refinement.</p>
+<h3 id="r-tools">R tools</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Job</th>
+<th>Try</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Scattered points to a grid, linear</td>
+<td><code>interp::interp(method = "linear")</code></td>
+</tr>
+<tr class="even">
+<td>Smoother</td>
+<td><code>interp::interp(method = "akima")</code>; Sibson via
+<code>interpolation::interpfun()</code>; without triangles: gstat,
+fields::Tps, MBA, terra::interpIDW</td>
+</tr>
+<tr class="odd">
+<td>GDAL's linear gridder</td>
+<td><code>sf::gdal_utils("grid", ...)</code> with
+<code>-a linear</code></td>
+</tr>
+<tr class="even">
+<td>Values at points from a mesh</td>
+<td><code>geometry::tsearch()</code>, <code>interp::interpp()</code>,
+<code>fmesher::fm_basis()</code> (sparse weight matrix)</td>
+</tr>
+<tr class="odd">
+<td>Rasterise a TIN</td>
+<td>lidR, lasR; guerrilla [GitHub] compares methods side by side</td>
+</tr>
+<tr class="even">
+<td>Attributes onto new vertices</td>
+<td>RTriangle (<code>PA</code>), cdtr, trowel, laridae</td>
+</tr>
+<tr class="odd">
+<td>Totals between zone sets</td>
+<td><code>sf::st_interpolate_aw()</code></td>
+</tr>
+</tbody>
+</table>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 #!/bin/sh
-## Render the survey and the package guide into the Pages site:
-## docs/survey/index.html and docs/choose/index.html.
+## Render the articles into the Pages site, and write redirect stubs for
+## pages that were merged into others.
 ##   sh survey/build.sh
 set -e
 render () {
@@ -10,15 +10,29 @@ render () {
     -o "docs/$2/index.html" "survey/$1"
   echo "wrote docs/$2/index.html"
 }
+redirect () {
+  mkdir -p "docs/$1"
+  cat > "docs/$1/index.html" <<HTML
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Moved</title>
+<meta http-equiv="refresh" content="0; url=$2">
+<link rel="canonical" href="$2">
+</head>
+<body><p>This page has moved to <a href="$2">$2</a>.</p></body>
+</html>
+HTML
+  echo "wrote docs/$1/index.html (redirect)"
+}
 render r-triangulation-survey.md survey "Triangulation in R" survey \
-  "A survey of R packages that triangulate points, polygons and segment sets: algorithm, upstream library, input, constraints and output control."
-render choosing-a-package.md choose "Choosing a triangulation package" "choosing a package" \
-  "Which R package to try for each kind of triangulation problem, CRAN first."
-render dimension.md dimension "On dimension" "on dimension" \
-  "Coordinate dimension versus topological dimension: how GIS, geometry, graphics, finite elements and array tools use the word, and where it matters for triangulation."
-render interpolation.md interpolation "Interpolation on triangles" "interpolation" \
-  "Linear interpolation on triangulations: what it promises, how the mesh decides the answer, and which R tools do each job."
-render roadmap.md roadmap "Roadmap for R and Python" roadmap \
-  "Development steps, CRAN order and blockers for cdtr, laridae and trowel, and what this work can offer other R and Python triangulation packages."
+  "R packages that triangulate points, polygons and segment sets: quick answers by problem, then algorithm, upstream library, input, constraints and output control, with a look at Python."
 render context.md context "Triangulation in context" "in context" \
   "Why triangles are everywhere, what earcut and the GEOS functions promise, what silicate and anglr tried, and why laridae builds on CGAL."
+render notes.md notes "Notes: dimension and interpolation" notes \
+  "Coordinate versus topological dimension, triangles on the sphere, and what linear interpolation on a mesh promises."
+redirect choose ../survey/#quick-answers
+redirect dimension ../notes/#dimension
+redirect interpolation ../notes/#interpolation
+redirect roadmap https://github.com/hypertidy/meshcore/blob/main/docs/roadmap.md
