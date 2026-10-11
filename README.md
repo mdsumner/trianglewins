@@ -16,7 +16,7 @@ results as skipped, not as a failure. It also serves as laridae's
 acceptance test.
 
 
-The site at https://mdsumner.github.io/trianglewins/ indexes three pages:
+The site at https://mdsumner.github.io/trianglewins/ indexes these pages:
 
 - a survey of R packages that triangulate points, polygons or segment sets
   (algorithm, upstream library, input, constraints, output control), at
@@ -25,6 +25,12 @@ The site at https://mdsumner.github.io/trianglewins/ indexes three pages:
 - the performance benchmark at scale (geoBoundaries country boundaries from
   `sds::CGAZ()`, 23 thousand to 6.8 million vertices), at
   https://mdsumner.github.io/trianglewins/bench/, code in [bench/](bench/);
+- triangulation in context: why triangles turn up everywhere, earcut
+  (decido) and GEOS against laridae on the same inputs, the silicate and
+  anglr history, and why CGAL, at
+  https://mdsumner.github.io/trianglewins/context/, source in
+  [survey/context.md](survey/context.md) with figures from
+  [survey/context/figures.R](survey/context/figures.R);
 - a guide for R users choosing a triangulation package, by kind of
   problem, CRAN first, at https://mdsumner.github.io/trianglewins/choose/,
   source in [survey/choosing-a-package.md](survey/choosing-a-package.md).

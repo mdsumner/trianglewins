@@ -20,3 +20,5 @@ render interpolation.md interpolation "Interpolation on triangles" "interpolatio
   "Linear interpolation on triangulations: what it promises, how the mesh decides the answer, and which R tools do each job."
 render roadmap.md roadmap "Roadmap for R and Python" roadmap \
   "Development steps, CRAN order and blockers for cdtr, laridae and trowel, and what this work can offer other R and Python triangulation packages."
+render context.md context "Triangulation in context" "in context" \
+  "Why triangles are everywhere, what earcut and the GEOS functions promise, what silicate and anglr tried, and why laridae builds on CGAL."
