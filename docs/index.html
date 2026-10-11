@@ -74,6 +74,9 @@ p.lede { color: var(--text-secondary); margin: 0 0 8px; max-width: 760px; font-s
   background: #fff; border: 1px solid var(--border); border-radius: 10px; }
 .card.featured { grid-column: 1 / -1; border-color: var(--link); }
 .card.featured h2 { font-size: 20px; }
+.aside { margin-top: 24px; padding: 14px 16px; border-left: 3px solid var(--border);
+  color: var(--text-secondary); font-size: 14px; max-width: 760px; }
+.aside a { font-weight: 600; }
 </style>
 </head>
 <body>
@@ -112,6 +115,9 @@ interpolation on a triangle mesh does and does not promise.</p>
 to 6.8 million vertices.</p>
 </a>
 </div>
+<p class="aside">Gridded data has its own thorny word. <a href="https://hypertidy.github.io/regular-in-what/">Regular in what?</a>
+is a short companion book on why a grid is regular, rectilinear or curvilinear only
+<em>in a frame</em>, and on the communities and software that blur the difference.</p>
 <p class="muted" style="margin-top:28px">Under the hood, trianglewins is a test harness: it runs
 the same inputs through laridae (CGAL), cdtr (CDT), trowel (spade) and RTriangle (Triangle) and
 checks the results with code that belongs to none of them. See the

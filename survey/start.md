@@ -167,7 +167,9 @@ or points, and never sees two polygons as one mesh.
 squared means different things at the equator and near the poles, and
 "nicely shaped" triangles in degrees are stretched on the ground.
 Project your data first, as above, unless you are deliberately meshing
-the sphere.
+the sphere. The same trap catches gridded data, where a grid can be
+regular in one frame and curved in another; that is the subject of
+[Regular in what?](https://hypertidy.github.io/regular-in-what/).
 
 ## Which package?
 

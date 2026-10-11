@@ -1,7 +1,9 @@
 # Notes: dimension and interpolation
 
 Two words that cause most of the confusion around triangulation, and the
-wording the rest of this site uses for them.
+wording the rest of this site uses for them. A third word, "regular", gets
+the same treatment for gridded data in the companion book
+[Regular in what?](https://hypertidy.github.io/regular-in-what/).
 
 ## Dimension
 
