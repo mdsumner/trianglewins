@@ -76,6 +76,79 @@ cdtr is on GitHub (`remotes::install_github("hypertidy/cdtr")`). On
 CRAN, fmesher does this job for statistical meshes, and RTriangle does
 it in general but has a non-commercial licence.
 
+## Triangles as a network
+
+Once you have triangles you also have a network. Every triangle edge
+joins two points that are neighbours, every triangle knows the
+triangles beside it, and lengths and areas come straight from the
+coordinates. That is why triangulation answers questions such as "who
+is next to whom", "how far apart are they", and "how much ground does
+each one cover". It also lets you cut a region into pieces of equal
+size, so you can hand out the work.
+
+![County centres joined by Delaunay edges with Wake's neighbours highlighted; Voronoi tiles coloured by area; Wake's mesh in eight equal-area batches](network.png)
+
+**Neighbours and distances.** spdep builds its neighbour lists from a
+Delaunay triangulation of points:
+
+```r
+nc <- st_transform(nc, 32119)
+centres <- st_centroid(st_geometry(nc))
+cxy <- st_coordinates(centres)
+nb <- spdep::tri2nb(cxy)                 # each county's Delaunay neighbours
+i <- which(nc$NAME == "Wake")
+nc$NAME[nb[[i]]]                         # Franklin Durham Chatham Johnston Lee Harnett
+spdep::nbdists(nb, cxy)[[i]] / 1000      # 46 34 55 40 59 50 km
+```
+
+These are neighbours of the *points*, not of the counties. Lee is
+listed but doesn't touch Wake, while Granville and Nash do touch it and
+are missing. If you need counties that share a border, use
+`spdep::poly2nb(nc)`. A Delaunay triangulation also joins points across
+open ground: see the long edges along the coast. Trim edges that are
+longer than makes sense for your data.
+
+**Catchments.** The Voronoi tiles are the other side of the same
+triangulation. Each tile holds the ground closer to its point than to any
+other point, so its area says how much room that point has: large tiles
+mean sparse points.
+
+```r
+tiles <- st_voronoi(st_union(centres), st_as_sfc(st_bbox(nc))) |>
+  st_collection_extract() |>
+  st_intersection(st_union(nc))
+tiles <- tiles[unlist(st_intersects(centres, tiles))]   # back in county order
+st_area(tiles)
+```
+
+**Work in equal pieces.** A refined mesh has many small triangles of
+similar size. Sort them into batches of equal area and you can send
+each batch to a different worker, field team or process. Here, Wake's
+mesh from above is split into eight batches of about 274 km^2 each:
+
+```r
+v <- m$P; tri <- m$T
+tx <- matrix(v[tri, 1], ncol = 3); ty <- matrix(v[tri, 2], ncol = 3)
+area <- abs((tx[, 2] - tx[, 1]) * (ty[, 3] - ty[, 1]) -
+            (tx[, 3] - tx[, 1]) * (ty[, 2] - ty[, 1])) / 2
+halve <- function(cx, cy, a, k) {        # k batches of equal area, k a power of 2
+  if (k == 1) return(rep(1L, length(a)))
+  v <- if (diff(range(cx)) > diff(range(cy))) cx else cy
+  o <- order(v)
+  i <- seq_along(a) %in% o[cumsum(a[o]) <= sum(a) / 2]
+  g <- integer(length(a))
+  g[i] <- halve(cx[i], cy[i], a[i], k / 2)
+  g[!i] <- halve(cx[!i], cy[!i], a[!i], k / 2) + k / 2
+  g
+}
+batch <- halve(rowMeans(tx), rowMeans(ty), area, 8)
+tapply(area, batch, sum) / 1e6           # km^2 in each batch
+```
+
+Each batch is a set of triangle rows, so the triangles that share an
+edge with another batch are easy to find when the pieces have to be
+stitched back together.
+
 ## Three things that catch people out
 
 **Neighbouring polygons should be meshed together.** If you mesh each

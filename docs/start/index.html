@@ -129,6 +129,64 @@ edge that must be kept. cdtr is on GitHub
 (<code>remotes::install_github("hypertidy/cdtr")</code>). On CRAN,
 fmesher does this job for statistical meshes, and RTriangle does it in
 general but has a non-commercial licence.</p>
+<h2 id="triangles-as-a-network">Triangles as a network</h2>
+<p>Once you have triangles you also have a network. Every triangle edge
+joins two points that are neighbours, every triangle knows the triangles
+beside it, and lengths and areas come straight from the coordinates.
+That is why triangulation answers questions such as "who is next to
+whom", "how far apart are they", and "how much ground does each one
+cover". It also lets you cut a region into pieces of equal size, so you
+can hand out the work.</p>
+<p><img src="network.png"
+alt="County centres joined by Delaunay edges with Wake&#39;s neighbours highlighted; Voronoi tiles coloured by area; Wake&#39;s mesh in eight equal-area batches" /></p>
+<p><strong>Neighbours and distances.</strong> spdep builds its neighbour
+lists from a Delaunay triangulation of points:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>nc <span class="ot">&lt;-</span> <span class="fu">st_transform</span>(nc, <span class="dv">32119</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>centres <span class="ot">&lt;-</span> <span class="fu">st_centroid</span>(<span class="fu">st_geometry</span>(nc))</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>cxy <span class="ot">&lt;-</span> <span class="fu">st_coordinates</span>(centres)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>nb <span class="ot">&lt;-</span> spdep<span class="sc">::</span><span class="fu">tri2nb</span>(cxy)                 <span class="co"># each county&#39;s Delaunay neighbours</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>i <span class="ot">&lt;-</span> <span class="fu">which</span>(nc<span class="sc">$</span>NAME <span class="sc">==</span> <span class="st">&quot;Wake&quot;</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>nc<span class="sc">$</span>NAME[nb[[i]]]                         <span class="co"># Franklin Durham Chatham Johnston Lee Harnett</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>spdep<span class="sc">::</span><span class="fu">nbdists</span>(nb, cxy)[[i]] <span class="sc">/</span> <span class="dv">1000</span>      <span class="co"># 46 34 55 40 59 50 km</span></span></code></pre></div>
+<p>These are neighbours of the <em>points</em>, not of the counties. Lee
+is listed but doesn't touch Wake, while Granville and Nash do touch it
+and are missing. If you need counties that share a border, use
+<code>spdep::poly2nb(nc)</code>. A Delaunay triangulation also joins
+points across open ground: see the long edges along the coast. Trim
+edges that are longer than makes sense for your data.</p>
+<p><strong>Catchments.</strong> The Voronoi tiles are the other side of
+the same triangulation. Each tile holds the ground closer to its point
+than to any other point, so its area says how much room that point has:
+large tiles mean sparse points.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>tiles <span class="ot">&lt;-</span> <span class="fu">st_voronoi</span>(<span class="fu">st_union</span>(centres), <span class="fu">st_as_sfc</span>(<span class="fu">st_bbox</span>(nc))) <span class="sc">|&gt;</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_collection_extract</span>() <span class="sc">|&gt;</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_intersection</span>(<span class="fu">st_union</span>(nc))</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>tiles <span class="ot">&lt;-</span> tiles[<span class="fu">unlist</span>(<span class="fu">st_intersects</span>(centres, tiles))]   <span class="co"># back in county order</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="fu">st_area</span>(tiles)</span></code></pre></div>
+<p><strong>Work in equal pieces.</strong> A refined mesh has many small
+triangles of similar size. Sort them into batches of equal area and you
+can send each batch to a different worker, field team or process. Here,
+Wake's mesh from above is split into eight batches of about 274 km^2
+each:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>v <span class="ot">&lt;-</span> m<span class="sc">$</span>P; tri <span class="ot">&lt;-</span> m<span class="sc">$</span>T</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>tx <span class="ot">&lt;-</span> <span class="fu">matrix</span>(v[tri, <span class="dv">1</span>], <span class="at">ncol =</span> <span class="dv">3</span>); ty <span class="ot">&lt;-</span> <span class="fu">matrix</span>(v[tri, <span class="dv">2</span>], <span class="at">ncol =</span> <span class="dv">3</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>area <span class="ot">&lt;-</span> <span class="fu">abs</span>((tx[, <span class="dv">2</span>] <span class="sc">-</span> tx[, <span class="dv">1</span>]) <span class="sc">*</span> (ty[, <span class="dv">3</span>] <span class="sc">-</span> ty[, <span class="dv">1</span>]) <span class="sc">-</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>            (tx[, <span class="dv">3</span>] <span class="sc">-</span> tx[, <span class="dv">1</span>]) <span class="sc">*</span> (ty[, <span class="dv">2</span>] <span class="sc">-</span> ty[, <span class="dv">1</span>])) <span class="sc">/</span> <span class="dv">2</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>halve <span class="ot">&lt;-</span> <span class="cf">function</span>(cx, cy, a, k) {        <span class="co"># k batches of equal area, k a power of 2</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (k <span class="sc">==</span> <span class="dv">1</span>) <span class="fu">return</span>(<span class="fu">rep</span>(<span class="dv">1</span><span class="dt">L</span>, <span class="fu">length</span>(a)))</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  v <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="fu">diff</span>(<span class="fu">range</span>(cx)) <span class="sc">&gt;</span> <span class="fu">diff</span>(<span class="fu">range</span>(cy))) cx <span class="cf">else</span> cy</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  o <span class="ot">&lt;-</span> <span class="fu">order</span>(v)</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  i <span class="ot">&lt;-</span> <span class="fu">seq_along</span>(a) <span class="sc">%in%</span> o[<span class="fu">cumsum</span>(a[o]) <span class="sc">&lt;=</span> <span class="fu">sum</span>(a) <span class="sc">/</span> <span class="dv">2</span>]</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  g <span class="ot">&lt;-</span> <span class="fu">integer</span>(<span class="fu">length</span>(a))</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  g[i] <span class="ot">&lt;-</span> <span class="fu">halve</span>(cx[i], cy[i], a[i], k <span class="sc">/</span> <span class="dv">2</span>)</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  g[<span class="sc">!</span>i] <span class="ot">&lt;-</span> <span class="fu">halve</span>(cx[<span class="sc">!</span>i], cy[<span class="sc">!</span>i], a[<span class="sc">!</span>i], k <span class="sc">/</span> <span class="dv">2</span>) <span class="sc">+</span> k <span class="sc">/</span> <span class="dv">2</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  g</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>batch <span class="ot">&lt;-</span> <span class="fu">halve</span>(<span class="fu">rowMeans</span>(tx), <span class="fu">rowMeans</span>(ty), area, <span class="dv">8</span>)</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="fu">tapply</span>(area, batch, sum) <span class="sc">/</span> <span class="fl">1e6</span>           <span class="co"># km^2 in each batch</span></span></code></pre></div>
+<p>Each batch is a set of triangle rows, so the triangles that share an
+edge with another batch are easy to find when the pieces have to be
+stitched back together.</p>
 <h2 id="three-things-that-catch-people-out">Three things that catch
 people out</h2>
 <p><strong>Neighbouring polygons should be meshed together.</strong> If

@@ -1,6 +1,6 @@
 ## Figures for survey/start.md (docs/start/index.html). Run from the repo root:
 ##   Rscript survey/start/figures.R
-## Needs sf, decido, deldir and cdtr.
+## Needs sf, decido, deldir, spdep and cdtr.
 
 suppressPackageStartupMessages({
   library(sf)
@@ -52,7 +52,7 @@ pts <- st_coordinates(st_sample(st_geometry(one), 60))
 dd <- deldir::deldir(pts[, 1], pts[, 2])
 dtri <- do.call(rbind, lapply(deldir::triang.list(dd), function(t) t$ptNum))
 mesh <- cdtr::cdt_triangulate(p$x, p$y, p$s0, p$s1,
-                              max_area = st_area(one) |> as.numeric() / 300, min_angle = 25)
+                              max_area = 7e6, min_angle = 25)
 
 ## ---- 1. the idea: a polygon becomes triangles, points become triangles ----
 png_open("idea.png", 1100, 320)
@@ -114,3 +114,55 @@ segments(bx[s[, 1]], by[s[, 1]], bx[s[, 2]], by[s[, 2]], lwd = 2)
 par(op); dev.off()
 
 cat("wrote", list.files(out, pattern = "png$", full.names = TRUE), sep = "\n")
+
+## ---- 4. triangles as a network: neighbours, catchments, batches of work ----
+pc <- st_centroid(st_geometry(nc))
+cxy <- st_coordinates(pc)
+nb <- suppressWarnings(spdep::tri2nb(cxy))
+state <- st_union(nc)
+tiles <- st_collection_extract(st_voronoi(st_union(pc), st_geometry(state)))
+tiles <- st_intersection(tiles, state)
+tiles <- tiles[unlist(st_intersects(pc, tiles))]
+tile_area <- as.numeric(st_area(tiles)) / 1e6
+i0 <- which(nc$NAME == "Wake")
+
+## recursive halving by area: k a power of 2
+halve <- function(cx, cy, a, k) {
+  if (k == 1) return(rep(1L, length(a)))
+  v <- if (diff(range(cx)) > diff(range(cy))) cx else cy
+  o <- order(v)
+  i <- seq_along(a) %in% o[cumsum(a[o]) <= sum(a) / 2]
+  g <- integer(length(a))
+  g[i] <- halve(cx[i], cy[i], a[i], k / 2)
+  g[!i] <- halve(cx[!i], cy[!i], a[!i], k / 2) + k / 2
+  g
+}
+P <- mesh$P; T <- mesh$T
+tx <- matrix(P[T, 1], ncol = 3); ty <- matrix(P[T, 2], ncol = 3)
+tri_area <- abs((tx[, 2] - tx[, 1]) * (ty[, 3] - ty[, 1]) - (tx[, 3] - tx[, 1]) * (ty[, 2] - ty[, 1])) / 2
+g <- halve(rowMeans(tx), rowMeans(ty), tri_area, 8)
+
+slim <- lim_of(st_bbox(state)[c(1, 3)], st_bbox(state)[c(2, 4)], pad = 0.01)
+png_open("network.png", 1100, 600)
+layout(matrix(c(1, 2, 3, 3), 2), widths = c(1.7, 1))
+op <- par(mar = c(0.5, 0.5, 2.6, 0.5))
+frame(slim, "who are my neighbours?\n(Delaunay edges between county centres)")
+plot(state, add = TRUE, col = "grey96", border = "grey70")
+for (i in seq_along(nb)) for (j in nb[[i]][nb[[i]] > i])
+  segments(cxy[i, 1], cxy[i, 2], cxy[j, 1], cxy[j, 2], col = "grey45", lwd = 0.7)
+for (j in nb[[i0]]) segments(cxy[i0, 1], cxy[i0, 2], cxy[j, 1], cxy[j, 2], col = "#eb6834", lwd = 2.2)
+points(cxy, pch = 19, cex = 0.45)
+points(cxy[c(i0, nb[[i0]]), , drop = FALSE], pch = 19, cex = 0.9, col = "#eb6834")
+frame(slim, "how much room does each one have?\n(Voronoi tiles, the dual of the triangles)")
+pal <- hcl.colors(9, "YlGnBu", rev = TRUE)
+br <- quantile(tile_area, seq(0, 1, length.out = 10))
+plot(tiles, add = TRUE, col = pal[findInterval(tile_area, br, all.inside = TRUE)], border = "white", lwd = 0.6)
+points(cxy, pch = 19, cex = 0.35)
+frame(lim, "split the work\n(Wake's mesh in 8 batches of equal area)")
+bcol <- hcl.colors(8, "Set 2")
+tris(P[, 1], P[, 2], T, col = bcol[g], border = "white", lwd = 0.5)
+outline(p)
+par(op); dev.off()
+note_batch <- tapply(tri_area, g, sum) / 1e6
+cat("batch areas (km2):", round(note_batch, 1), "\n")
+cat("Wake neighbours:", nc$NAME[nb[[i0]]], "\n")
