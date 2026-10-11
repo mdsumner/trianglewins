@@ -2,7 +2,8 @@
 ## common output shape that tw_measure() reads:
 ##   vertices   data frame x, y (and z when attributes were given)
 ##   triangles  data frame v0, v1, v2 (1-based rows of vertices), depth (NA
-##              when the backend has none)
+##              when the backend has none), and optionally depth_distinct (a
+##              doubled boundary counted once; omitted when the backend lacks it)
 ##   unrefined  one string summarising what the backend reports it could
 ##              not do (NA when it reports nothing)
 ## The region kept follows case$region: "outer" keeps triangles inside the
@@ -53,7 +54,8 @@ run_laridae <- function(case, max_area = NULL, min_angle = NULL, attr = FALSE) {
   V <- r$vertices
   list(vertices = xyz(V, attr),
        triangles = data.frame(v0 = r$triangles$v0, v1 = r$triangles$v1,
-                              v2 = r$triangles$v2, depth = r$triangles$depth),
+                              v2 = r$triangles$v2, depth = r$triangles$depth,
+                              depth_distinct = r$triangles$depth_distinct),
        unrefined = if (is.null(r$unrefined)) NA_character_
                    else nonzero_summary(r$unrefined[setdiff(names(r$unrefined),
                                                       c("min_edge_length", "inserted"))]))

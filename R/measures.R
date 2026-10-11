@@ -51,7 +51,8 @@ vertices_on_segment <- function(x, y, xs, ord, ax, ay, bx, by, tol) {
 #' @param case a case from [tw_case()]
 #' @param out backend output: a list with `vertices` (data frame with `x`,
 #'   `y`) and `triangles` (data frame with `v0`, `v1`, `v2` as 1-based rows
-#'   of `vertices`, and `depth`, which may be NA)
+#'   of `vertices`, and `depth`, which may be NA; an optional `depth_distinct`
+#'   column, a doubled boundary counted once, is checked against `depth_1`)
 #' @param max_area,min_angle the targets the run asked for (NULL for none)
 #' @param tol relative tolerance (times the bounding box diagonal) for
 #'   matching vertices to input vertices and segments
@@ -114,6 +115,15 @@ tw_measure <- function(case, out, max_area = NULL, min_angle = NULL, tol = 1e-9)
     if (mk && m1) "k=1" else if (mk) "k" else if (m1) "1" else "neither"
   }
 
+  ## a backend that reports its own distinct depth (a doubled boundary counted
+  ## once): check it against the harness depth_1
+  bdd <- T$depth_distinct
+  has_bdd <- !is.null(bdd) && length(bdd) == nt && !all(is.na(bdd))
+  depth_distinct_match <- if (!has_bdd || !nt) NA_character_ else {
+    mk <- all(bdd == dk); m1 <- all(bdd == d1)
+    if (mk && m1) "k=1" else if (m1) "1" else if (mk) "k" else "neither"
+  }
+
   data.frame(
     n_vertices = n,
     n_triangles = nt,
@@ -132,6 +142,8 @@ tw_measure <- function(case, out, max_area = NULL, min_angle = NULL, tol = 1e-9)
     depth_k = depth_table(dk),
     depth_1 = depth_table(d1),
     depth_match = depth_match,
+    depth_distinct_backend = if (has_bdd) depth_table(bdd) else NA_character_,
+    depth_distinct_match = depth_distinct_match,
     stringsAsFactors = FALSE
   )
 }

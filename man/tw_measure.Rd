@@ -11,7 +11,8 @@ tw_measure(case, out, max_area = NULL, min_angle = NULL, tol = 1e-09)
 
 \item{out}{backend output: a list with \code{vertices} (data frame with \code{x},
 \code{y}) and \code{triangles} (data frame with \code{v0}, \code{v1}, \code{v2} as 1-based rows
-of \code{vertices}, and \code{depth}, which may be NA)}
+of \code{vertices}, and \code{depth}, which may be NA; an optional \code{depth_distinct}
+column, a doubled boundary counted once, is checked against \code{depth_1})}
 
 \item{max_area, min_angle}{the targets the run asked for (NULL for none)}
 
