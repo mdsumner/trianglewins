@@ -11,27 +11,11 @@ examples in [Triangulation in context](../context/). "xy" and "xyz" are
 coordinate dimension, and triangles and tetrahedra are topological
 dimension; see [Notes](../notes/).
 
-## Quick answers
+## Before the algorithm
 
-CRAN first, because it installs everywhere; several problems are only
-solved off CRAN today.
-
-| You want to | Try first [CRAN] | Also consider |
-|---|---|---|
-| Fill polygons with triangles for drawing | decido | rgl::triangulate, sf::st_triangulate_constrained |
-| Delaunay triangles or edges of a point set | deldir | geometry (large sets, xyz and up), interp, the GEOS functions for spatial objects |
-| Interpolate scattered values linearly | interp | geometry::tsearch; lidR, lasR for point clouds |
-| A TIN from a height grid | terrainmeshr | lidR, lasR from LiDAR points |
-| A mesh for an SPDE model (INLA, TMB) | fmesher | tulpaMesh |
-| A mesh for finite elements on a polygon | fmesher, fdaPDE | RTriangle, tulpaMesh |
-| Polygons, lines and points with every segment kept | RCDT | RTriangle, delaunay; [GitHub] cdtr |
-| Good-shaped triangles on a general segment set | RTriangle | [GitHub] cdtr, laridae, trowel |
-| Density that varies over space | fmesher | geometry::distmesh2d; [GitHub] laridae |
-| Add or remove points and segments after building | nothing | [GitHub] trowel, laridae |
-| A mesh on the sphere | fmesher | tulpaMesh; points only: geometry::convhulln on geocentric xyz ([Notes](../notes/#triangles-on-the-sphere)) |
-| Delaunay of xyz points (tetrahedra) | geometry, tessellation | delaunay |
-
-What decides the choice before the algorithm does:
+For a short answer by kind of problem, see the table in
+[Start here](../start/#which-package). What often decides the choice
+before the algorithm does:
 
 - **Licence.** RTriangle, fdaPDE's mesher, sfdct and anglr carry
   Triangle's non-commercial terms; tripack and akima the ACM licence

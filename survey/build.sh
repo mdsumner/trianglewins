@@ -26,13 +26,15 @@ redirect () {
 HTML
   echo "wrote docs/$1/index.html (redirect)"
 }
+render start.md start "Start here: triangles for spatial data" "start here" \
+  "A gentle introduction to triangulation for spatial users in R: what it is, the three common questions, the usual traps, and which package to try."
 render r-triangulation-survey.md survey "Triangulation in R" survey \
-  "R packages that triangulate points, polygons and segment sets: quick answers by problem, then algorithm, upstream library, input, constraints and output control, with a look at Python."
+  "R packages that triangulate points, polygons and segment sets: algorithm, upstream library, input, constraints and output control, with a look at Python."
 render context.md context "Triangulation in context" "in context" \
   "Why triangles are everywhere, what earcut and the GEOS functions promise, what silicate and anglr tried, and why laridae builds on CGAL."
 render notes.md notes "Notes: dimension and interpolation" notes \
   "Coordinate versus topological dimension, triangles on the sphere, and what linear interpolation on a mesh promises."
-redirect choose ../survey/#quick-answers
+redirect choose ../start/#which-package
 redirect dimension ../notes/#dimension
 redirect interpolation ../notes/#interpolation
 redirect roadmap https://github.com/hypertidy/meshcore/blob/main/docs/roadmap.md

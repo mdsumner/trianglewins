@@ -3,8 +3,8 @@
 11 October 2026. Why triangles turn up everywhere, what decido's earcut
 and the GEOS functions do and do not promise, what silicate and anglr tried
 before, and why laridae is built on CGAL, with one set of small examples
-run through all three. The package list and quick advice are in the
-[survey](../survey/).
+run through all three. New to triangulation? [Start here](../start/)
+first; the full package list is in the [survey](../survey/).
 
 Figures and numbers come from
 [`survey/context/figures.R`](https://github.com/mdsumner/trianglewins/blob/main/survey/context/figures.R)
@@ -320,8 +320,8 @@ promises.
 
 ## Choosing
 
-Quick answers by kind of problem, CRAN first, are at the top of the
-[survey](../survey/#quick-answers). In short: decido to draw polygons, the
+Quick answers by kind of problem, CRAN first, are in
+[Start here](../start/#which-package). In short: decido to draw polygons, the
 GEOS functions for quick per-polygon jobs, deldir for points, fmesher for
 SPDE meshes, cdtr for a general segment set under a permissive licence,
 and laridae for the full contract.
