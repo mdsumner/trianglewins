@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>trianglewins</title>
-<meta name="description" content="Constrained triangulation in R: a survey of R triangulation packages, a benchmark of laridae, cdtr, trowel and RTriangle, and a guide to choosing a package.">
+<meta name="description" content="A friendly guide to triangulation for spatial data in R: what it is, which package to reach for, and how the engines differ.">
 <style>
 :root {
   color-scheme: light;
@@ -69,45 +69,54 @@ th { color: var(--text-secondary); font-weight: 600; }
 .card:hover { border-color: var(--link); }
 .card h2 { margin: 0 0 6px; font-size: 17px; color: var(--link); }
 .card p { margin: 0; color: var(--text-secondary); font-size: 14px; }
-p.lede { color: var(--text-secondary); margin: 0 0 8px; max-width: 760px; }
+p.lede { color: var(--text-secondary); margin: 0 0 8px; max-width: 760px; font-size: 17px; }
+.hero { display: block; width: 100%; max-width: 900px; height: auto; margin: 20px 0 4px;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px; }
+.card.featured { grid-column: 1 / -1; border-color: var(--link); }
+.card.featured h2 { font-size: 20px; }
 </style>
 </head>
 <body>
 <main>
-<h1>trianglewins</h1>
-<p class="lede">Constrained triangulation in R: the same inputs through every backend, judged
-by code that belongs to none of them. Backends are laridae (CGAL), cdtr (CDT), trowel (spade)
-and RTriangle (Triangle).</p>
+<h1>Triangles for spatial data in R</h1>
+<p class="lede">Triangles are everywhere in spatial work: drawing polygons, joining up points,
+interpolating, terrain, and the meshes behind spatial models. This is a friendly guide to
+what triangulation is, which R package to reach for, and why the choice matters.</p>
+<img class="hero" src="start/three.png" alt="One county filled with triangles three ways: ear cutting, Delaunay of sample points, and a refined constrained mesh">
+<p class="muted">One county, three kinds of triangulation. <a href="start/">Start here</a> to see why they differ.</p>
 <div class="cards">
-<a class="card" href="survey/">
-<h2>Survey and choosing a package</h2>
-<p>Quick answers by kind of problem, CRAN first, then about 35 R packages by algorithm,
-upstream library, input, constraints and output control, with lineage, a capability
-matrix, a look at Python and what this work could offer other packages.</p>
+<a class="card featured" href="start/">
+<h2>Start here</h2>
+<p>What a triangulation is, the three questions most people are really asking
+("fill my polygon", "connect my points", "keep my edges and make nice triangles"), the traps
+that catch people out, and which package to try first.</p>
 </a>
 <a class="card" href="context/">
-<h2>Triangulation in context</h2>
-<p>Why triangles are everywhere, what earcut (decido) and the GEOS functions do and do not promise,
-what silicate and anglr tried before, and why laridae is built on CGAL, with one set of examples run
-through all three.</p>
+<h2>How the engines differ</h2>
+<p>The same small examples through ear cutting, GEOS and a full mesher, side by side; what
+silicate and anglr tried before; and why laridae is built on CGAL.</p>
 </a>
-<a class="card" href="bench/">
-<h2>Benchmark at scale</h2>
-<p>Times, memory and mesh quality on geoBoundaries country polygons, from 23 thousand to
-6.8 million vertices: constrained, area and quality refinement, point Delaunay, and edits to a
-live mesh.</p>
+<a class="card" href="survey/">
+<h2>Package survey</h2>
+<p>A reference to about 35 R packages: the algorithm and library behind each, what it
+takes and returns, and what it can and cannot do, with a look at Python.</p>
 </a>
 <a class="card" href="notes/">
-<h2>Notes: dimension and interpolation</h2>
-<p>Coordinate versus topological dimension and what each community means by "2D", "3D" and
-"2.5D"; triangles on the sphere; what linear interpolation on a mesh promises and how the mesh
-decides the answer.</p>
+<h2>Notes</h2>
+<p>What "2D", "3D" and "2.5D" mean to different people, triangles on the sphere, and what
+interpolation on a triangle mesh does and does not promise.</p>
+</a>
+<a class="card" href="bench/">
+<h2>Benchmark</h2>
+<p>For developers: speed, memory and mesh quality on country boundaries, from 23 thousand
+to 6.8 million vertices.</p>
 </a>
 </div>
-<p class="muted" style="margin-top:28px">The roadmap now lives in
+<p class="muted" style="margin-top:28px">Under the hood, trianglewins is a test harness: it runs
+the same inputs through laridae (CGAL), cdtr (CDT), trowel (spade) and RTriangle (Triangle) and
+checks the results with code that belongs to none of them. See the
+<a href="https://github.com/mdsumner/trianglewins">repository</a>. The development roadmap lives in
 <a href="https://github.com/hypertidy/meshcore/blob/main/docs/roadmap.md">hypertidy/meshcore</a>.</p>
-<p class="muted" style="margin-top:28px">Source:
-<a href="https://github.com/mdsumner/trianglewins">mdsumner/trianglewins</a>.</p>
 </main>
 </body>
 </html>

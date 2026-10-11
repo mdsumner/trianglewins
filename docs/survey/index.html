@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Triangulation in R</title>
-<meta name="description" content="R packages that triangulate points, polygons and segment sets: quick answers by problem, then algorithm, upstream library, input, constraints and output control, with a look at Python.">
+<meta name="description" content="R packages that triangulate points, polygons and segment sets: algorithm, upstream library, input, constraints and output control, with a look at Python.">
 <style>
 :root {
   color-scheme: light;
@@ -80,83 +80,10 @@ engines are compared on worked examples in <a
 href="../context/">Triangulation in context</a>. "xy" and "xyz" are
 coordinate dimension, and triangles and tetrahedra are topological
 dimension; see <a href="../notes/">Notes</a>.</p>
-<h2 id="quick-answers">Quick answers</h2>
-<p>CRAN first, because it installs everywhere; several problems are only
-solved off CRAN today.</p>
-<table>
-<thead>
-<tr class="header">
-<th>You want to</th>
-<th>Try first [CRAN]</th>
-<th>Also consider</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Fill polygons with triangles for drawing</td>
-<td>decido</td>
-<td>rgl::triangulate, sf::st_triangulate_constrained</td>
-</tr>
-<tr class="even">
-<td>Delaunay triangles or edges of a point set</td>
-<td>deldir</td>
-<td>geometry (large sets, xyz and up), interp, the GEOS functions for
-spatial objects</td>
-</tr>
-<tr class="odd">
-<td>Interpolate scattered values linearly</td>
-<td>interp</td>
-<td>geometry::tsearch; lidR, lasR for point clouds</td>
-</tr>
-<tr class="even">
-<td>A TIN from a height grid</td>
-<td>terrainmeshr</td>
-<td>lidR, lasR from LiDAR points</td>
-</tr>
-<tr class="odd">
-<td>A mesh for an SPDE model (INLA, TMB)</td>
-<td>fmesher</td>
-<td>tulpaMesh</td>
-</tr>
-<tr class="even">
-<td>A mesh for finite elements on a polygon</td>
-<td>fmesher, fdaPDE</td>
-<td>RTriangle, tulpaMesh</td>
-</tr>
-<tr class="odd">
-<td>Polygons, lines and points with every segment kept</td>
-<td>RCDT</td>
-<td>RTriangle, delaunay; [GitHub] cdtr</td>
-</tr>
-<tr class="even">
-<td>Good-shaped triangles on a general segment set</td>
-<td>RTriangle</td>
-<td>[GitHub] cdtr, laridae, trowel</td>
-</tr>
-<tr class="odd">
-<td>Density that varies over space</td>
-<td>fmesher</td>
-<td>geometry::distmesh2d; [GitHub] laridae</td>
-</tr>
-<tr class="even">
-<td>Add or remove points and segments after building</td>
-<td>nothing</td>
-<td>[GitHub] trowel, laridae</td>
-</tr>
-<tr class="odd">
-<td>A mesh on the sphere</td>
-<td>fmesher</td>
-<td>tulpaMesh; points only: geometry::convhulln on geocentric xyz (<a
-href="../notes/#triangles-on-the-sphere">Notes</a>)</td>
-</tr>
-<tr class="even">
-<td>Delaunay of xyz points (tetrahedra)</td>
-<td>geometry, tessellation</td>
-<td>delaunay</td>
-</tr>
-</tbody>
-</table>
-<p>What decides the choice before the algorithm does:</p>
+<h2 id="before-the-algorithm">Before the algorithm</h2>
+<p>For a short answer by kind of problem, see the table in <a
+href="../start/#which-package">Start here</a>. What often decides the
+choice before the algorithm does:</p>
 <ul>
 <li><strong>Licence.</strong> RTriangle, fdaPDE's mesher, sfdct and
 anglr carry Triangle's non-commercial terms; tripack and akima the ACM

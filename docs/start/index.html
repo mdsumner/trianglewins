@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Start here: triangles for spatial data</title>
+<meta name="description" content="A gentle introduction to triangulation for spatial users in R: what it is, the three common questions, the usual traps, and which package to try.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--grid); min-width: 9em; }
+th:first-child, td:first-child { min-width: 13em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../">trianglewins</a> / start here</p>
+<h1 id="start-here-triangles-for-spatial-data">Start here: triangles for
+spatial data</h1>
+<p>If you work with maps in R, you have probably met triangles without
+asking for them. Every filled polygon on a screen is drawn as triangles,
+and a terrain model is often a mesh of triangles. Spatial statistics
+packages such as INLA build a triangle mesh before they fit anything.
+This page explains what triangulation is, what it is good for, and which
+package to reach for. It assumes you know sf and nothing else.</p>
+<h2 id="what-a-triangulation-is">What a triangulation is</h2>
+<p>A triangulation cuts a shape into triangles that fit together edge to
+edge, with no gaps or overlaps. You can start from a polygon or from a
+set of points.</p>
+<p><img src="idea.png"
+alt="A polygon cut into triangles, and a set of points joined into triangles" /></p>
+<p>Why triangles? A triangle is the simplest shape that can tile any
+polygon, and a triangle is always flat. If you know a value at each of
+its three corners (an elevation, say), there is exactly one sensible way
+to fill in the values inside. That makes triangles the natural unit for
+drawing, for interpolating, and for numerical models.</p>
+<h2 id="three-questions-three-kinds-of-answer">Three questions, three
+kinds of answer</h2>
+<p>Most needs come down to one of three questions. They look alike but
+they want different tools, because each one asks for a different promise
+about the triangles.</p>
+<p><img src="three.png"
+alt="The same county filled by earcut, its sample points joined by Delaunay, and a refined constrained mesh" /></p>
+<p><strong>"Fill my polygon."</strong> You want to draw a polygon,
+extrude it, or compute with its pieces. Any triangles will do, as long
+as they cover the polygon exactly. The answer is <em>ear cutting</em>:
+fast, it adds no new points, and it doesn't care if the triangles are
+long and thin.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sf)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>nc <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="fu">system.file</span>(<span class="st">&quot;shape/nc.shp&quot;</span>, <span class="at">package =</span> <span class="st">&quot;sf&quot;</span>))</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>wake <span class="ot">&lt;-</span> <span class="fu">st_transform</span>(nc[nc<span class="sc">$</span>NAME <span class="sc">==</span> <span class="st">&quot;Wake&quot;</span>, ], <span class="dv">32119</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">st_triangulate_constrained</span>(<span class="fu">st_geometry</span>(wake))   <span class="co"># triangles as polygons</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>xy <span class="ot">&lt;-</span> <span class="fu">st_coordinates</span>(wake)[, <span class="fu">c</span>(<span class="st">&quot;X&quot;</span>, <span class="st">&quot;Y&quot;</span>)]</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>xy <span class="ot">&lt;-</span> xy[<span class="sc">-</span><span class="fu">nrow</span>(xy), ]          <span class="co"># one ring; drop the repeated last point</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>decido<span class="sc">::</span><span class="fu">earcut</span>(xy)             <span class="co"># or as indices into xy, much faster</span></span></code></pre></div>
+<p><strong>"Connect my points."</strong> You have points (sample sites,
+weather stations, LiDAR returns) and want to know which are neighbours,
+or to interpolate between them. The answer is a <em>Delaunay
+triangulation</em>: the triangles are as close to equilateral as the
+points allow, and no point lies inside another triangle's circumcircle.
+It ignores any boundary and fills the convex hull of the points.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>pts <span class="ot">&lt;-</span> <span class="fu">st_sample</span>(wake, <span class="dv">60</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">st_triangulate</span>(<span class="fu">st_union</span>(pts))      <span class="co"># sf, via GEOS</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>deldir<span class="sc">::</span><span class="fu">deldir</span>(<span class="fu">st_coordinates</span>(pts)[, <span class="dv">1</span>], <span class="fu">st_coordinates</span>(pts)[, <span class="dv">2</span>])  <span class="co"># with Voronoi tiles too</span></span></code></pre></div>
+<p><strong>"Keep my edges, and make the triangles nice."</strong> You
+have boundaries, coastlines, roads or contours that must stay as edges,
+and you want well-shaped triangles of a size you choose. This is a mesh
+for a model, a smooth surface, or a finite element solver. The answer is
+a <em>constrained Delaunay triangulation</em>, refined by adding new
+points until every triangle meets a minimum angle and a maximum
+area.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fu">nrow</span>(xy)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>m <span class="ot">&lt;-</span> cdtr<span class="sc">::</span><span class="fu">cdt_triangulate</span>(xy[, <span class="dv">1</span>], xy[, <span class="dv">2</span>], <span class="at">s0 =</span> <span class="dv">1</span><span class="sc">:</span>n, <span class="at">s1 =</span> <span class="fu">c</span>(<span class="dv">2</span><span class="sc">:</span>n, <span class="dv">1</span>),</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>                           <span class="at">max_area =</span> <span class="fl">7e6</span>, <span class="at">min_angle =</span> <span class="dv">25</span>)   <span class="co"># m^2, degrees</span></span></code></pre></div>
+<p><code>s0</code> and <code>s1</code> say which points are joined by an
+edge that must be kept. cdtr is on GitHub
+(<code>remotes::install_github("hypertidy/cdtr")</code>). On CRAN,
+fmesher does this job for statistical meshes, and RTriangle does it in
+general but has a non-commercial licence.</p>
+<h2 id="three-things-that-catch-people-out">Three things that catch
+people out</h2>
+<p><strong>Neighbouring polygons should be meshed together.</strong> If
+you mesh each polygon separately and add points, the two sides of a
+shared boundary get different points, and the meshes don't join up.
+Meshed as one, the shared boundary is one set of edges.</p>
+<p><img src="neighbours.png"
+alt="Two neighbouring counties meshed one at a time, and together" /></p>
+<p><strong>"Constrained" in sf, geos and terra means one polygon at a
+time.</strong> <code>st_triangulate_constrained()</code> keeps each
+polygon's edges, which is what you need for drawing. But it adds no new
+points, takes no loose lines or points, and never sees two polygons as
+one mesh.</p>
+<p><strong>Longitude and latitude are not flat.</strong> A maximum area
+in degrees squared means different things at the equator and near the
+poles, and "nicely shaped" triangles in degrees are stretched on the
+ground. Project your data first, as above, unless you are deliberately
+meshing the sphere.</p>
+<h2 id="which-package">Which package?</h2>
+<p>CRAN first, because it installs everywhere. Several problems are only
+solved off CRAN today, marked [GitHub].</p>
+<table>
+<thead>
+<tr class="header">
+<th>You want to</th>
+<th>Try first</th>
+<th>Also consider</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Fill polygons with triangles for drawing</td>
+<td>decido</td>
+<td>rgl::triangulate, sf::st_triangulate_constrained</td>
+</tr>
+<tr class="even">
+<td>Delaunay triangles or edges of a point set</td>
+<td>deldir</td>
+<td>geometry (large sets, xyz and up), interp, the GEOS functions in sf
+and terra</td>
+</tr>
+<tr class="odd">
+<td>Interpolate scattered values linearly</td>
+<td>interp</td>
+<td>geometry::tsearch; lidR, lasR for point clouds</td>
+</tr>
+<tr class="even">
+<td>A TIN from a height grid</td>
+<td>terrainmeshr</td>
+<td>lidR, lasR from LiDAR points</td>
+</tr>
+<tr class="odd">
+<td>A mesh for an SPDE model (INLA, TMB)</td>
+<td>fmesher</td>
+<td>tulpaMesh</td>
+</tr>
+<tr class="even">
+<td>A mesh for finite elements on a polygon</td>
+<td>fmesher, fdaPDE</td>
+<td>RTriangle, tulpaMesh</td>
+</tr>
+<tr class="odd">
+<td>Polygons, lines and points with every edge kept</td>
+<td>RCDT</td>
+<td>RTriangle, delaunay; [GitHub] cdtr</td>
+</tr>
+<tr class="even">
+<td>Good-shaped triangles on any set of edges</td>
+<td>RTriangle</td>
+<td>[GitHub] cdtr, laridae, trowel</td>
+</tr>
+<tr class="odd">
+<td>Triangle size that varies over space</td>
+<td>fmesher</td>
+<td>geometry::distmesh2d; [GitHub] laridae</td>
+</tr>
+<tr class="even">
+<td>Add or remove points and edges after building</td>
+<td>nothing on CRAN</td>
+<td>[GitHub] trowel, laridae</td>
+</tr>
+<tr class="odd">
+<td>A mesh on the sphere</td>
+<td>fmesher</td>
+<td>tulpaMesh; for points only, see <a
+href="../notes/#triangles-on-the-sphere">Notes</a></td>
+</tr>
+<tr class="even">
+<td>Delaunay of xyz points (tetrahedra)</td>
+<td>geometry, tessellation</td>
+<td>delaunay</td>
+</tr>
+</tbody>
+</table>
+<h2 id="where-to-go-next">Where to go next</h2>
+<ul>
+<li><a href="../context/">How the engines differ</a>: the same inputs
+through earcut, GEOS and a full mesher, side by side, with the words
+(constraint, Steiner point, depth) explained as they come up.</li>
+<li><a href="../survey/">Package survey</a>: every R package found, what
+algorithm and library it uses, and what it can and cannot do. A
+reference, not a read.</li>
+<li><a href="../notes/">Notes</a>: what "2D" and "3D" mean to different
+people, and what interpolation on triangles promises.</li>
+<li><a href="../bench/">Benchmark</a>: speed, memory and mesh quality at
+scale, for developers.</li>
+</ul>
+<p>Figures are drawn by <a
+href="https://github.com/mdsumner/trianglewins/blob/main/survey/start/figures.R"><code>survey/start/figures.R</code></a>.</p>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>
