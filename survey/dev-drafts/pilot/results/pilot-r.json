@@ -1,0 +1,23 @@
+{
+  "triangulate_s": 0.063,
+  "export_s": 0.02,
+  "features": 6,
+  "vertices": 30835,
+  "triangles": 33205,
+  "dictionary_array_s": 0.019,
+  "decoded_array_s": 0.015,
+  "parquet_field_metadata": "geoarrow.triangles",
+  "parquet_read_pool_s": 0.049,
+  "wkpool_ids_preserved": true,
+  "wkpool_coords_equal": true,
+  "python_parquet_pool_s": 0.613,
+  "python_parquet_triangles": 399962,
+  "python_parquet_vertices": 200000,
+  "python_parquet_ids_equal": true,
+  "versions": {
+    "nanoarrow": "0.8.0.1",
+    "wkpool": "0.4.0",
+    "wk": "0.9.5",
+    "arrow": "25.0.0"
+  }
+} 

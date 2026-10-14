@@ -5,6 +5,9 @@ GeoArrow side on the dictionary form. Written for the GeoArrow discussion about
 storing triangles, from what we learned building triangle meshes in R. Not a
 spec; a list of what worked, what broke, and one possible shape.*
 
+*The proposal-shaped version is
+[Proposal: geoarrow.triangles](../geoarrow-triangles-proposal/).*
+
 The remark that started this:
 
 > we have to solve triangles in GeoArrow too at some point... we can

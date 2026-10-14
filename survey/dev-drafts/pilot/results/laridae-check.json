@@ -1,0 +1,110 @@
+{
+ "lari-vic-nsw-act": {
+  "type": "extension<geoarrow.triangles<Triangles>>",
+  "meta": {
+   "vertex_identity": "exact_float"
+  },
+  "ipc_ids_equal": true,
+  "parquet_ids_equal": true,
+  "parquet_coords_bitwise_equal": true,
+  "sibling_columns": {
+   "constrained": "fixed_size_list<element: bool not null>[3]",
+   "depth": "int32"
+  },
+  "unique_constrained_edges": 14327,
+  "depth_values": {
+   "1": 65671,
+   "2": 4444,
+   "3": 1203
+  },
+  "vertex_table_rows": 40654,
+  "vertex_table_matches_dictionary": true,
+  "vertex_table_columns": {
+   "vertex": "int32",
+   "input_row": "int32",
+   "origin": "dictionary<values=string, indices=int8, ordered=0>"
+  }
+ },
+ "lari-minimal-mesh": {
+  "type": "extension<geoarrow.triangles<Triangles>>",
+  "meta": {
+   "vertex_identity": "exact_float"
+  },
+  "ipc_ids_equal": true,
+  "parquet_ids_equal": true,
+  "parquet_coords_bitwise_equal": true,
+  "sibling_columns": {
+   "constrained": "fixed_size_list<element: bool not null>[3]",
+   "depth": "int32"
+  },
+  "unique_constrained_edges": 97,
+  "depth_values": {
+   "1": 433,
+   "2": 46
+  },
+  "vertex_table_rows": 275,
+  "vertex_table_matches_dictionary": true,
+  "vertex_table_columns": {
+   "vertex": "int32",
+   "input_row": "int32",
+   "origin": "dictionary<values=string, indices=int8, ordered=0>"
+  }
+ },
+ "lari-polymer7-exact": {
+  "type": "extension<geoarrow.triangles<Triangles>>",
+  "meta": {
+   "vertex_identity": "exact"
+  },
+  "ipc_ids_equal": true,
+  "parquet_ids_equal": true,
+  "parquet_coords_bitwise_equal": true,
+  "sibling_columns": {
+   "constrained": "fixed_size_list<element: bool not null>[3]"
+  },
+  "unique_constrained_edges": 10872,
+  "vertex_table_rows": 5636,
+  "vertex_table_matches_dictionary": true,
+  "vertex_table_columns": {
+   "vertex": "int32",
+   "input_row": "int32",
+   "origin": "dictionary<values=string, indices=int8, ordered=0>",
+   "x_num": "string",
+   "x_den": "string",
+   "y_num": "string",
+   "y_den": "string"
+  },
+  "exact_nearest_double_matches_xy": false,
+  "exact_non_dyadic_crossings": 5236,
+  "max_denominator_digits": 50
+ },
+ "lari-polymer7-double": {
+  "type": "extension<geoarrow.triangles<Triangles>>",
+  "meta": {
+   "vertex_identity": "noded"
+  },
+  "ipc_ids_equal": true,
+  "parquet_ids_equal": true,
+  "parquet_coords_bitwise_equal": true,
+  "sibling_columns": {
+   "constrained": "fixed_size_list<element: bool not null>[3]"
+  },
+  "unique_constrained_edges": 10872,
+  "vertex_table_rows": 5636,
+  "vertex_table_matches_dictionary": true,
+  "vertex_table_columns": {
+   "vertex": "int32",
+   "input_row": "int32",
+   "origin": "dictionary<values=string, indices=int8, ordered=0>",
+   "x_num": "string",
+   "x_den": "string",
+   "y_num": "string",
+   "y_den": "string"
+  }
+ },
+ "polymer7_exact_vs_double": {
+  "exact_points": 5636,
+  "double_points": 5636,
+  "bitwise_shared": 779,
+  "only_exact": 4857
+ }
+}
