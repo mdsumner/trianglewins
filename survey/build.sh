@@ -34,6 +34,9 @@ render context.md context "Triangulation in context" "in context" \
   "Why triangles are everywhere, what earcut and the GEOS functions promise, what silicate and anglr tried, and why laridae builds on CGAL."
 render notes.md notes "Notes: dimension and interpolation" notes \
   "Coordinate versus topological dimension, triangles on the sphere, and what linear interpolation on a mesh promises."
+render dev-drafts/geoarrow-triangles.md dev-drafts/geoarrow-triangles \
+  "Triangles in GeoArrow (draft)" "dev draft" \
+  "Development draft: what building triangle meshes with wkpool, laridae and cdtr suggests for storing triangles in GeoArrow."
 redirect choose ../start/#which-package
 redirect dimension ../notes/#dimension
 redirect interpolation ../notes/#interpolation
