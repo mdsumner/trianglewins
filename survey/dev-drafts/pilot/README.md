@@ -119,9 +119,11 @@ Two findings from the exact mesh:
   vertices differ, by at most 9.6e-13. Both runs give the same counts here,
   so this input does not show the spurious vertices seen on integer segments.
 
-The vertex table also shows a tension: laridae (and mesh spec v0.1) put input
-vertices first in input order, while the proposal recommends first-appearance
-order. The pilot keeps both by renumbering and carrying `input_row`.
+The vertex table resolves an ordering question: laridae (and mesh spec v0.1)
+put input vertices first in input order, while the proposal recommends
+first-appearance order. Settled 14 October 2026: both, at different layers.
+The in-memory mesh keeps input-first; the serialised array uses first
+appearance, and `input_row` maps each vertex back (mesh spec Decision 8).
 
 ## Not covered
 

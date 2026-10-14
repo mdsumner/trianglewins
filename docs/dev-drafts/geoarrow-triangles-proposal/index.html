@@ -213,9 +213,16 @@ the vertices a second time in IPC.</li>
 <li><code>depth: int32</code> per triangle: constraint edges crossed to
 reach it from outside; odd is inside under even-odd rules.</li>
 <li>Vertex attributes (<code>origin</code> as input, crossing or
-steiner; z; exact rational coordinates) need a home keyed by dictionary
-index, either a wider dictionary value type or a vertex table. This
-draft does not choose.</li>
+steiner; z; exact rational coordinates) go in a vertex table keyed by
+dictionary index (<code>vertex</code>, 0-based), one row per dictionary
+entry. The dictionary value type stays a plain coordinate, as GeoArrow
+child arrays carry no extension metadata.</li>
+<li><code>input_row</code> in that vertex table, when the mesh came from
+a model that keeps its own vertex order. The hypertidy mesh spec puts
+input vertices first in input order; a serialised mesh uses
+first-appearance order instead, and <code>input_row</code> maps each
+vertex back. No order of triangles makes the two coincide, so the map is
+needed rather than a shared order.</li>
 </ul>
 <h2 id="out-of-scope">Out of scope</h2>
 <ul>

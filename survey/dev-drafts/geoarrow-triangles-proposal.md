@@ -152,8 +152,14 @@ columns beside the triangles, not part of the extension type:
 - `depth: int32` per triangle: constraint edges crossed to reach it from
   outside; odd is inside under even-odd rules.
 - Vertex attributes (`origin` as input, crossing or steiner; z; exact rational
-  coordinates) need a home keyed by dictionary index, either a wider
-  dictionary value type or a vertex table. This draft does not choose.
+  coordinates) go in a vertex table keyed by dictionary index (`vertex`,
+  0-based), one row per dictionary entry. The dictionary value type stays a
+  plain coordinate, as GeoArrow child arrays carry no extension metadata.
+- `input_row` in that vertex table, when the mesh came from a model that keeps
+  its own vertex order. The hypertidy mesh spec puts input vertices first in
+  input order; a serialised mesh uses first-appearance order instead, and
+  `input_row` maps each vertex back. No order of triangles makes the two
+  coincide, so the map is needed rather than a shared order.
 
 ## Out of scope
 
