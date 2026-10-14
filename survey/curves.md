@@ -146,16 +146,21 @@ dense <- densify(pool, prj)
 lon <- seq(100, 160, by = 0.5)
 planar <- rbind(cbind(lon, -35), cbind(160, seq(-35, -20, by = 0.5)),
                 cbind(rev(lon), -20), cbind(100, seq(-20, -35, by = -0.5)))
-v <- wkpool::pool_vertices(dense)
-seg <- wkpool::pool_segments(dense)
-p0 <- rproj_xy(cbind(v$x, v$y)[match(seg$.vx0, v$.vx), ], prj)
-p1 <- rproj_xy(cbind(v$x, v$y)[match(seg$.vx1, v$.vx), ], prj)
+## back to geometry, then project with wk and PROJ
+## (merge_coincident() closes the ring where its last vertex repeats the first)
+geom <- wkpool::cycles_to_wkb(wkpool::merge_coincident(dense))
+to_map <- PROJ::proj_trans_create(wk::wk_crs(geom), prj)
+drawn <- wk::wk_transform(geom, to_map)
+flat <- wk::wk_transform(wk::xy(planar[, 1], planar[, 2], crs = "OGC:CRS84"), to_map)
 
+fc <- wk::wk_coords(flat)
+dc <- wk::wk_coords(drawn)
 op <- par(mar = rep(0.5, 4))
-plot(rbind(p0, p1), type = "n", asp = 1, axes = FALSE, xlab = "", ylab = "")
-lines(rproj_xy(planar, prj), col = "grey60", lwd = 3)
-segments(p0[, 1], p0[, 2], p1[, 1], p1[, 2], lwd = 1.5)
-points(rproj_xy(cbind(v$x, v$y), prj), pch = 19, cex = 0.4)
+plot(range(fc$x, dc$x), range(fc$y, dc$y), type = "n", asp = 1,
+     axes = FALSE, xlab = "", ylab = "")
+lines(fc$x, fc$y, col = "grey60", lwd = 3)
+plot(drawn, lwd = 1.5, add = TRUE)
+points(dc$x, dc$y, pch = 19, cex = 0.4)
 ```
 
 ![A box from longitude 100 to 160 and latitude -35 to -20, drawn in a Lambert azimuthal projection: grey with sides along parallels, black with great circle sides and the vertices bigcurve added](box.png)
@@ -239,9 +244,28 @@ that the box contributed. The coastline is already finely detailed and is
 left alone. That economy is the purpose of adaptive densification: points
 are spent where the map bends the line, and nowhere else.
 
-To draw the result, project the densified pool with PROJ (`rproj_xy()`,
-sf, terra or anything else) or turn it back into geometry with
-`wkpool::segments_to_wkb()` or `wkpool::cycles_to_wkb()`.
+To draw the result, turn the pool back into geometry and project it.
+The fast general path is wk and PROJ: build the transform once with
+`PROJ::proj_trans_create()` and stream the geometry through
+`wk::wk_transform()`. Any other tool that projects (sf, terra) works too,
+since the densified vertices are ordinary longitude, latitude points.
+
+
+```r
+geom <- wkpool::cycles_to_wkb(wkpool::merge_coincident(out))
+drawn <- wk::wk_transform(geom, PROJ::proj_trans_create(wk::wk_crs(geom), prj))
+dc <- wk::wk_coords(drawn)
+op <- par(mar = rep(0.5, 4))
+plot(range(dc$x), range(dc$y), type = "n", asp = 1,
+     axes = FALSE, xlab = "", ylab = "")
+plot(drawn, col = "grey90", add = TRUE)
+```
+
+![The part of Australia inside the box, densified and drawn in the same projection](cut.png)
+
+```r
+par(op)
+```
 
 ## Things that are the same, and things that are not
 

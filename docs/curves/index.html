@@ -183,16 +183,21 @@ is the geodesic reading with bigcurve's added vertices (the points).</p>
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>lon <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="dv">100</span>, <span class="dv">160</span>, <span class="at">by =</span> <span class="fl">0.5</span>)</span>
 <span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>planar <span class="ot">&lt;-</span> <span class="fu">rbind</span>(<span class="fu">cbind</span>(lon, <span class="sc">-</span><span class="dv">35</span>), <span class="fu">cbind</span>(<span class="dv">160</span>, <span class="fu">seq</span>(<span class="sc">-</span><span class="dv">35</span>, <span class="sc">-</span><span class="dv">20</span>, <span class="at">by =</span> <span class="fl">0.5</span>)),</span>
 <span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>                <span class="fu">cbind</span>(<span class="fu">rev</span>(lon), <span class="sc">-</span><span class="dv">20</span>), <span class="fu">cbind</span>(<span class="dv">100</span>, <span class="fu">seq</span>(<span class="sc">-</span><span class="dv">20</span>, <span class="sc">-</span><span class="dv">35</span>, <span class="at">by =</span> <span class="sc">-</span><span class="fl">0.5</span>)))</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>v <span class="ot">&lt;-</span> wkpool<span class="sc">::</span><span class="fu">pool_vertices</span>(dense)</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>seg <span class="ot">&lt;-</span> wkpool<span class="sc">::</span><span class="fu">pool_segments</span>(dense)</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>p0 <span class="ot">&lt;-</span> <span class="fu">rproj_xy</span>(<span class="fu">cbind</span>(v<span class="sc">$</span>x, v<span class="sc">$</span>y)[<span class="fu">match</span>(seg<span class="sc">$</span>.vx0, v<span class="sc">$</span>.vx), ], prj)</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>p1 <span class="ot">&lt;-</span> <span class="fu">rproj_xy</span>(<span class="fu">cbind</span>(v<span class="sc">$</span>x, v<span class="sc">$</span>y)[<span class="fu">match</span>(seg<span class="sc">$</span>.vx1, v<span class="sc">$</span>.vx), ], prj)</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>op <span class="ot">&lt;-</span> <span class="fu">par</span>(<span class="at">mar =</span> <span class="fu">rep</span>(<span class="fl">0.5</span>, <span class="dv">4</span>))</span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">rbind</span>(p0, p1), <span class="at">type =</span> <span class="st">&quot;n&quot;</span>, <span class="at">asp =</span> <span class="dv">1</span>, <span class="at">axes =</span> <span class="cn">FALSE</span>, <span class="at">xlab =</span> <span class="st">&quot;&quot;</span>, <span class="at">ylab =</span> <span class="st">&quot;&quot;</span>)</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="fu">lines</span>(<span class="fu">rproj_xy</span>(planar, prj), <span class="at">col =</span> <span class="st">&quot;grey60&quot;</span>, <span class="at">lwd =</span> <span class="dv">3</span>)</span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="fu">segments</span>(p0[, <span class="dv">1</span>], p0[, <span class="dv">2</span>], p1[, <span class="dv">1</span>], p1[, <span class="dv">2</span>], <span class="at">lwd =</span> <span class="fl">1.5</span>)</span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(<span class="fu">rproj_xy</span>(<span class="fu">cbind</span>(v<span class="sc">$</span>x, v<span class="sc">$</span>y), prj), <span class="at">pch =</span> <span class="dv">19</span>, <span class="at">cex =</span> <span class="fl">0.4</span>)</span></code></pre></div>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="do">## back to geometry, then project with wk and PROJ</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="do">## (merge_coincident() closes the ring where its last vertex repeats the first)</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>geom <span class="ot">&lt;-</span> wkpool<span class="sc">::</span><span class="fu">cycles_to_wkb</span>(wkpool<span class="sc">::</span><span class="fu">merge_coincident</span>(dense))</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>to_map <span class="ot">&lt;-</span> PROJ<span class="sc">::</span><span class="fu">proj_trans_create</span>(wk<span class="sc">::</span><span class="fu">wk_crs</span>(geom), prj)</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>drawn <span class="ot">&lt;-</span> wk<span class="sc">::</span><span class="fu">wk_transform</span>(geom, to_map)</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>flat <span class="ot">&lt;-</span> wk<span class="sc">::</span><span class="fu">wk_transform</span>(wk<span class="sc">::</span><span class="fu">xy</span>(planar[, <span class="dv">1</span>], planar[, <span class="dv">2</span>], <span class="at">crs =</span> <span class="st">&quot;OGC:CRS84&quot;</span>), to_map)</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>fc <span class="ot">&lt;-</span> wk<span class="sc">::</span><span class="fu">wk_coords</span>(flat)</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>dc <span class="ot">&lt;-</span> wk<span class="sc">::</span><span class="fu">wk_coords</span>(drawn)</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>op <span class="ot">&lt;-</span> <span class="fu">par</span>(<span class="at">mar =</span> <span class="fu">rep</span>(<span class="fl">0.5</span>, <span class="dv">4</span>))</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">range</span>(fc<span class="sc">$</span>x, dc<span class="sc">$</span>x), <span class="fu">range</span>(fc<span class="sc">$</span>y, dc<span class="sc">$</span>y), <span class="at">type =</span> <span class="st">&quot;n&quot;</span>, <span class="at">asp =</span> <span class="dv">1</span>,</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>     <span class="at">axes =</span> <span class="cn">FALSE</span>, <span class="at">xlab =</span> <span class="st">&quot;&quot;</span>, <span class="at">ylab =</span> <span class="st">&quot;&quot;</span>)</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="fu">lines</span>(fc<span class="sc">$</span>x, fc<span class="sc">$</span>y, <span class="at">col =</span> <span class="st">&quot;grey60&quot;</span>, <span class="at">lwd =</span> <span class="dv">3</span>)</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(drawn, <span class="at">lwd =</span> <span class="fl">1.5</span>, <span class="at">add =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(dc<span class="sc">$</span>x, dc<span class="sc">$</span>y, <span class="at">pch =</span> <span class="dv">19</span>, <span class="at">cex =</span> <span class="fl">0.4</span>)</span></code></pre></div>
 <p><img src="box.png"
 alt="A box from longitude 100 to 160 and latitude -35 to -20, drawn in a Lambert azimuthal projection: grey with sides along parallels, black with great circle sides and the vertices bigcurve added" /></p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(op)</span></code></pre></div>
@@ -290,10 +295,22 @@ sides that the box contributed. The coastline is already finely detailed
 and is left alone. That economy is the purpose of adaptive
 densification: points are spent where the map bends the line, and
 nowhere else.</p>
-<p>To draw the result, project the densified pool with PROJ
-(<code>rproj_xy()</code>, sf, terra or anything else) or turn it back
-into geometry with <code>wkpool::segments_to_wkb()</code> or
-<code>wkpool::cycles_to_wkb()</code>.</p>
+<p>To draw the result, turn the pool back into geometry and project it.
+The fast general path is wk and PROJ: build the transform once with
+<code>PROJ::proj_trans_create()</code> and stream the geometry through
+<code>wk::wk_transform()</code>. Any other tool that projects (sf,
+terra) works too, since the densified vertices are ordinary longitude,
+latitude points.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>geom <span class="ot">&lt;-</span> wkpool<span class="sc">::</span><span class="fu">cycles_to_wkb</span>(wkpool<span class="sc">::</span><span class="fu">merge_coincident</span>(out))</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>drawn <span class="ot">&lt;-</span> wk<span class="sc">::</span><span class="fu">wk_transform</span>(geom, PROJ<span class="sc">::</span><span class="fu">proj_trans_create</span>(wk<span class="sc">::</span><span class="fu">wk_crs</span>(geom), prj))</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>dc <span class="ot">&lt;-</span> wk<span class="sc">::</span><span class="fu">wk_coords</span>(drawn)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>op <span class="ot">&lt;-</span> <span class="fu">par</span>(<span class="at">mar =</span> <span class="fu">rep</span>(<span class="fl">0.5</span>, <span class="dv">4</span>))</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">range</span>(dc<span class="sc">$</span>x), <span class="fu">range</span>(dc<span class="sc">$</span>y), <span class="at">type =</span> <span class="st">&quot;n&quot;</span>, <span class="at">asp =</span> <span class="dv">1</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>     <span class="at">axes =</span> <span class="cn">FALSE</span>, <span class="at">xlab =</span> <span class="st">&quot;&quot;</span>, <span class="at">ylab =</span> <span class="st">&quot;&quot;</span>)</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(drawn, <span class="at">col =</span> <span class="st">&quot;grey90&quot;</span>, <span class="at">add =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p><img src="cut.png"
+alt="The part of Australia inside the box, densified and drawn in the same projection" /></p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(op)</span></code></pre></div>
 <h2 id="things-that-are-the-same-and-things-that-are-not">Things that
 are the same, and things that are not</h2>
 <ul>
