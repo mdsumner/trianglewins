@@ -1,6 +1,7 @@
 # Triangles in GeoArrow: notes from wkpool, laridae and cdtr
 
-*Development draft, October 2026. Written for the GeoArrow discussion about
+*Development draft, October 2026; revised 14 October after feedback from the
+GeoArrow side on the dictionary form. Written for the GeoArrow discussion about
 storing triangles, from what we learned building triangle meshes in R. Not a
 spec; a list of what worked, what broke, and one possible shape.*
 
@@ -17,29 +18,47 @@ are about the details that decide whether that works in practice.
 
 ## 1. Four ways to store triangles
 
-| form | layout | keeps adjacency | survives Parquet | notes |
+| form | layout | keeps adjacency | Parquet | notes |
 |---|---|---|---|---|
 | A. soup | `fixed_size_list<geoarrow.point, 3>` per triangle | no | yes | simplest; same information as WKB `TRIANGLE`; every shared vertex repeated (about 6 times in a typical mesh) |
-| B. per-feature mesh | struct of `vertices: list<point>` and `triangles: list<fixed_size_list<uint32, 3>>`, indices local to the row | within a feature | yes | like glTF or PLY; one row is one mesh (a TIN, a triangulated polygon) |
-| C. two tables | a vertex table and a triangle table of three vertex ids | across features | yes | the form in our mesh spec; vertices shared across the whole dataset |
-| D. dictionary | `dictionary<int32, geoarrow.point>` columns | across a batch | doubtful | see below |
+| B. per-feature mesh | struct of `vertices: list<point>` and `triangles: list<fixed_size_list<uint32, 3>>`, indices local to the row | within a feature | yes | like glTF or PLY; one row is one mesh |
+| C. two tables | a vertex table and a triangle table of three vertex ids | across features | yes | the form in our mesh spec |
+| D. dictionary | `fixed_size_list<dictionary<int32, geoarrow.point>, 3>`, one mesh per Arrow array | across batches | no (decode to A) | rows are triangles, the dictionary is the vertex pool |
 
-Form D is the literal reading of "dictionary-encode the points", and it has two
-problems.
+**Form D is the one GeoArrow has in mind**: one mesh per Arrow array, each
+row a triangle, the dictionary holding the vertices. It is form C folded into a
+single column, and it has the right properties for Arrow:
 
-- **Parquet.** Parquet dictionary pages belong to one column chunk and hold
-  primitive values. A dictionary whose values are a struct of x and y is not a
-  Parquet dictionary, so as far as we know writers either refuse it or decode
-  it back to plain points. The sharing is lost on disk.
-- **Batches.** In Arrow IPC a dictionary is scoped to the stream and can be
-  replaced or extended between batches, and the file format restricts
-  replacement. Vertex ids that must mean the same thing across batches (a
-  coverage streamed in pieces) need care that the format does not give you.
+- **Shared across batches.** In IPC the dictionary is sent once and every later
+  record batch refers to it. Checked with pyarrow 25: two batches of triangles
+  over one vertex dictionary write as `schema, dictionary, record batch,
+  record batch`, and both batches read back with the same dictionary. The IPC
+  file format round-trips the type too.
+- **Rows stay small.** Each row is three indices, so nothing depends on very
+  large rows, which many tools handle poorly.
+- **Triangle attributes are sibling columns** (depth, a feature id, a face
+  value), aligned row for row.
 
-Forms B and C put the sharing in ordinary integer columns, which every Arrow
-and Parquet implementation already handles. B is the natural GeoArrow
-geometry type (one row, one mesh). C is what you want when meshes share
-boundaries, and it can live beside a GeoArrow table rather than inside it.
+What we found when testing it
+([script](https://github.com/mdsumner/trianglewins/blob/main/survey/dev-drafts/geoarrow-dict-check.py)):
+
+- **Parquet does not take it.** pyarrow 25 refuses to write it
+  (`Writing DictionaryArray with nested dictionary type not yet supported`).
+  The sharing has to be decoded to form A for Parquet, or written as form C.
+- **A second column means a second dictionary.** Constraint edges stored as
+  `fixed_size_list<dictionary<int32, point>, 2>` beside the triangles get
+  their own dictionary in IPC (`schema, dictionary, dictionary, record batch`),
+  so the vertices are sent twice. Flags on the triangle avoid that (section 4).
+- **Vertex attributes need a home.** `origin`, z, or exact rational
+  coordinates (section 2) belong to vertices, not triangles. Either the
+  dictionary value type carries them (a struct wider than `geoarrow.point`),
+  or a vertex table sits beside the array keyed by dictionary index.
+
+**Form B is still useful, in addition.** It is what a scalar function returns:
+an `ST_Earcut(wkb)` or `ST_Triangulate(wkb)` maps one geometry to one mesh, so
+its output must be a per-row value. Rows can get big for detailed polygons,
+which is the cost of a scalar result. Form C is the interchange form for
+writing to Parquet or a database.
 
 ## 2. Say how vertices were matched
 
@@ -86,8 +105,11 @@ apart, and to trace mesh edges back to the input.
 A set of triangles does not say which edges were boundaries, or which
 triangles are inside a hole. Keep two more things:
 
-- the **constraint edges** (as vertex id pairs), so boundaries and holes can be
-  rebuilt;
+- the **constraint edges**, so boundaries and holes can be rebuilt. In form C
+  they are a table of vertex id pairs. In form D, where a second column would
+  repeat the dictionary, a per-triangle `fixed_size_list<bool, 3>` saying
+  which of its edges are constrained does the same job (edge k runs from
+  vertex k to vertex k + 1);
 - a per-triangle **depth**: how many constraint edges you cross to reach it
   from outside. Odd depth is inside under even-odd rules. When two polygons
   share a boundary, that edge is counted once per copy, so depth stays
@@ -109,7 +131,7 @@ and are painful to change later.
 Indexing is not only about size. In wkpool, drawing 40,000 triangles from the
 vertex pool with one indexed `polygon()` call took 0.4 s, against 74 s when
 each triangle was cast to its own polygon geometry first. Renderers (deck.gl,
-WebGL, glTF) want indexed triangles too, so form B or C feeds them directly.
+WebGL, glTF) want indexed triangles too, so forms B, C and D feed them directly.
 
 ## 7. Traps we hit
 
@@ -129,7 +151,17 @@ WebGL, glTF) want indexed triangles too, so form B or C feeds them directly.
 
 ## A possible shape
 
-For discussion only, a per-feature mesh type (form B):
+For discussion only. The mesh as one array (form D), with optional sibling
+columns:
+
+```
+triangles:   fixed_size_list<dictionary<int32, geoarrow.point>, 3>  -- CCW
+constrained: fixed_size_list<bool, 3>    -- optional; edge k is v[k] -> v[k+1]
+depth:       int32                       -- optional, per triangle
+field metadata: vertex_identity
+```
+
+For a scalar function returning one mesh per geometry (form B):
 
 ```
 struct<
@@ -138,11 +170,10 @@ struct<
   constraints: list<fixed_size_list<uint32, 2>>,   -- optional
   depth:       list<int32>                         -- optional, per triangle
 >
-field metadata: vertex_identity, origin dictionary on an optional vertex column
 ```
 
-and, for shared-vertex meshes across rows, the two-table form C with the same
-column names, the triangle table keyed to the vertex table.
+and for Parquet or a database, the two-table form C with the same column
+names, the triangle table keyed to the vertex table.
 
 ## Where this comes from
 
