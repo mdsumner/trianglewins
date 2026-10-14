@@ -99,7 +99,7 @@ def from_mesh(xy, tri, meta=None):
 def to_mesh(arr):
     """Vertices (n, 2) and triangles (m, 3) from the dictionary layout."""
     st = arr.storage if isinstance(arr, pa.ExtensionArray) else arr
-    d = st.values
+    d = st.flatten()  # respects slice offsets, unlike .values
     dic = d.dictionary
     xy = np.column_stack([dic.field("x").to_numpy(), dic.field("y").to_numpy()])
     return xy, d.indices.to_numpy().reshape(-1, 3)
@@ -119,21 +119,22 @@ def repool(decoded_chunks, meta=None):
     """Decoded layout -> dictionary layout, exact match on bit patterns.
 
     Vertices are numbered by first appearance across all chunks in order.
+    Hash-based (Arrow dictionary_encode on the 16-byte x/y bit pattern).
     """
     xs, ys = [], []
     for ch in decoded_chunks:
         st = ch.storage if isinstance(ch, pa.ExtensionArray) else ch
-        v = st.values
+        v = st.flatten()  # respects slice offsets, unlike .values
         xs.append(v.field("x").to_numpy(zero_copy_only=False))
         ys.append(v.field("y").to_numpy(zero_copy_only=False))
-    bits = np.column_stack([np.concatenate(xs), np.concatenate(ys)]).view(np.uint64)
-    key = np.ascontiguousarray(bits).view(np.dtype((np.void, 16))).ravel()
-    _, first, inv = np.unique(key, return_index=True, return_inverse=True)
-    rank = np.empty(len(first), dtype=np.int64)
-    rank[np.argsort(first, kind="stable")] = np.arange(len(first))
-    ids = rank[inv.ravel()]
-    xy = bits[np.sort(first)].view(np.float64)
-    return from_mesh(xy, ids.reshape(-1, 3), meta)
+    xy = np.column_stack([np.concatenate(xs), np.concatenate(ys)])
+    key = pa.FixedSizeBinaryArray.from_buffers(
+        pa.binary(16), len(xy), [None, pa.py_buffer(np.ascontiguousarray(xy).tobytes())])
+    enc = key.dictionary_encode()
+    ids = enc.indices.to_numpy()
+    pool = np.frombuffer(enc.dictionary.buffers()[1], dtype=np.float64,
+                         count=2 * len(enc.dictionary)).reshape(-1, 2)
+    return from_mesh(pool, ids.reshape(-1, 3), meta)
 
 
 # ---- files ------------------------------------------------------------------

@@ -1,0 +1,46 @@
+{
+ "delaunay_s": 12.459,
+ "canonical_order_s": 0.673,
+ "points": 1000000,
+ "vertices": 999999,
+ "triangles": 1999957,
+ "ccw": true,
+ "build_array_s": 0.185,
+ "ipc_write_s": 0.166,
+ "ipc_delta_write_s": 0.1,
+ "ipc_delta_read_s": 0.013,
+ "ipc_batches": 31,
+ "ipc_delta_ids_equal": true,
+ "ipc_delta_dict_equal": true,
+ "parquet_write_s": 1.167,
+ "parquet_read_repool_s": 1.386,
+ "parquet_type_kept": true,
+ "parquet_meta_kept": true,
+ "parquet_ids_preserved": true,
+ "parquet_coords_bitwise_equal": true,
+ "noncanonical_ids_preserved": false,
+ "noncanonical_same_triangles": true,
+ "wkb_build_s": 8.105,
+ "bytes": {
+  "ipc_dictionary": 48761130,
+  "ipc_dictionary_deltas": 48769290,
+  "parquet_decoded_default": 41900191,
+  "parquet_two_tables_c": 29236012,
+  "parquet_wkb_polygons": 42707912
+ },
+ "duckdb_query_s": 0.135,
+ "duckdb": {
+  "rows": 1999957,
+  "area_rel_diff": 1.907437822520663e-16,
+  "type_seen": "STRUCT(x DOUBLE, y DOUBLE)[]"
+ },
+ "edge_unreferenced_vertex_dropped": true,
+ "edge_negative_zero_kept_distinct": true,
+ "edge_duplicate_coords_merged": true,
+ "peak_rss_mb": 2560,
+ "versions": {
+  "pyarrow": "26.0.0",
+  "numpy": "2.5.3",
+  "duckdb": "1.5.6"
+ }
+}

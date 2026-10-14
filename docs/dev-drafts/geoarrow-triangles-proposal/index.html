@@ -131,6 +131,10 @@ a triangle to a Polygon appends the first vertex to close the ring.</li>
 <li>Producers should not write degenerate (zero-area) triangles.</li>
 <li>The dictionary should not contain two entries with equal
 coordinates.</li>
+<li>Producers should number vertices in order of first appearance in the
+triangles. This keeps vertex ids through the decoded layout (below) and
+lets an IPC stream add each batch's new vertices as a dictionary
+delta.</li>
 <li>The dictionary may contain vertices that no triangle references (for
 example isolated input points of a triangulation).</li>
 <li>Coordinates in the dictionary must not be null. A triangle may be
@@ -140,9 +144,10 @@ null; the indices of a non-null triangle must not be null.</li>
 support a dictionary nested in a list:</p>
 <pre><code>FixedSizeList&lt;Coordinate&gt;[3]</code></pre>
 <p>This holds the same triangles with each vertex written out. Vertex
-sharing is recovered by matching coordinates exactly (see
-<code>vertex_identity</code> below); vertex ids are renumbered and
-unreferenced vertices are lost.</p>
+sharing is recovered by matching coordinates exactly, on their bit
+patterns, numbering vertices by first appearance. When the producer used
+that order, vertex ids come back unchanged; otherwise they are
+renumbered. Unreferenced vertices are lost.</p>
 <h2 id="proposed-text-for-extension-typesmd">Proposed text for
 <code>extension-types.md</code></h2>
 <p>Add <code>geoarrow.triangles</code> to the list of extension names.
@@ -175,13 +180,23 @@ layout under the same extension name</strong>, and a reader rebuilds the
 dictionary by exact coordinate matching. Checked: the decoded array
 round-trips through Parquet with its extension name and metadata, and
 re-pooling recovers the same 4 vertices and the same triangles.</p>
-<p>What this loses: vertex ids are renumbered (by first appearance),
-unreferenced vertices are dropped, and with <code>vertex_identity</code>
-<code>"tolerance"</code> two distinct entries that happen to share a
-double value would merge. A lossless alternative is two tables
-(vertices, and triangles of <code>FixedSizeList&lt;int32&gt;[3]</code>
-indices), but that is a file-level convention for GeoParquet rather than
-a column type for GeoArrow, so it is left out of this proposal.</p>
+<p>A <a
+href="https://github.com/mdsumner/trianglewins/tree/main/survey/dev-drafts/pilot">pilot</a>
+implements this default in Python (pyarrow) and R (nanoarrow, wkpool),
+and each reads the other's files. With vertices in first-appearance
+order the round trip is exact: 1,999,957 triangles on 999,999 vertices
+came back with the same ids and bit-identical coordinates, re-pooled in
+1.4 s. The decoded Parquet was 41.9 MB, against 29.2 MB for two tables
+and 42.7 MB for WKB polygons (random full-precision coordinates, the
+worst case for compression). DuckDB reads it with no knowledge of the
+type.</p>
+<p>What this loses: unreferenced vertices are dropped, ids are
+renumbered if the producer did not use first-appearance order, and two
+distinct entries that share a double value would merge. A lossless
+alternative is two tables (vertices, and triangles of
+<code>FixedSizeList&lt;int32&gt;[3]</code> indices), but that is a
+file-level convention for GeoParquet rather than a column type for
+GeoArrow, so it is left out of this proposal.</p>
 <p><strong>This is the main open decision.</strong> The options are (a)
 decoded layout as above, (b) no Parquet story in the type, defer to
 GeoParquet, (c) a second storage layout of plain indices plus a separate
@@ -214,7 +229,8 @@ These can be computed from the indices.</li>
 </ul>
 <h2 id="open-questions">Open questions</h2>
 <ol type="1">
-<li>Parquet: (a), (b) or (c) above.</li>
+<li>Parquet: (a), (b) or (c) above. The pilot shows (a) works; (c) is
+about 30% smaller.</li>
 <li>Does <code>vertex_identity</code> belong in the spec, or in
 producer-specific metadata?</li>
 <li>Should counter-clockwise order be "should" or "must"? GeoArrow does
@@ -274,9 +290,13 @@ vertices and the same triangles</td>
 </tr>
 </tbody>
 </table>
-<p>Still to do before this goes upstream: an export from wkpool (R,
-through nanoarrow) so there is a second, independent producer, and a
-reader in geoarrow-c or geoarrow-rs if a maintainer is willing.</p>
+<p>The <a
+href="https://github.com/mdsumner/trianglewins/tree/main/survey/dev-drafts/pilot">pilot</a>
+goes further: the Parquet default at 2M triangles, IPC deltas across 31
+batches, a second producer and reader in R built with nanoarrow and
+wkpool, and files exchanged between the two. Still to do before this
+goes upstream: a reader in geoarrow-c or geoarrow-rs, if a maintainer is
+willing, and a real constrained mesh from laridae or cdtr.</p>
 </main>
 <script>
 document.querySelectorAll("table").forEach(function (t) {

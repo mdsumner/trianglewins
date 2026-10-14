@@ -72,6 +72,9 @@ different dictionaries are different meshes.
   triangle to a Polygon appends the first vertex to close the ring.
 - Producers should not write degenerate (zero-area) triangles.
 - The dictionary should not contain two entries with equal coordinates.
+- Producers should number vertices in order of first appearance in the
+  triangles. This keeps vertex ids through the decoded layout (below) and lets
+  an IPC stream add each batch's new vertices as a dictionary delta.
 - The dictionary may contain vertices that no triangle references (for
   example isolated input points of a triangulation).
 - Coordinates in the dictionary must not be null. A triangle may be null; the
@@ -85,8 +88,10 @@ FixedSizeList<Coordinate>[3]
 ```
 
 This holds the same triangles with each vertex written out. Vertex sharing is
-recovered by matching coordinates exactly (see `vertex_identity` below); vertex
-ids are renumbered and unreferenced vertices are lost.
+recovered by matching coordinates exactly, on their bit patterns, numbering
+vertices by first appearance. When the producer used that order, vertex ids
+come back unchanged; otherwise they are renumbered. Unreferenced vertices are
+lost.
 
 ## Proposed text for `extension-types.md`
 
@@ -116,9 +121,17 @@ matching. Checked: the decoded array round-trips through Parquet with its
 extension name and metadata, and re-pooling recovers the same 4 vertices and
 the same triangles.
 
-What this loses: vertex ids are renumbered (by first appearance), unreferenced
-vertices are dropped, and with `vertex_identity` `"tolerance"` two distinct
-entries that happen to share a double value would merge. A lossless
+A [pilot](https://github.com/mdsumner/trianglewins/tree/main/survey/dev-drafts/pilot) implements this default in Python (pyarrow) and R
+(nanoarrow, wkpool), and each reads the other's files. With vertices in
+first-appearance order the round trip is exact: 1,999,957 triangles on
+999,999 vertices came back with the same ids and bit-identical coordinates,
+re-pooled in 1.4 s. The decoded Parquet was 41.9 MB, against 29.2 MB for two
+tables and 42.7 MB for WKB polygons (random full-precision coordinates, the
+worst case for compression). DuckDB reads it with no knowledge of the type.
+
+What this loses: unreferenced vertices are dropped, ids are renumbered if the
+producer did not use first-appearance order, and two distinct entries that
+share a double value would merge. A lossless
 alternative is two tables (vertices, and triangles of `FixedSizeList<int32>[3]`
 indices), but that is a file-level convention for GeoParquet rather than a
 column type for GeoArrow, so it is left out of this proposal.
@@ -153,7 +166,8 @@ columns beside the triangles, not part of the extension type:
 
 ## Open questions
 
-1. Parquet: (a), (b) or (c) above.
+1. Parquet: (a), (b) or (c) above. The pilot shows (a) works; (c) is about
+   30% smaller.
 2. Does `vertex_identity` belong in the spec, or in producer-specific
    metadata?
 3. Should counter-clockwise order be "should" or "must"? GeoArrow does not
@@ -179,6 +193,8 @@ registers the type in pyarrow (26.0) and checks the claims above:
 | triangle to Polygon | ring closed by repeating the first vertex |
 | winding | the test triangles are counter-clockwise |
 
-Still to do before this goes upstream: an export from wkpool (R, through
-nanoarrow) so there is a second, independent producer, and a reader in
-geoarrow-c or geoarrow-rs if a maintainer is willing.
+The [pilot](https://github.com/mdsumner/trianglewins/tree/main/survey/dev-drafts/pilot) goes further: the Parquet default at 2M triangles, IPC
+deltas across 31 batches, a second producer and reader in R built with
+nanoarrow and wkpool, and files exchanged between the two. Still to do before
+this goes upstream: a reader in geoarrow-c or geoarrow-rs, if a maintainer is
+willing, and a real constrained mesh from laridae or cdtr.

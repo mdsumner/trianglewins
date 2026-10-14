@@ -1,0 +1,18 @@
+{
+ "r_ipc_type": "extension<geoarrow.triangles<Triangles>>",
+ "r_ipc_meta": {
+  "vertex_identity": "exact_float"
+ },
+ "r_ipc_ids_equal": true,
+ "r_ipc_ccw": true,
+ "r_parquet_type_kept": true,
+ "r_parquet_repool_ids_equal": true,
+ "r_parquet_coords_equal_ipc": true,
+ "r_feature_column": "int32",
+ "python_parquet": {
+  "path": "/home/claude/work/rout/python-mesh.parquet",
+  "vertices": 200000,
+  "triangles": 399962,
+  "row_groups": 4
+ }
+}
