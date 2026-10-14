@@ -1,12 +1,14 @@
 #!/bin/sh
 ## Render the articles into the Pages site, and write redirect stubs for
-## pages that were merged into others.
+## pages that were merged into others. render's optional 6th argument is the
+## relative path back to the site root (default ../), for pages nested deeper.
 ##   sh survey/build.sh
 set -e
 render () {
   mkdir -p "docs/$2"
   pandoc -f gfm -t html5 --template survey/template.html \
     --metadata pagetitle="$3" -V crumb="$4" -V description="$5" \
+    -V root="${6:-../}" \
     -o "docs/$2/index.html" "survey/$1"
   echo "wrote docs/$2/index.html"
 }
@@ -36,7 +38,8 @@ render notes.md notes "Notes: dimension and interpolation" notes \
   "Coordinate versus topological dimension, triangles on the sphere, and what linear interpolation on a mesh promises."
 render dev-drafts/geoarrow-triangles.md dev-drafts/geoarrow-triangles \
   "Triangles in GeoArrow (draft)" "dev draft" \
-  "Development draft: what building triangle meshes with wkpool, laridae and cdtr suggests for storing triangles in GeoArrow."
+  "Development draft: what building triangle meshes with wkpool, laridae and cdtr suggests for storing triangles in GeoArrow." \
+  ../../
 redirect choose ../start/#which-package
 redirect dimension ../notes/#dimension
 redirect interpolation ../notes/#interpolation
