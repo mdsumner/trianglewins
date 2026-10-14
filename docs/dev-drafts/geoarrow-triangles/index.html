@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triangles in GeoArrow (draft)</title>
+<meta name="description" content="Development draft: what building triangle meshes with wkpool, laridae and cdtr suggests for storing triangles in GeoArrow.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--grid); min-width: 9em; }
+th:first-child, td:first-child { min-width: 13em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../">trianglewins</a> / dev draft</p>
+<h1
+id="triangles-in-geoarrow-notes-from-wkpool-laridae-and-cdtr">Triangles
+in GeoArrow: notes from wkpool, laridae and cdtr</h1>
+<p><em>Development draft, October 2026. Written for the GeoArrow
+discussion about storing triangles, from what we learned building
+triangle meshes in R. Not a spec; a list of what worked, what broke, and
+one possible shape.</em></p>
+<p>The remark that started this:</p>
+<blockquote>
+<p>we have to solve triangles in GeoArrow too at some point... we can
+dictionary-encode points maybe and store as a fixed-size list or struct
+of geoarrow.point</p>
+</blockquote>
+<p>Dictionary-encoding the points is the right instinct. It is the
+vertex pool that <a
+href="https://github.com/hypertidy/wkpool">wkpool</a> is built on: one
+table of unique vertices, and geometry as integer references into it.
+The notes below are about the details that decide whether that works in
+practice.</p>
+<h2 id="1-four-ways-to-store-triangles">1. Four ways to store
+triangles</h2>
+<table>
+<thead>
+<tr class="header">
+<th>form</th>
+<th>layout</th>
+<th>keeps adjacency</th>
+<th>survives Parquet</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A. soup</td>
+<td><code>fixed_size_list&lt;geoarrow.point, 3&gt;</code> per
+triangle</td>
+<td>no</td>
+<td>yes</td>
+<td>simplest; same information as WKB <code>TRIANGLE</code>; every
+shared vertex repeated (about 6 times in a typical mesh)</td>
+</tr>
+<tr class="even">
+<td>B. per-feature mesh</td>
+<td>struct of <code>vertices: list&lt;point&gt;</code> and
+<code>triangles: list&lt;fixed_size_list&lt;uint32, 3&gt;&gt;</code>,
+indices local to the row</td>
+<td>within a feature</td>
+<td>yes</td>
+<td>like glTF or PLY; one row is one mesh (a TIN, a triangulated
+polygon)</td>
+</tr>
+<tr class="odd">
+<td>C. two tables</td>
+<td>a vertex table and a triangle table of three vertex ids</td>
+<td>across features</td>
+<td>yes</td>
+<td>the form in our mesh spec; vertices shared across the whole
+dataset</td>
+</tr>
+<tr class="even">
+<td>D. dictionary</td>
+<td><code>dictionary&lt;int32, geoarrow.point&gt;</code> columns</td>
+<td>across a batch</td>
+<td>doubtful</td>
+<td>see below</td>
+</tr>
+</tbody>
+</table>
+<p>Form D is the literal reading of "dictionary-encode the points", and
+it has two problems.</p>
+<ul>
+<li><strong>Parquet.</strong> Parquet dictionary pages belong to one
+column chunk and hold primitive values. A dictionary whose values are a
+struct of x and y is not a Parquet dictionary, so as far as we know
+writers either refuse it or decode it back to plain points. The sharing
+is lost on disk.</li>
+<li><strong>Batches.</strong> In Arrow IPC a dictionary is scoped to the
+stream and can be replaced or extended between batches, and the file
+format restricts replacement. Vertex ids that must mean the same thing
+across batches (a coverage streamed in pieces) need care that the format
+does not give you.</li>
+</ul>
+<p>Forms B and C put the sharing in ordinary integer columns, which
+every Arrow and Parquet implementation already handles. B is the natural
+GeoArrow geometry type (one row, one mesh). C is what you want when
+meshes share boundaries, and it can live beside a GeoArrow table rather
+than inside it.</p>
+<h2 id="2-say-how-vertices-were-matched">2. Say how vertices were
+matched</h2>
+<p>Two points are "the same vertex" only by some rule. We use a
+ladder:</p>
+<ol type="1">
+<li>exact float equality of the input coordinates;</li>
+<li>tolerance or snapping;</li>
+<li>noded, as GEOS does, where crossings become vertices;</li>
+<li>exact, with constructed points held as rationals (CGAL's exact
+kernel).</li>
+</ol>
+<p>Dictionary-encoding by equality is rung 1 only. A mesh should record
+which rung produced its vertex ids, for example in field metadata
+(<code>"vertex_identity": "exact_float"</code>), so a reader knows
+whether two nearby vertices are meant to be one.</p>
+<p>Why this matters: we triangulated 60 random segments with integer
+endpoints twice. With crossings computed in double (CGAL's Epick kernel)
+there were 398 crossing vertices, but only 15 lay exactly on their input
+segments, and 4 were spurious near-duplicates (one pair 1.9e-14 apart)
+where three segments meet. With exact constructions there were 394, all
+exactly on their segments. The exact run uses
+<code>lari_cdt(exact = TRUE)</code> on the laridae <a
+href="https://github.com/hypertidy/laridae/tree/exact-cdt"><code>exact-cdt</code>
+branch</a>, and the check uses euclid's exact <code>has_on()</code>.</p>
+<p>If exact values need to travel, they can: numerator and denominator
+as string columns (<code>x_num</code>, <code>x_den</code>,
+<code>y_num</code>, <code>y_den</code>) beside the nearest doubles. That
+is plain data, unlike an exact number behind a pointer.</p>
+<h2 id="3-constructed-vertices-are-not-input">3. Constructed vertices
+are not input</h2>
+<p>A constrained triangulation adds vertices: crossings where input
+segments intersect, and Steiner points from refinement. A reader needs
+to tell them apart, and to trace mesh edges back to the input.</p>
+<ul>
+<li>An <code>origin</code> column on vertices, dictionary encoded:
+<code>input</code>, <code>crossing</code>, <code>steiner</code> (plus
+<code>grid</code> or <code>lattice</code> for generated meshes).</li>
+<li>Optionally, for each constraint edge in the mesh, the input segment
+it came from and how many input segments overlap it (laridae returns
+<code>segment</code> and <code>count</code>).</li>
+<li>Input vertices first, in input order, so ids of the input
+survive.</li>
+</ul>
+<h2 id="4-triangles-alone-lose-the-polygon">4. Triangles alone lose the
+polygon</h2>
+<p>A set of triangles does not say which edges were boundaries, or which
+triangles are inside a hole. Keep two more things:</p>
+<ul>
+<li>the <strong>constraint edges</strong> (as vertex id pairs), so
+boundaries and holes can be rebuilt;</li>
+<li>a per-triangle <strong>depth</strong>: how many constraint edges you
+cross to reach it from outside. Odd depth is inside under even-odd
+rules. When two polygons share a boundary, that edge is counted once per
+copy, so depth stays meaningful for coverages.</li>
+</ul>
+<h2 id="5-conventions-worth-fixing-early">5. Conventions worth fixing
+early</h2>
+<p>These are the decisions in our mesh spec (v0.1); they cost nothing to
+agree on and are painful to change later.</p>
+<ul>
+<li>Triangles counter-clockwise in xy.</li>
+<li>Vertex ids 0-based in Arrow (R presents them 1-based).</li>
+<li>The constraint table is called <code>constraints</code>.</li>
+<li>A doubled boundary counts once per copy in depth.</li>
+<li>The constraint-to-input map is optional.</li>
+</ul>
+<h2 id="6-indexed-triangles-pay-off">6. Indexed triangles pay off</h2>
+<p>Indexing is not only about size. In wkpool, drawing 40,000 triangles
+from the vertex pool with one indexed <code>polygon()</code> call took
+0.4 s, against 74 s when each triangle was cast to its own polygon
+geometry first. Renderers (deck.gl, WebGL, glTF) want indexed triangles
+too, so form B or C feeds them directly.</p>
+<h2 id="7-traps-we-hit">7. Traps we hit</h2>
+<ul>
+<li><strong>Per-polygon triangulation.</strong> Triangulating each
+polygon of a coverage on its own is easy, but Steiner points added on a
+shared edge are not shared by the neighbour, so the mesh has cracks.
+Triangulate the coverage as one planar straight-line graph, or refine
+shared edges once.</li>
+<li><strong>Batch seams.</strong> Streaming a large coverage in batches
+means edges on the seam appear in two batches; the vertex ids there must
+agree (see section 2).</li>
+<li><strong>Units.</strong> A maximum triangle area in metres applied to
+longitude/latitude data asks for an astronomical number of triangles.
+Estimating <code>bbox_area / max_area</code> before refining and warning
+above about 1e7 catches it.</li>
+<li><strong>Points and lines.</strong> A triangulation input can include
+bare points and open lines, not only polygons. A format that only takes
+polygons cannot carry them.</li>
+</ul>
+<h2 id="a-possible-shape">A possible shape</h2>
+<p>For discussion only, a per-feature mesh type (form B):</p>
+<pre><code>struct&lt;
+  vertices:    list&lt;geoarrow.point&gt;,
+  triangles:   list&lt;fixed_size_list&lt;uint32, 3&gt;&gt;,   -- CCW, 0-based, row-local
+  constraints: list&lt;fixed_size_list&lt;uint32, 2&gt;&gt;,   -- optional
+  depth:       list&lt;int32&gt;                         -- optional, per triangle
+&gt;
+field metadata: vertex_identity, origin dictionary on an optional vertex column</code></pre>
+<p>and, for shared-vertex meshes across rows, the two-table form C with
+the same column names, the triangle table keyed to the vertex table.</p>
+<h2 id="where-this-comes-from">Where this comes from</h2>
+<ul>
+<li><a href="https://github.com/hypertidy/wkpool">wkpool</a>: vertex
+pool, <code>wkpool_tri</code>.</li>
+<li><a href="https://github.com/hypertidy/cdtr">cdtr</a>: constrained
+Delaunay triangulation (CDT library); minimal points / triangles /
+segments contract.</li>
+<li><a href="https://github.com/hypertidy/laridae">laridae</a>: CGAL
+constrained triangulation and refinement with the full contract (origin,
+constraint map, depth).</li>
+<li><a href="https://github.com/hypertidy/meshcore">meshcore</a>: mesh
+spec v0.1 in <code>docs/mesh-spec-v0.1.md</code>.</li>
+</ul>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>
