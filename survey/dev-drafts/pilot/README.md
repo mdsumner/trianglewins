@@ -15,6 +15,9 @@ and R (nanoarrow arrays, wkpool for pooling), read each other's files.
 | `pilot.py` | scale run: Delaunay of N random points, IPC, Parquet, comparisons, DuckDB, edge cases |
 | `pilot-r.R` | R producer (inlandwaters through wkpool) and R reader |
 | `cross.py` | Python reads the R files and writes a mesh for R to read |
+| `laridae-mesh.R` | real constrained meshes from laridae (exact-cdt branch), exported with `constrained`, `depth` and a vertex table |
+| `laridae-check.py` | Python checks on those meshes, including the exact rational coordinates |
+| `plot-mesh.R` | draws a mesh read back from its Parquet file |
 | `setup.sh` | environment (conda-forge R, pip Python) |
 | `results/` | JSON output of the runs below |
 
@@ -81,10 +84,49 @@ polygons. For inlandwaters
 two entries with equal coordinates merge, and `-0.0` and `0.0` stay distinct
 because matching is on the bit pattern.
 
+## Real constrained meshes from laridae
+
+`laridae-mesh.R` triangulates three inputs with laridae built here from the
+`exact-cdt` branch (RcppCGAL 6.2.1), and writes each as a dictionary-layout
+IPC file, a decoded Parquet file and a vertex table keyed by dictionary index
+(`vertex`, `input_row`, `origin`, and the exact rational strings when present).
+Sibling columns are `constrained` (`fixed_size_list<bool>[3]`) and `depth`.
+
+| mesh | input vertices | vertices (Steiner, crossing) | triangles | depth |
+|---|---|---|---|---|
+| ACT, NSW, Victoria (inlandwaters rows 1, 3, 6), refined, min angle 25 | 12,140 | 40,654 (28,514 Steiner) | 71,318 | 1: 65,671; 2: 4,444; 3: 1,203 |
+| `minimal_mesh`, refined, min angle 25 | 14 | 275 (261 Steiner) | 479 | 1: 433; 2: 46 |
+| polymer#7 lines (200 points, buffered), exact crossings | 400 | 5,636 (5,236 crossing) | 11,250 | not computed by `lari_cdt()` |
+
+For all of them, in Python: the IPC ids match what R wrote, the Parquet round
+trip gives the same ids and bit-identical coordinates, the vertex table lines
+up with the dictionary, and the unique constrained edges recovered from the
+per-triangle flags equal the rows of laridae's segment table (14,327; 97;
+10,872). The pictures are drawn in R from the Parquet files alone:
+`results/minimal-mesh.png` and `results/vic-nsw-act.png`.
+
+Two findings from the exact mesh:
+
+- **laridae's `x`, `y` for exact crossings are not always the nearest
+  double.** Rounding the exact rationals correctly (Python `Fraction`) differs
+  from laridae's doubles for 3,961 of 5,636 vertices, mostly by 1 ulp, at most
+  51 ulps. The proposal's `"exact"` identity says "rounded to the nearest
+  double", so `lari_cdt()` should round from the rational. It uses
+  `CGAL::to_double()` on the lazy exact number (`src/exact.cpp` lines 90-91),
+  which does not promise the nearest double.
+- **Double and exact crossings differ almost everywhere.** Against the
+  correctly rounded exact values, 4,839 of the double-kernel run's 5,636
+  vertices differ, by at most 9.6e-13. Both runs give the same counts here,
+  so this input does not show the spurious vertices seen on integer segments.
+
+The vertex table also shows a tension: laridae (and mesh spec v0.1) put input
+vertices first in input order, while the proposal recommends first-appearance
+order. The pilot keeps both by renumbering and carrying `input_row`.
+
 ## Not covered
 
 - Streaming re-pool row group by row group (the pilot re-pools whole files;
   a hash table carried across row groups would bound memory).
 - GDAL, geoarrow-c and geoarrow-rs as readers.
-- Real meshes from laridae or cdtr with constraint flags and Steiner points
-  (the pilot writes `depth` and `constrained` columns but all-default values).
+- A per-triangle input feature (which polygon a triangle came from); laridae
+  gives depth, not the feature.

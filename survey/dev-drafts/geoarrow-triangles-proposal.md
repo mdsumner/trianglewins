@@ -195,6 +195,8 @@ registers the type in pyarrow (26.0) and checks the claims above:
 
 The [pilot](https://github.com/mdsumner/trianglewins/tree/main/survey/dev-drafts/pilot) goes further: the Parquet default at 2M triangles, IPC
 deltas across 31 batches, a second producer and reader in R built with
-nanoarrow and wkpool, and files exchanged between the two. Still to do before
-this goes upstream: a reader in geoarrow-c or geoarrow-rs, if a maintainer is
-willing, and a real constrained mesh from laridae or cdtr.
+nanoarrow and wkpool, files exchanged between the two, and real constrained
+meshes from laridae (refined coverages with lakes, islands and a filled hole,
+and exact crossings) carrying `constrained`, `depth` and a vertex table with
+origin and exact rationals. Still to do before this goes upstream: a reader in
+geoarrow-c or geoarrow-rs, if a maintainer is willing.

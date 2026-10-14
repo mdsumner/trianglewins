@@ -1,0 +1,73 @@
+{
+  "vic-nsw-act_triangulate_s": 0.458,
+  "vic_nsw_act": {
+    "input_vertices": 12140,
+    "input_segments": 14485,
+    "max_area": 97800000,
+    "vertices": 40654,
+    "unreferenced": 0,
+    "triangles": 71318,
+    "origin": {
+      "input": 12140,
+      "crossing": 0,
+      "steiner": 28514
+    },
+    "constrained_edges": 18758,
+    "segments": 14327,
+    "ccw": true
+  },
+  "minimal-mesh_triangulate_s": 0.008,
+  "minimal_mesh": {
+    "input_vertices": 14,
+    "input_segments": 16,
+    "max_area": 0.0031,
+    "vertices": 275,
+    "unreferenced": 0,
+    "triangles": 479,
+    "origin": {
+      "input": 14,
+      "crossing": 0,
+      "steiner": 261
+    },
+    "constrained_edges": 125,
+    "segments": 97,
+    "ccw": true
+  },
+  "polymer7_st_intersection": "ok",
+  "polymer7_cdt_exact_s": 0.226,
+  "polymer7_exact": {
+    "input_vertices": 400,
+    "input_segments": 400,
+    "vertices": 5636,
+    "unreferenced": 0,
+    "triangles": 11250,
+    "origin": {
+      "input": 400,
+      "crossing": 5236,
+      "steiner": 0
+    },
+    "constrained_edges": 21737,
+    "segments": 10872,
+    "ccw": true
+  },
+  "polymer7_cdt_double_s": 0.021,
+  "polymer7_double": {
+    "input_vertices": 400,
+    "input_segments": 400,
+    "vertices": 5636,
+    "unreferenced": 0,
+    "triangles": 11250,
+    "origin": {
+      "input": 400,
+      "crossing": 5236,
+      "steiner": 0
+    },
+    "constrained_edges": 21737,
+    "segments": 10872,
+    "ccw": true
+  },
+  "versions": {
+    "laridae": "0.1.0",
+    "RcppCGAL": "6.2.1.1"
+  }
+} 
