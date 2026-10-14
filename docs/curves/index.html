@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curves: bigcurve and s2</title>
+<meta name="description" content="What an edge between two longitude, latitude points is, how s2 measures it, and how bigcurve draws it in any map projection.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 code, h2 code, h3 code, h4 code { font-size: 0.9em; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--grid); min-width: 9em; }
+th:first-child, td:first-child { min-width: 13em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../">trianglewins</a> / curves</p>
+<h1 id="curves-bigcurve-and-s2">Curves: bigcurve and s2</h1>
+<p>Triangles have straight edges, and so does every line a map draws. On
+the Earth, though, the edge between two longitude, latitude points is
+usually meant as a curve. This page is about that gap: what an edge
+"is", how s2 measures it, and how bigcurve draws it in a projection. It
+sits alongside <a
+href="https://hypertidy.github.io/regular-in-what/">Regular in
+what?</a>, which asks the same kind of question about grids: regular,
+straight or curved only in some frame.</p>
+<p>The page is also the vignette in <a
+href="https://github.com/hypertidy/bigcurve">bigcurve</a>, which is not
+on CRAN yet; install it with
+<code>install.packages("bigcurve", repos = c("https://hypertidy.r-universe.dev", "https://cloud.r-project.org"))</code>.</p>
+<p>If you already use s2 (directly, or through sf, where it is the
+default for longitude and latitude data) you may wonder where bigcurve
+fits. The short answer: <strong>they agree on what a line between two
+points on the Earth is, and they answer different questions about
+it.</strong></p>
+<ul>
+<li>s2 answers <em>"what is this shape on the sphere, and how does it
+relate to other shapes?"</em> Does it intersect, what is its area, what
+is the union, how far apart are these?</li>
+<li>bigcurve answers <em>"how many points do I need to draw this shape
+in a given map projection so that it looks right, and no
+more?"</em></li>
+</ul>
+<p>This page walks through the shared idea, where each package does its
+work, and how to use them together.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(bigcurve)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(s2)</span></code></pre></div>
+<h2 id="the-shared-idea-an-edge-is-a-great-circle">The shared idea: an
+edge is a great circle</h2>
+<p>Give a computer two points in longitude and latitude and ask for the
+line between them. There are two common answers.</p>
+<ol type="1">
+<li>The <strong>planar</strong> answer: draw a straight line in
+longitude, latitude space, as if the coordinates were x and y on graph
+paper. This was what sf and GEOS did for years, and what most file
+formats quietly assume.</li>
+<li>The <strong>geodesic</strong> answer: follow the shortest path over
+the surface of the Earth, a great circle arc.</li>
+</ol>
+<p>s2 takes the second answer for every edge, and so does bigcurve. Take
+a line along latitude 60 from longitude 0 to longitude 100. The planar
+middle of that line is (50, 60). The great circle middle is a long way
+north of it:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>line <span class="ot">&lt;-</span> <span class="fu">s2_make_line</span>(<span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">100</span>), <span class="fu">c</span>(<span class="dv">60</span>, <span class="dv">60</span>))</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">s2_as_text</span>(<span class="fu">s2_interpolate_normalized</span>(line, <span class="fl">0.5</span>))</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] &quot;POINT (49.99999999999999 69.63942512488693)&quot;</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="do">## how far is the planar middle from the true line, in metres?</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="fu">s2_distance</span>(<span class="fu">s2_lnglat</span>(<span class="dv">50</span>, <span class="dv">60</span>), line)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 1071857</span></span></code></pre></div>
+<p>More than a thousand kilometres. Neither answer is wrong, they are
+two different shapes that happen to share their vertices. What matters
+is knowing which one your data means. s2 makes the geodesic reading the
+default; bigcurve assumes it.</p>
+<p>bigcurve inserts its new vertices exactly on s2's arc. Densify the
+same line and ask s2 how far each new vertex is from the line:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>d <span class="ot">&lt;-</span> <span class="fu">densify</span>(<span class="fu">segment</span>(<span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">100</span>), <span class="fu">c</span>(<span class="dv">60</span>, <span class="dv">60</span>)),</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>             <span class="st">&quot;+proj=laea +lon_0=50 +lat_0=60&quot;</span>, <span class="at">tolerance =</span> <span class="dv">1000</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(d)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 13</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="fu">max</span>(<span class="fu">s2_distance</span>(<span class="fu">s2_lnglat</span>(d[, <span class="dv">1</span>], d[, <span class="dv">2</span>]), line))</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 1.749256e-09</span></span></code></pre></div>
+<p>A few nanometres, which is floating point noise. The added vertices
+change nothing about the shape on the sphere; they only make it explicit
+for a flat drawing.</p>
+<h2 id="where-the-work-happens">Where the work happens</h2>
+<p>s2 does all its work on the sphere itself. Internally every point is
+a unit vector in three dimensions, and there is no map projection
+anywhere in sight. That is why s2 has no trouble at the poles or at the
+antimeridian: on a sphere there is no edge of the map to fall off.</p>
+<p>bigcurve does its work in the <strong>plane of the map you are going
+to draw</strong>. For each edge it projects the great circle midpoint
+with PROJ and asks how far it lands from the straight chord between the
+projected endpoints. If it is further than <code>tolerance</code> (in
+the map's own units, usually metres) the edge is split and both halves
+are checked again. This is the adaptive resampling that Mike Bostock
+wrote for d3-geo.</p>
+<p>That one difference explains most of what follows:</p>
+<ul>
+<li>A tolerance in bigcurve is "how far may the drawn line stray on the
+map". The default is about one part in 2048 of the map, roughly a pixel
+on a large plot.</li>
+<li>The same edge gets <strong>different</strong> numbers of vertices in
+different projections, because the curve is a different shape on each
+map. An edge that is straight in one projection gets no new vertices at
+all.</li>
+</ul>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>s <span class="ot">&lt;-</span> <span class="fu">segment</span>(<span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">100</span>), <span class="fu">c</span>(<span class="dv">60</span>, <span class="dv">60</span>))</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">c</span>(<span class="at">laea  =</span> <span class="fu">nrow</span>(<span class="fu">densify</span>(s, <span class="st">&quot;+proj=laea +lon_0=50 +lat_0=60&quot;</span>, <span class="at">tolerance =</span> <span class="dv">1000</span>)),</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">stere =</span> <span class="fu">nrow</span>(<span class="fu">densify</span>(s, <span class="st">&quot;+proj=stere +lat_0=90&quot;</span>, <span class="at">tolerance =</span> <span class="dv">1000</span>)),</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">merc  =</span> <span class="fu">nrow</span>(<span class="fu">densify</span>(s, <span class="st">&quot;+proj=merc&quot;</span>, <span class="at">tolerance =</span> <span class="dv">1000</span>)))</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;  laea stere  merc </span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    13    17    65</span></span></code></pre></div>
+<h2 id="same-shape-two-readings">Same shape, two readings</h2>
+<p>Here is a "box" written with four corners, from longitude 100 to 160
+and latitude -35 to -20. As planar data its sides are parallels and
+meridians. As s2 (and bigcurve) read it, the north and south sides are
+great circles, and they bow away from the equator:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>box <span class="ot">&lt;-</span> <span class="fu">s2_make_polygon</span>(<span class="fu">c</span>(<span class="dv">100</span>, <span class="dv">160</span>, <span class="dv">160</span>, <span class="dv">100</span>), <span class="fu">c</span>(<span class="sc">-</span><span class="dv">35</span>, <span class="sc">-</span><span class="dv">35</span>, <span class="sc">-</span><span class="dv">20</span>, <span class="sc">-</span><span class="dv">20</span>))</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>south <span class="ot">&lt;-</span> <span class="fu">s2_make_line</span>(<span class="fu">c</span>(<span class="dv">100</span>, <span class="dv">160</span>), <span class="fu">c</span>(<span class="sc">-</span><span class="dv">35</span>, <span class="sc">-</span><span class="dv">35</span>))</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">s2_as_text</span>(<span class="fu">s2_interpolate_normalized</span>(south, <span class="fl">0.5</span>))</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] &quot;POINT (130 -38.95657940063204)&quot;</span></span></code></pre></div>
+<p>Densify it for a map centred on Australia and draw both readings.
+Grey is the planar reading (sides along parallels and meridians), black
+is the geodesic reading with bigcurve's added vertices (the points).</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>prj <span class="ot">&lt;-</span> <span class="st">&quot;+proj=laea +lon_0=130 +lat_0=-30&quot;</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>pool <span class="ot">&lt;-</span> wkpool<span class="sc">::</span><span class="fu">establish_topology</span>(wk<span class="sc">::</span><span class="fu">as_wkb</span>(box))</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>dense <span class="ot">&lt;-</span> <span class="fu">densify</span>(pool, prj)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="do">## the planar reading: sides that follow parallels and meridians</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>lon <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="dv">100</span>, <span class="dv">160</span>, <span class="at">by =</span> <span class="fl">0.5</span>)</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>planar <span class="ot">&lt;-</span> <span class="fu">rbind</span>(<span class="fu">cbind</span>(lon, <span class="sc">-</span><span class="dv">35</span>), <span class="fu">cbind</span>(<span class="dv">160</span>, <span class="fu">seq</span>(<span class="sc">-</span><span class="dv">35</span>, <span class="sc">-</span><span class="dv">20</span>, <span class="at">by =</span> <span class="fl">0.5</span>)),</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>                <span class="fu">cbind</span>(<span class="fu">rev</span>(lon), <span class="sc">-</span><span class="dv">20</span>), <span class="fu">cbind</span>(<span class="dv">100</span>, <span class="fu">seq</span>(<span class="sc">-</span><span class="dv">20</span>, <span class="sc">-</span><span class="dv">35</span>, <span class="at">by =</span> <span class="sc">-</span><span class="fl">0.5</span>)))</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>v <span class="ot">&lt;-</span> wkpool<span class="sc">::</span><span class="fu">pool_vertices</span>(dense)</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>seg <span class="ot">&lt;-</span> wkpool<span class="sc">::</span><span class="fu">pool_segments</span>(dense)</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>p0 <span class="ot">&lt;-</span> <span class="fu">rproj_xy</span>(<span class="fu">cbind</span>(v<span class="sc">$</span>x, v<span class="sc">$</span>y)[<span class="fu">match</span>(seg<span class="sc">$</span>.vx0, v<span class="sc">$</span>.vx), ], prj)</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>p1 <span class="ot">&lt;-</span> <span class="fu">rproj_xy</span>(<span class="fu">cbind</span>(v<span class="sc">$</span>x, v<span class="sc">$</span>y)[<span class="fu">match</span>(seg<span class="sc">$</span>.vx1, v<span class="sc">$</span>.vx), ], prj)</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>op <span class="ot">&lt;-</span> <span class="fu">par</span>(<span class="at">mar =</span> <span class="fu">rep</span>(<span class="fl">0.5</span>, <span class="dv">4</span>))</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">rbind</span>(p0, p1), <span class="at">type =</span> <span class="st">&quot;n&quot;</span>, <span class="at">asp =</span> <span class="dv">1</span>, <span class="at">axes =</span> <span class="cn">FALSE</span>, <span class="at">xlab =</span> <span class="st">&quot;&quot;</span>, <span class="at">ylab =</span> <span class="st">&quot;&quot;</span>)</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="fu">lines</span>(<span class="fu">rproj_xy</span>(planar, prj), <span class="at">col =</span> <span class="st">&quot;grey60&quot;</span>, <span class="at">lwd =</span> <span class="dv">3</span>)</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="fu">segments</span>(p0[, <span class="dv">1</span>], p0[, <span class="dv">2</span>], p1[, <span class="dv">1</span>], p1[, <span class="dv">2</span>], <span class="at">lwd =</span> <span class="fl">1.5</span>)</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(<span class="fu">rproj_xy</span>(<span class="fu">cbind</span>(v<span class="sc">$</span>x, v<span class="sc">$</span>y), prj), <span class="at">pch =</span> <span class="dv">19</span>, <span class="at">cex =</span> <span class="fl">0.4</span>)</span></code></pre></div>
+<p><img src="box.png"
+alt="A box from longitude 100 to 160 and latitude -35 to -20, drawn in a Lambert azimuthal projection: grey with sides along parallels, black with great circle sides and the vertices bigcurve added" /></p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(op)</span></code></pre></div>
+<p>The black shape is the one s2 measures when you ask for its area or
+test whether a point is inside. On this map, centred close to the box,
+the great circles are nearly straight, so the black outline is almost
+what you would get by joining the four corners; the parallels are what
+curve. On other maps the reverse is true, which is why bigcurve decides
+per projection. Drawing the grey shape while analysing the black one is
+how a map ends up disagreeing with its own analysis.</p>
+<h2 id="s2-can-tessellate-too">s2 can tessellate too</h2>
+<p>s2 is not blind to this problem. Its C++ library has an <em>edge
+tessellator</em> that turns geodesic edges into chains of straight edges
+in a projection, and the R package exposes it when it writes data
+out:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="do">## geodesic edges, written as planar longitude, latitude within 1 km</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>txt <span class="ot">&lt;-</span> <span class="fu">s2_as_text</span>(line, <span class="at">planar =</span> <span class="cn">TRUE</span>, <span class="at">tessellate_tol_m =</span> <span class="dv">1000</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="fu">length</span>(wk<span class="sc">::</span><span class="fu">wk_vertices</span>(wk<span class="sc">::</span><span class="fu">wkt</span>(txt)))</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 63</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="do">## in s2&#39;s own Mercator projection</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>merc <span class="ot">&lt;-</span> wk<span class="sc">::</span><span class="fu">wk_handle</span>(line, wk<span class="sc">::</span><span class="fu">wkt_writer</span>(),</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>                      <span class="at">s2_projection =</span> <span class="fu">s2_projection_mercator</span>(),</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>                      <span class="at">s2_tessellate_tol =</span> <span class="dv">1000</span> <span class="sc">/</span> <span class="fu">s2_earth_radius_meters</span>())</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="fu">length</span>(wk<span class="sc">::</span><span class="fu">wk_vertices</span>(merc))</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 57</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="do">## bigcurve, for PROJ&#39;s Mercator, within 1 km on the map</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(<span class="fu">densify</span>(<span class="fu">segment</span>(<span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">100</span>), <span class="fu">c</span>(<span class="dv">60</span>, <span class="dv">60</span>)), <span class="st">&quot;+proj=merc&quot;</span>, <span class="at">tolerance =</span> <span class="dv">1000</span>))</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; [1] 65</span></span></code></pre></div>
+<p>The counts are similar, and that is the point: both packages are
+solving the same problem in the same spirit. The differences are
+practical.</p>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th>s2 tessellation</th>
+<th>bigcurve</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Projections</td>
+<td>plate carree, Mercator, orthographic</td>
+<td>anything PROJ can do (laea, stere, any EPSG code, custom
+strings)</td>
+</tr>
+<tr class="even">
+<td>Tolerance measured</td>
+<td>on the sphere (s2 takes metres and converts to an angle)</td>
+<td>on the map, in the map's units</td>
+</tr>
+<tr class="odd">
+<td>Output coordinates</td>
+<td>projected (or planar longitude, latitude)</td>
+<td>the input's longitude, latitude, so you can project with any tool
+afterwards</td>
+</tr>
+<tr class="even">
+<td>Input</td>
+<td>s2 geography</td>
+<td>matrices, segment meshes, wkpool topology (so any wk-readable
+data)</td>
+</tr>
+<tr class="odd">
+<td>Other direction</td>
+<td>yes: planar edges to geodesic on import
+(<code>planar = TRUE</code>)</td>
+<td>no</td>
+</tr>
+</tbody>
+</table>
+<p>The "other direction" row deserves a sentence. If your data really
+are planar in longitude and latitude (a coastline digitised on a plate
+carree map, say), s2 can densify on the way <em>in</em> so that its
+geodesic edges follow the planar ones. bigcurve never does this. It
+always assumes the edges you hand it are great circles.</p>
+<h2 id="using-them-together">Using them together</h2>
+<p>Because both packages agree on what an edge is, a natural pipeline is
+s2 for the analysis and bigcurve for the drawing. Here we cut Australia
+with the box above in s2, then densify what the cut produced for the
+same map centred on Australia:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>aus <span class="ot">&lt;-</span> <span class="fu">s2_data_countries</span>(<span class="st">&quot;Australia&quot;</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>cut <span class="ot">&lt;-</span> <span class="fu">s2_intersection</span>(aus, box)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>pool <span class="ot">&lt;-</span> wkpool<span class="sc">::</span><span class="fu">establish_topology</span>(wk<span class="sc">::</span><span class="fu">as_wkb</span>(cut))</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>out <span class="ot">&lt;-</span> <span class="fu">densify</span>(pool, prj)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="fu">c</span>(<span class="at">before =</span> <span class="fu">nrow</span>(wkpool<span class="sc">::</span><span class="fu">pool_vertices</span>(pool)),</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">after  =</span> <span class="fu">nrow</span>(wkpool<span class="sc">::</span><span class="fu">pool_vertices</span>(out)))</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; before  after </span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt;    110    113</span></span></code></pre></div>
+<p>Only a handful of vertices are added, all along the long straight
+sides that the box contributed. The coastline is already finely detailed
+and is left alone. That economy is the purpose of adaptive
+densification: points are spent where the map bends the line, and
+nowhere else.</p>
+<p>To draw the result, project the densified pool with PROJ
+(<code>rproj_xy()</code>, sf, terra or anything else) or turn it back
+into geometry with <code>wkpool::segments_to_wkb()</code> or
+<code>wkpool::cycles_to_wkb()</code>.</p>
+<h2 id="things-that-are-the-same-and-things-that-are-not">Things that
+are the same, and things that are not</h2>
+<ul>
+<li><strong>Both are spherical.</strong> s2 uses a sphere of radius
+about 6371 km; so does bigcurve's midpoint. Neither follows the
+ellipsoid. For drawing a map this makes no visible difference; for
+survey-grade distances use geographiclib (through sf or geosphere).</li>
+<li><strong>Neither clips.</strong> If part of a line is beyond the
+horizon of an orthographic map, s2 can intersect with
+<code>s2_hemisphere()</code> first; bigcurve leaves unprojectable edges
+alone and never errors.</li>
+<li><strong>The antimeridian.</strong> s2 has no seam at all. bigcurve
+keeps whatever longitudes you gave it: an edge along 180 stays at 180,
+an edge written from 170 to -170 is refined through 180 continuously. If
+you need the two copies of the seam to be one boundary, densify first
+and then fuse with
+<code>wkpool::merge_coincident(period_x = 360)</code>.</li>
+<li><strong>Operations.</strong> Union, intersection, buffer, distance,
+area and containment are s2's job. bigcurve has one verb,
+<code>densify()</code>, and it does not change the shape.</li>
+</ul>
+<h2 id="in-one-sentence">In one sentence</h2>
+<p>Use s2 to decide <em>what</em> the shape is; use bigcurve to draw
+<em>that</em> shape, honestly, in whatever projection your map
+needs.</p>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>
