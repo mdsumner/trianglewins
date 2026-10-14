@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposal: geoarrow.triangles (draft)</title>
+<meta name="description" content="Development draft: a geoarrow.triangles extension type, written in the shape of a GeoArrow spec proposal, with reference checks.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--grid); min-width: 9em; }
+th:first-child, td:first-child { min-width: 13em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../../">trianglewins</a> / dev draft</p>
+<h1 id="proposal-a-geoarrowtriangles-extension-type">Proposal: a
+<code>geoarrow.triangles</code> extension type</h1>
+<p><em>Development draft, October 2026. Not submitted anywhere. This is
+the proposal-shaped companion to <a
+href="../geoarrow-triangles/">Triangles in GeoArrow</a>, which carries
+the background and the reasons; this page carries only what would be
+asked of the spec.</em></p>
+<p>GeoArrow has no formal RFC process. Changes to the <a
+href="https://github.com/geoarrow/geoarrow">spec repository</a> (format
+version 0.2) arrive as an issue, then a pull request that edits
+<code>format.md</code> and <code>extension-types.md</code>, backed by a
+working implementation. This draft is written so that its two "proposed
+text" sections can be lifted into that pull request nearly as they are,
+and its reference checks can travel with it.</p>
+<h2 id="summary">Summary</h2>
+<p>Add one extension type, <code>geoarrow.triangles</code>. Each row is
+one triangle. The three vertices are indices into a dictionary of
+coordinates, and that dictionary is the mesh's vertex pool, so a whole
+triangulation is one Arrow array that shares its vertices instead of
+repeating them.</p>
+<pre><code>FixedSizeList&lt;Dictionary&lt;int32, Coordinate&gt;&gt;[3]</code></pre>
+<p>A decoded form, <code>FixedSizeList&lt;Coordinate&gt;[3]</code>,
+carries the same extension name for formats that cannot store a nested
+dictionary, which today includes Parquet.</p>
+<h2 id="motivation">Motivation</h2>
+<p>Constrained Delaunay triangulation, terrain TINs, finite element
+meshes and renderers (deck.gl, WebGL, glTF) all produce or consume
+indexed triangles: a vertex table and triangles that point into it.
+Today the only GeoArrow route is one polygon per triangle, which repeats
+each shared vertex about six times, closes every ring, and loses which
+triangles share an edge. WKB has <code>TRIANGLE</code> and
+<code>TIN</code>, with the same repetition.</p>
+<p>Dictionary-encoding the vertices was suggested from the GeoArrow
+side, and it fits Arrow well: in IPC the dictionary is sent once and
+every record batch refers to it, and rows stay small (three indices
+each). The background page covers the alternatives that were considered
+(soup, per-feature mesh, two tables) and what was learned building
+meshes in R with wkpool, cdtr and laridae.</p>
+<h2 id="proposed-text-for-formatmd">Proposed text for
+<code>format.md</code></h2>
+<h4 id="triangles">Triangles</h4>
+<pre><code>FixedSizeList&lt;Dictionary&lt;Index, Coordinate&gt;&gt;[3]</code></pre>
+<p>An array of triangles is represented as a fixed-size list of three
+vertices per element. The child field name should be "vertices" and the
+child must be marked non-nullable. Each vertex is an index into a
+dictionary whose values are coordinates in either the separated or the
+interleaved representation. <code>Index</code> should be
+<code>int32</code>; <code>int64</code> may be used for meshes with more
+than 2^31 - 1 vertices.</p>
+<p>The dictionary is the vertex pool of a mesh, and a dictionary index
+is a vertex id (0-based). Triangles that share an index share that
+vertex. One array is one mesh. In the IPC format a mesh may span record
+batches: later batches may add vertices with dictionary deltas, and
+vertex ids stay valid across the batches of a stream. A dictionary
+replacement starts a new mesh, and consumers must not compare vertex ids
+across it. Chunks of an in-memory chunked array with different
+dictionaries are different meshes.</p>
+<ul>
+<li>The three vertices of a triangle should be in counter-clockwise
+order in the x-y plane.</li>
+<li>The ring is not closed: the first vertex is not repeated. Converting
+a triangle to a Polygon appends the first vertex to close the ring.</li>
+<li>Producers should not write degenerate (zero-area) triangles.</li>
+<li>The dictionary should not contain two entries with equal
+coordinates.</li>
+<li>The dictionary may contain vertices that no triangle references (for
+example isolated input points of a triangulation).</li>
+<li>Coordinates in the dictionary must not be null. A triangle may be
+null; the indices of a non-null triangle must not be null.</li>
+</ul>
+<p>A decoded layout is also defined for formats and systems that do not
+support a dictionary nested in a list:</p>
+<pre><code>FixedSizeList&lt;Coordinate&gt;[3]</code></pre>
+<p>This holds the same triangles with each vertex written out. Vertex
+sharing is recovered by matching coordinates exactly (see
+<code>vertex_identity</code> below); vertex ids are renumbered and
+unreferenced vertices are lost.</p>
+<h2 id="proposed-text-for-extension-typesmd">Proposed text for
+<code>extension-types.md</code></h2>
+<p>Add <code>geoarrow.triangles</code> to the list of extension names.
+Both layouts above use this name. The <code>crs</code> and
+<code>edges</code> keys apply as for other types (with
+<code>"edges": "spherical"</code> a triangle is a spherical
+triangle).</p>
+<p>One new optional key:</p>
+<ul>
+<li><p><code>vertex_identity</code>: an optional JSON string saying by
+which rule two vertices are the same vertex, so that a consumer knows
+whether two nearby dictionary entries are meant to be distinct. Omitted
+means unknown. One of:</p>
+<ul>
+<li><code>"exact_float"</code>: entries are distinct as double
+values.</li>
+<li><code>"tolerance"</code>: vertices closer than a producer-chosen
+tolerance were merged.</li>
+<li><code>"noded"</code>: input was noded so that crossings are
+vertices, with crossings computed in floating point.</li>
+<li><code>"exact"</code>: as <code>"noded"</code>, with constructions
+computed exactly and rounded to the nearest double on output.</li>
+</ul></li>
+</ul>
+<h2 id="parquet-the-default-chosen-here">Parquet: the default chosen
+here</h2>
+<p>pyarrow refuses to write a dictionary nested in a list to Parquet.
+The default in this draft is that <strong>Parquet gets the decoded
+layout under the same extension name</strong>, and a reader rebuilds the
+dictionary by exact coordinate matching. Checked: the decoded array
+round-trips through Parquet with its extension name and metadata, and
+re-pooling recovers the same 4 vertices and the same triangles.</p>
+<p>What this loses: vertex ids are renumbered (by first appearance),
+unreferenced vertices are dropped, and with <code>vertex_identity</code>
+<code>"tolerance"</code> two distinct entries that happen to share a
+double value would merge. A lossless alternative is two tables
+(vertices, and triangles of <code>FixedSizeList&lt;int32&gt;[3]</code>
+indices), but that is a file-level convention for GeoParquet rather than
+a column type for GeoArrow, so it is left out of this proposal.</p>
+<p><strong>This is the main open decision.</strong> The options are (a)
+decoded layout as above, (b) no Parquet story in the type, defer to
+GeoParquet, (c) a second storage layout of plain indices plus a separate
+vertex column, which needs a cross-column reference GeoArrow has never
+had.</p>
+<h2 id="conventions-outside-the-type">Conventions outside the type</h2>
+<p>These came out of the mesh work and are worth recommending, but they
+are columns beside the triangles, not part of the extension type:</p>
+<ul>
+<li><code>constrained: FixedSizeList&lt;bool&gt;[3]</code> per triangle:
+whether edge k (vertex k to vertex k + 1) is a constraint (an input
+boundary). A second dictionary column for constraint edges would send
+the vertices a second time in IPC.</li>
+<li><code>depth: int32</code> per triangle: constraint edges crossed to
+reach it from outside; odd is inside under even-odd rules.</li>
+<li>Vertex attributes (<code>origin</code> as input, crossing or
+steiner; z; exact rational coordinates) need a home keyed by dictionary
+index, either a wider dictionary value type or a vertex table. This
+draft does not choose.</li>
+</ul>
+<h2 id="out-of-scope">Out of scope</h2>
+<ul>
+<li>A per-feature mesh, one mesh per row, as returned by a scalar
+<code>ST_Triangulate(geom)</code>. Useful as a later addition; rows can
+get large.</li>
+<li>Meshes of quads or mixed polygons (UGRID-style face-node tables),
+and tetrahedra.</li>
+<li>Topology beyond shared vertices (edge tables, neighbour tables).
+These can be computed from the indices.</li>
+</ul>
+<h2 id="open-questions">Open questions</h2>
+<ol type="1">
+<li>Parquet: (a), (b) or (c) above.</li>
+<li>Does <code>vertex_identity</code> belong in the spec, or in
+producer-specific metadata?</li>
+<li>Should counter-clockwise order be "should" or "must"? GeoArrow does
+not fix ring orientation for polygons.</li>
+<li>Should GeoArrow implementations (geoarrow-c, geoarrow-rs) also read
+WKB <code>TRIANGLE</code> into this type, and write a mesh as WKB
+<code>TIN</code>?</li>
+<li>Is the name <code>geoarrow.triangles</code> right, given each row is
+one triangle but the array is the mesh?</li>
+</ol>
+<h2 id="reference-checks">Reference checks</h2>
+<p><a
+href="https://github.com/mdsumner/trianglewins/blob/main/survey/dev-drafts/geoarrow-triangles-ref.py"><code>geoarrow-triangles-ref.py</code></a>
+registers the type in pyarrow (26.0) and checks the claims above:</p>
+<table>
+<thead>
+<tr class="header">
+<th>check</th>
+<th>result</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>IPC stream, two batches, one dictionary</td>
+<td><code>schema, dictionary, record batch, record batch</code></td>
+</tr>
+<tr class="even">
+<td>IPC stream, batch 2 adds a vertex by delta</td>
+<td><code>schema, dictionary, record batch, dictionary, record batch</code>;
+batch 2 sees 5 vertices</td>
+</tr>
+<tr class="odd">
+<td>delta dictionaries in the IPC file format</td>
+<td>written and read, 2 batches</td>
+</tr>
+<tr class="even">
+<td>reader without the type registered</td>
+<td>sees the storage type plus <code>ARROW:extension:name</code> and
+metadata</td>
+</tr>
+<tr class="odd">
+<td>Parquet, dictionary layout</td>
+<td>refused: nested dictionary not supported</td>
+</tr>
+<tr class="even">
+<td>Parquet, decoded layout</td>
+<td>round-trips with extension name and metadata; re-pooling gives 4
+vertices and the same triangles</td>
+</tr>
+<tr class="odd">
+<td>triangle to Polygon</td>
+<td>ring closed by repeating the first vertex</td>
+</tr>
+<tr class="even">
+<td>winding</td>
+<td>the test triangles are counter-clockwise</td>
+</tr>
+</tbody>
+</table>
+<p>Still to do before this goes upstream: an export from wkpool (R,
+through nanoarrow) so there is a second, independent producer, and a
+reader in geoarrow-c or geoarrow-rs if a maintainer is willing.</p>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>

@@ -40,6 +40,10 @@ render dev-drafts/geoarrow-triangles.md dev-drafts/geoarrow-triangles \
   "Triangles in GeoArrow (draft)" "dev draft" \
   "Development draft: what building triangle meshes with wkpool, laridae and cdtr suggests for storing triangles in GeoArrow." \
   ../../
+render dev-drafts/geoarrow-triangles-proposal.md dev-drafts/geoarrow-triangles-proposal \
+  "Proposal: geoarrow.triangles (draft)" "dev draft" \
+  "Development draft: a geoarrow.triangles extension type, written in the shape of a GeoArrow spec proposal, with reference checks." \
+  ../../
 redirect choose ../start/#which-package
 redirect dimension ../notes/#dimension
 redirect interpolation ../notes/#interpolation
