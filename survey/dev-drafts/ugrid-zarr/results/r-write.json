@@ -1,0 +1,22 @@
+{
+  "triangulate_s": 1.12,
+  "ccw_all": true,
+  "n_vertices": 178506,
+  "n_triangles": 323676,
+  "n_constraint_edges": 36264,
+  "origin": {
+    "input": 30835,
+    "crossing": 0,
+    "steiner": 147671
+  },
+  "depth": {
+    "1": 322375,
+    "3": 1301
+  },
+  "write_v2_s": 3.39,
+  "bytes_v2": 9802408,
+  "roundtrip_v2": true,
+  "write_v3_s": 2.58,
+  "bytes_v3": 9800502,
+  "roundtrip_v3": true
+}
