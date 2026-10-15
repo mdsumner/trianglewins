@@ -1,0 +1,92 @@
+{
+  "xarray_open_v2_s": 1.083,
+  "xarray_open_v3_s": 0.161,
+  "xarray_v2_equals_v3": true,
+  "dtypes": {
+    "mesh": "int32",
+    "mesh_face_nodes": "int32",
+    "mesh_node_origin": "int8",
+    "mesh_node_input_row": "int32",
+    "mesh_face_depth": "int32",
+    "mesh_edge_nodes": "int32",
+    "mesh_edge_constrained": "int8",
+    "field": "float64",
+    "area": "float64",
+    "mesh_node_x": "float64",
+    "mesh_node_y": "float64"
+  },
+  "n_node": 178506,
+  "n_face": 323676,
+  "ccw_all": true,
+  "area_matches": true,
+  "edges_match_faces": true,
+  "n_edge": 502065,
+  "n_constrained_edges": 36264,
+  "euler_V_minus_E_plus_F": 117,
+  "gdal_v2": {
+    "dimensions": {
+      "mesh_edge": 502065,
+      "mesh_face": 323676,
+      "mesh_node": 178506,
+      "three": 3,
+      "two": 2
+    },
+    "arrays": 11
+  },
+  "gdal_v3": {
+    "dimensions": {
+      "mesh_edge": 502065,
+      "mesh_face": 323676,
+      "mesh_node": 178506,
+      "three": 3,
+      "two": 2
+    },
+    "arrays": 11
+  },
+  "uxarray_open_s": 0.529,
+  "uxarray": {
+    "n_node": 178506,
+    "n_face": 323676,
+    "n_max_face_nodes": 3,
+    "face_nodes_equal": true
+  },
+  "uxarray_field_mean": -0.0038019391288208033,
+  "xugrid_open_s": 0.073,
+  "xugrid": {
+    "n_node": 178506,
+    "n_face": 323676,
+    "face_nodes_equal": true,
+    "edge_dimension": "mesh_edge",
+    "field_on": "('mesh_node',)",
+    "area_on": "('mesh_face',)"
+  },
+  "xpt_detect_mesh": {
+    "face_dim": "mesh_face",
+    "node_dim": "mesh_node",
+    "start_index": 0
+  },
+  "xpt_grid_system_s": 0.401,
+  "xpt_grid": "Triangular",
+  "xpt_delaunay_calls": 0,
+  "tile": [
+    116,
+    80,
+    7
+  ],
+  "xpt_tile_field": "67431 bytes",
+  "xpt_tile_area": "TileTooBigError: Tile request too big, requires loading data of total size: 4683.685302734375MB across shapes [(369290,)]. Please choose a higher zoom level.",
+  "xpt_tile_area_budget_lifted": "168743 bytes",
+  "xpt_delaunay_calls_after_tiles": 0,
+  "icechunk_write_s": 0.394,
+  "icechunk_read_s": 0.187,
+  "icechunk_identical": true,
+  "icechunk_attrs_kept": true,
+  "icechunk_detect_mesh": true,
+  "versions": {
+    "xarray": "2026.9.0",
+    "zarr": "3.4.1",
+    "uxarray": "2026.9.1",
+    "xugrid": "0.15.3",
+    "icechunk": "2.3.0"
+  }
+}
