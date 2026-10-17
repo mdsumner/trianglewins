@@ -57,11 +57,17 @@ a { color: var(--link); }
 .tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
   border: 1px solid var(--border); border-radius: 10px; }
 table { border-collapse: collapse; font-size: 13px; width: 100%; }
-th, td { text-align: left; vertical-align: top; padding: 6px 8px;
-  border-bottom: 1px solid var(--grid); min-width: 9em; }
-th:first-child, td:first-child { min-width: 13em; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+  border-bottom: 1px solid var(--grid); line-height: 1.45; }
+th:first-child, td:first-child { min-width: 12em; }
 tr:last-child td { border-bottom: none; }
-th { color: var(--text-secondary); font-weight: 600; }
+th { color: var(--text-secondary); font-weight: 600; background: var(--surface-0);
+  border-bottom: 1px solid var(--border); }
+td code { font-size: 12px; color: var(--text-secondary); }
+td small { color: var(--text-muted); font-size: 12px; }
+td:first-child a { text-decoration: none; }
+td:first-child a:hover { text-decoration: underline; }
+td:first-child strong { font-size: 14px; }
 </style>
 </head>
 <body>
@@ -138,7 +144,7 @@ Delaunay TIN where a height grid's error is worst.</li>
 <table>
 <thead>
 <tr class="header">
-<th>Package::function</th>
+<th>Package</th>
 <th>Upstream code</th>
 <th>Input</th>
 <th>Holes / constraints</th>
@@ -147,7 +153,9 @@ Delaunay TIN where a height grid's error is worst.</li>
 </thead>
 <tbody>
 <tr class="odd">
-<td>decido::earcut() (CRAN 0.4.0, MIT)</td>
+<td><a
+href="https://cran.r-project.org/package=decido"><strong>decido</strong></a><br><code>earcut()</code><br><small>CRAN
+0.4.0, MIT</small></td>
 <td>mapbox earcut.hpp, vendored</td>
 <td>x,y of one polygon, <code>holes</code> = start row of each hole
 ring</td>
@@ -155,35 +163,45 @@ ring</td>
 <td>vertex index, 3 per triangle</td>
 </tr>
 <tr class="even">
-<td>rearcut (GitHub hypertidy)</td>
+<td><a
+href="https://github.com/hypertidy/rearcut"><strong>rearcut</strong></a><br><small>GitHub,
+superseded by decido</small></td>
 <td>earcut.js in V8</td>
 <td>x, y, holes</td>
 <td>holes</td>
-<td>index. Superseded by decido</td>
+<td>index</td>
 </tr>
 <tr class="odd">
-<td>silicate::TRI(), TRI0() (CRAN 0.7.2)</td>
+<td><a
+href="https://cran.r-project.org/package=silicate"><strong>silicate</strong></a><br><code>TRI()</code>,
+<code>TRI0()</code><br><small>CRAN 0.7.2</small></td>
 <td>decido</td>
 <td>sf/sp/silicate models</td>
 <td>holes via ring structure</td>
 <td>TRI/TRI0 tables</td>
 </tr>
 <tr class="even">
-<td>rgl::triangulate() (CRAN 1.3.36)</td>
+<td><a
+href="https://cran.r-project.org/package=rgl"><strong>rgl</strong></a><br><code>triangulate()</code><br><small>CRAN
+1.3.36</small></td>
 <td>own ear clipping (Eberly)</td>
 <td>rings separated by NA</td>
 <td>holes and islands by nesting</td>
 <td>3 x n index</td>
 </tr>
 <tr class="odd">
-<td>tigers::triangulate() (CRAN, Paradis)</td>
+<td><a
+href="https://cran.r-project.org/package=tigers"><strong>tigers</strong></a><br><code>triangulate()</code><br><small>CRAN,
+Paradis</small></td>
 <td>own R, Toussaint (1991)</td>
 <td>one simple polygon</td>
 <td>none</td>
 <td>index</td>
 </tr>
 <tr class="even">
-<td>interleave (CRAN, dcooley)</td>
+<td><a
+href="https://cran.r-project.org/package=interleave"><strong>interleave</strong></a><br><small>CRAN,
+dcooley</small></td>
 <td>earcut.hpp via geometries</td>
 <td>internal</td>
 <td>holes</td>
@@ -197,7 +215,7 @@ ring</td>
 <table>
 <thead>
 <tr class="header">
-<th>Package::function</th>
+<th>Package</th>
 <th>Upstream code</th>
 <th>Algorithm</th>
 <th>Input</th>
@@ -206,7 +224,9 @@ ring</td>
 </thead>
 <tbody>
 <tr class="odd">
-<td>deldir::deldir() (CRAN 2.0-4, GPL)</td>
+<td><a
+href="https://cran.r-project.org/package=deldir"><strong>deldir</strong></a><br><code>deldir()</code><br><small>CRAN
+2.0-4, GPL</small></td>
 <td>own Fortran (Turner)</td>
 <td>Lee-Schachter incremental</td>
 <td>x, y</td>
@@ -214,65 +234,88 @@ ring</td>
 duplicates and reports which were kept</td>
 </tr>
 <tr class="even">
-<td>interp::tri.mesh() (CRAN 1.1-6)</td>
+<td><a
+href="https://cran.r-project.org/package=interp"><strong>interp</strong></a><br><code>tri.mesh()</code><br><small>CRAN
+1.1-6</small></td>
 <td>S-hull (Sinclair), C++</td>
 <td>radial sweep, flips</td>
 <td>x, y</td>
 <td><code>duplicate</code>, <code>jitter</code></td>
 </tr>
 <tr class="odd">
-<td>geometry::delaunayn() (CRAN 0.5.2)</td>
+<td><a
+href="https://cran.r-project.org/package=geometry"><strong>geometry</strong></a><br><code>delaunayn()</code><br><small>CRAN
+0.5.2</small></td>
 <td>Qhull</td>
 <td>Quickhull, any number of coordinates</td>
 <td>n x d matrix</td>
 <td>Qhull options</td>
 </tr>
 <tr class="even">
-<td>tessellation::delaunay() (CRAN 2.3.0, Laurent)</td>
+<td><a
+href="https://cran.r-project.org/package=tessellation"><strong>tessellation</strong></a><br><code>delaunay()</code><br><small>CRAN
+2.3.0, Laurent</small></td>
 <td>Qhull</td>
 <td>Quickhull</td>
 <td>matrix</td>
 <td>degenerate handling; rich output</td>
 </tr>
 <tr class="odd">
-<td>rvoronoi (GitHub coolbutuseless)</td>
+<td><a
+href="https://github.com/coolbutuseless/rvoronoi"><strong>rvoronoi</strong></a><br><small>GitHub,
+coolbutuseless</small></td>
 <td>Fortune's C</td>
 <td>sweepline</td>
 <td>x, y</td>
 <td>none</td>
 </tr>
 <tr class="even">
-<td>voronoifortune (CRAN, Paradis)</td>
+<td><a
+href="https://cran.r-project.org/package=voronoifortune"><strong>voronoifortune</strong></a><br><small>CRAN,
+Paradis</small></td>
 <td>Fortune's C</td>
 <td>sweepline</td>
 <td>matrix</td>
 <td>none</td>
 </tr>
 <tr class="odd">
-<td>sf::st_triangulate(), terra::delaunay(),
-geos::geos_delaunay_triangles(),
-gdalraster::g_delaunay_triangulation()</td>
+<td><a
+href="https://cran.r-project.org/package=sf"><strong>sf</strong></a>, <a
+href="https://cran.r-project.org/package=terra"><strong>terra</strong></a>,
+<a
+href="https://cran.r-project.org/package=geos"><strong>geos</strong></a>,
+<a
+href="https://cran.r-project.org/package=gdalraster"><strong>gdalraster</strong></a><br><code>st_triangulate()</code>,
+<code>delaunay()</code>, <code>geos_delaunay_triangles()</code>,
+<code>g_delaunay_triangulation()</code></td>
 <td>GEOS</td>
 <td>quad-edge incremental (upstream docs)</td>
 <td>any geometry's vertices</td>
 <td><code>tolerance</code>, edges only; geometry out</td>
 </tr>
 <tr class="even">
-<td>spatstat.geom::delaunay(), ggforce geom_delaunay_*</td>
+<td><a
+href="https://cran.r-project.org/package=spatstat.geom"><strong>spatstat.geom</strong></a>,
+<a
+href="https://cran.r-project.org/package=ggforce"><strong>ggforce</strong></a><br><code>delaunay()</code>,
+<code>geom_delaunay_*</code></td>
 <td>deldir</td>
 <td>as deldir</td>
 <td>ppp, aesthetics</td>
 <td>none</td>
 </tr>
 <tr class="odd">
-<td>lasR triangulate() (r-universe)</td>
+<td><a
+href="https://github.com/r-lidar/lasR"><strong>lasR</strong></a><br><code>triangulate()</code><br><small>r-universe</small></td>
 <td>Delaunator, vendored</td>
 <td>sweep-hull</td>
 <td>LAS/LAZ, streaming</td>
 <td><code>max_edge</code>; 2.5D TIN</td>
 </tr>
 <tr class="even">
-<td>lidR (CRAN 4.3.3), internal</td>
+<td><a
+href="https://cran.r-project.org/package=lidR"><strong>lidR</strong></a><br><small>CRAN
+4.3.3, internal</small></td>
 <td>boost::polygon Voronoi on integers; incremental (hporro)</td>
 <td>dual of exact Voronoi</td>
 <td>LAS</td>
@@ -287,7 +330,7 @@ Delaunay, without refinement</h2>
 <table>
 <thead>
 <tr class="header">
-<th>Package::function</th>
+<th>Package</th>
 <th>Upstream code</th>
 <th>Input</th>
 <th>Holes / outside</th>
@@ -296,28 +339,36 @@ Delaunay, without refinement</h2>
 </thead>
 <tbody>
 <tr class="odd">
-<td>tripack::tri.mesh() + add.constraint() (CRAN, ACM licence)</td>
+<td><a
+href="https://cran.r-project.org/package=tripack"><strong>tripack</strong></a><br><code>tri.mesh()</code>
++ <code>add.constraint()</code><br><small>CRAN, ACM licence</small></td>
 <td>Renka TRIPACK (TOMS 751)</td>
 <td>x, y; closed constraint curves</td>
 <td>curve orientation</td>
 <td><code>tri</code> object</td>
 </tr>
 <tr class="even">
-<td>akima (CRAN, ACM licence)</td>
+<td><a
+href="https://cran.r-project.org/package=akima"><strong>akima</strong></a><br><small>CRAN,
+ACM licence</small></td>
 <td>Renka inside ACM 761</td>
 <td>x, y, z</td>
 <td>none</td>
 <td>interpolation only</td>
 </tr>
 <tr class="odd">
-<td>RCDT::delaunay() (CRAN 1.3.0, Laurent)</td>
+<td><a
+href="https://cran.r-project.org/package=RCDT"><strong>RCDT</strong></a><br><code>delaunay()</code><br><small>CRAN
+1.3.0, Laurent</small></td>
 <td>artem-ogre/CDT</td>
 <td>points, 2-column <code>edges</code> index</td>
 <td>parity</td>
 <td>list with rgl mesh, edges</td>
 </tr>
 <tr class="even">
-<td>delaunay::delaunay() (CRAN 2.0.0, Laurent)</td>
+<td><a
+href="https://cran.r-project.org/package=delaunay"><strong>delaunay</strong></a><br><code>delaunay()</code><br><small>CRAN
+2.0.0, Laurent</small></td>
 <td>CGAL CDT via RcppCGAL; gmp, mpfr</td>
 <td>points, <code>constraints</code> index; 2.5D <code>elevation</code>;
 xyz to tetrahedra</td>
@@ -325,9 +376,16 @@ xyz to tetrahedra</td>
 <td>list with mesh, edges</td>
 </tr>
 <tr class="odd">
-<td>sf::st_triangulate_constrained(),
-geos::geos_constrained_delaunay_triangles(), terra::delaunay(constrained
-= TRUE), gdalraster::g_delaunay_triangulation(constrained = TRUE)</td>
+<td><a
+href="https://cran.r-project.org/package=sf"><strong>sf</strong></a>, <a
+href="https://cran.r-project.org/package=geos"><strong>geos</strong></a>,
+<a
+href="https://cran.r-project.org/package=terra"><strong>terra</strong></a>,
+<a
+href="https://cran.r-project.org/package=gdalraster"><strong>gdalraster</strong></a><br><code>st_triangulate_constrained()</code>,
+<code>geos_constrained_delaunay_triangles()</code>,
+<code>delaunay(constrained = TRUE)</code>,
+<code>g_delaunay_triangulation(constrained = TRUE)</code></td>
 <td>GEOS &gt;= 3.10 (gdalraster: GDAL &gt;= 3.12): ear clipping then
 flips (upstream docs)</td>
 <td>valid polygons, one at a time</td>
@@ -335,15 +393,17 @@ flips (upstream docs)</td>
 <td>triangle polygons</td>
 </tr>
 <tr class="even">
-<td>cgalPolygons (CRAN 0.1.1)
-<code>$convexParts(method = "triangle")</code></td>
+<td><a
+href="https://cran.r-project.org/package=cgalPolygons"><strong>cgalPolygons</strong></a><br><code>$convexParts(method = "triangle")</code><br><small>CRAN
+0.1.1</small></td>
 <td>CGAL Polygon_triangulation_decomposition_2</td>
 <td>R6 polygon with holes</td>
 <td>holes</td>
 <td>coordinate matrices</td>
 </tr>
 <tr class="odd">
-<td>spatstat.geom::triangulate.owin()</td>
+<td><a
+href="https://cran.r-project.org/package=spatstat.geom"><strong>spatstat.geom</strong></a><br><code>triangulate.owin()</code></td>
 <td>deldir, recursive clipping</td>
 <td>owin</td>
 <td>holes</td>
@@ -359,7 +419,7 @@ taking an arbitrary segment index without refinement.</p>
 <table>
 <thead>
 <tr class="header">
-<th>Package::function</th>
+<th>Package</th>
 <th>Upstream code</th>
 <th>Input</th>
 <th>Output control</th>
@@ -367,8 +427,10 @@ taking an arbitrary segment index without refinement.</p>
 </thead>
 <tbody>
 <tr class="odd">
-<td>RTriangle::pslg() + triangulate() (CRAN 1.6-0.15, CC BY-NC-SA,
-Sterratt)</td>
+<td><a
+href="https://cran.r-project.org/package=RTriangle"><strong>RTriangle</strong></a><br><code>pslg()</code>
++ <code>triangulate()</code><br><small>CRAN 1.6-0.15, CC BY-NC-SA,
+Sterratt</small></td>
 <td>Shewchuk's Triangle 1.6</td>
 <td>points, markers, attributes, segments, hole seeds</td>
 <td><code>a</code> area, <code>q</code> angle, <code>Y</code>,
@@ -376,33 +438,43 @@ Sterratt)</td>
 attributes onto Steiner points</td>
 </tr>
 <tr class="even">
-<td>fdaPDE::create.mesh.2D(), refine.mesh.2D() (CRAN 1.1-24)</td>
+<td><a
+href="https://cran.r-project.org/package=fdaPDE"><strong>fdaPDE</strong></a><br><code>create.mesh.2D()</code>,
+<code>refine.mesh.2D()</code><br><small>CRAN 1.1-24</small></td>
 <td>Triangle, vendored (licence still non-commercial)</td>
 <td>nodes, attributes, segments, holes</td>
 <td><code>minimum_angle</code>, <code>maximum_area</code>; quadratic
 elements</td>
 </tr>
 <tr class="odd">
-<td>sfdct::ct_triangulate() (r-universe, archived)</td>
+<td><a
+href="https://github.com/hypertidy/sfdct"><strong>sfdct</strong></a><br><code>ct_triangulate()</code><br><small>r-universe,
+archived</small></td>
 <td>RTriangle</td>
 <td>sf</td>
 <td><code>trim</code>, RTriangle options</td>
 </tr>
 <tr class="even">
-<td>anglr::DEL(), DEL0() (r-universe, archived)</td>
+<td><a
+href="https://github.com/hypertidy/anglr"><strong>anglr</strong></a><br><code>DEL()</code>,
+<code>DEL0()</code><br><small>r-universe, archived</small></td>
 <td>RTriangle; cdtr via <code>triangulator</code></td>
 <td>sf/sp/silicate</td>
 <td><code>max_area</code></td>
 </tr>
 <tr class="odd">
-<td>retistruct (Sterratt)</td>
+<td><a
+href="https://cran.r-project.org/package=retistruct"><strong>retistruct</strong></a><br><small>CRAN,
+Sterratt</small></td>
 <td>RTriangle</td>
 <td>outlines</td>
 <td>area, angle</td>
 </tr>
 <tr class="even">
-<td>fmesher::fm_mesh_2d(), fm_rcdt_2d() (CRAN 0.8.0, MPL-2.0,
-Lindgren)</td>
+<td><a
+href="https://cran.r-project.org/package=fmesher"><strong>fmesher</strong></a><br><code>fm_mesh_2d()</code>,
+<code>fm_rcdt_2d()</code><br><small>CRAN 0.8.0, MPL-2.0,
+Lindgren</small></td>
 <td>own C++ (ex-INLA)</td>
 <td>points, sf/sp, boundary and interior segments, crs</td>
 <td><code>max.edge</code> (inner, outer), <code>min.angle</code>,
@@ -410,8 +482,10 @@ Lindgren)</td>
 <code>quality.spec</code>, sphere meshes</td>
 </tr>
 <tr class="odd">
-<td>tulpaMesh::tulpa_mesh(), refine_mesh() (CRAN 0.1.3, MIT,
-Colling)</td>
+<td><a
+href="https://cran.r-project.org/package=tulpaMesh"><strong>tulpaMesh</strong></a><br><code>tulpa_mesh()</code>,
+<code>refine_mesh()</code><br><small>CRAN 0.1.3, MIT,
+Colling</small></td>
 <td>artem-ogre/CDT plus its own off-centre Ruppert loop</td>
 <td>points, boundary (matrix or sf)</td>
 <td><code>max_edge</code>, <code>cutoff</code>, <code>extend</code>,
@@ -419,7 +493,9 @@ Colling)</td>
 adaptive refine; sphere; 1D meshes</td>
 </tr>
 <tr class="even">
-<td>geometry::distmesh2d(), distmeshnd()</td>
+<td><a
+href="https://cran.r-project.org/package=geometry"><strong>geometry</strong></a><br><code>distmesh2d()</code>,
+<code>distmeshnd()</code></td>
 <td>DistMesh port, Qhull per iteration</td>
 <td>distance function <code>fd</code>, size <code>fh</code>, fixed
 points</td>
@@ -450,7 +526,9 @@ error or triangle budget. lasR and lidR build TINs from point clouds
 </thead>
 <tbody>
 <tr class="odd">
-<td>cdtr (hypertidy/cdtr)</td>
+<td><a
+href="https://github.com/hypertidy/cdtr"><strong>cdtr</strong></a><br><small>GitHub,
+hypertidy</small></td>
 <td>artem-ogre/CDT, MPL-2.0</td>
 <td>CDT, conforming, CDT's refinement (one criterion per pass)</td>
 <td><code>max_area</code>, <code>min_angle</code>,
@@ -459,7 +537,9 @@ error or triangle budget. lasR and lidR build TINs from point clouds
 <td>vertices with origin, triangles with depth, segments</td>
 </tr>
 <tr class="even">
-<td>trowel (hypertidy/trowel)</td>
+<td><a
+href="https://github.com/hypertidy/trowel"><strong>trowel</strong></a><br><small>GitHub,
+hypertidy</small></td>
 <td>spade 2.15 (Rust)</td>
 <td>live CDT handle, insert and remove, spade refinement</td>
 <td><code>min_angle</code>, <code>max_area</code>,
@@ -467,7 +547,9 @@ error or triangle budget. lasR and lidR build TINs from point clouds
 <td>same tables, stable ids across edits</td>
 </tr>
 <tr class="odd">
-<td>laridae (hypertidy/laridae)</td>
+<td><a
+href="https://github.com/hypertidy/laridae"><strong>laridae</strong></a><br><small>GitHub,
+hypertidy</small></td>
 <td>CGAL Constrained_triangulation_plus_2 + Delaunay_mesher_2</td>
 <td>fully dynamic CDT, exact predicates, step-wise mesher</td>
 <td>angle, area, edge floor, sizing function or grid, seeds,
@@ -487,85 +569,100 @@ nearest value, then vendored crates under CRAN's Rust policy.</p>
 <table>
 <thead>
 <tr class="header">
-<th>Upstream library (licence)</th>
+<th>Upstream library</th>
 <th>Algorithm class</th>
 <th>R packages</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>Shewchuk's Triangle (non-commercial)</td>
+<td><a
+href="https://www.cs.cmu.edu/~quake/triangle.html"><strong>Shewchuk's
+Triangle</strong></a><br><small>non-commercial</small></td>
 <td>CDT, conforming, Ruppert/Chew</td>
 <td>RTriangle, fdaPDE; via RTriangle: sfdct, anglr, retistruct</td>
 </tr>
 <tr class="even">
-<td>artem-ogre/CDT (MPL-2.0)</td>
+<td><a
+href="https://github.com/artem-ogre/CDT"><strong>artem-ogre/CDT</strong></a><br><small>MPL-2.0</small></td>
 <td>CDT, conforming, simple refinement</td>
 <td>RCDT, tulpaMesh, cdtr</td>
 </tr>
 <tr class="odd">
-<td>CGAL (GPL/LGPL parts)</td>
+<td><a
+href="https://github.com/CGAL/cgal"><strong>CGAL</strong></a><br><small>GPL/LGPL
+parts</small></td>
 <td>CDT, dynamic CDT, mesher, decomposition</td>
 <td>delaunay, cgalPolygons, laridae, raybevel (skeletons)</td>
 </tr>
 <tr class="even">
-<td>spade (MIT/Apache)</td>
+<td><a
+href="https://github.com/Stoeoef/spade"><strong>spade</strong></a><br><small>MIT/Apache</small></td>
 <td>dynamic CDT, refinement</td>
 <td>trowel</td>
 </tr>
 <tr class="odd">
-<td>fmesher core (MPL-2.0)</td>
+<td><a href="https://github.com/inlabru-org/fmesher"><strong>fmesher
+core</strong></a><br><small>MPL-2.0</small></td>
 <td>CDT with refinement, sphere</td>
 <td>fmesher, and through it INLA, inlabru, sdmTMB</td>
 </tr>
 <tr class="even">
-<td>GEOS (LGPL)</td>
+<td><a
+href="https://github.com/libgeos/geos"><strong>GEOS</strong></a><br><small>LGPL</small></td>
 <td>point Delaunay, polygon CDT</td>
 <td>sf, geos, terra; gdalraster via GDAL</td>
 </tr>
 <tr class="odd">
-<td>Qhull</td>
+<td><a
+href="https://github.com/qhull/qhull"><strong>Qhull</strong></a></td>
 <td>Quickhull, any number of coordinates</td>
 <td>geometry, tessellation</td>
 </tr>
 <tr class="even">
-<td>mapbox earcut (ISC)</td>
+<td><a href="https://github.com/mapbox/earcut"><strong>mapbox
+earcut</strong></a><br><small>ISC</small></td>
 <td>ear cutting</td>
 <td>decido, interleave, rearcut; via decido: silicate, anglr,
 raybevel</td>
 </tr>
 <tr class="odd">
-<td>Renka TRIPACK / Akima (ACM)</td>
+<td><a href="https://www.netlib.org/toms/751"><strong>Renka
+TRIPACK</strong></a> / Akima<br><small>ACM</small></td>
 <td>incremental Delaunay, constraint curves</td>
 <td>tripack, akima</td>
 </tr>
 <tr class="even">
-<td>S-hull</td>
+<td><strong>S-hull</strong></td>
 <td>radial sweep</td>
 <td>interp, alphahull</td>
 </tr>
 <tr class="odd">
-<td>deldir (Fortran)</td>
+<td><a
+href="https://cran.r-project.org/package=deldir"><strong>deldir</strong></a><br><small>Fortran</small></td>
 <td>Lee-Schachter</td>
 <td>deldir, spatstat.geom, ggforce</td>
 </tr>
 <tr class="even">
-<td>Fortune's sweepline</td>
+<td><strong>Fortune's sweepline</strong></td>
 <td>Voronoi / Delaunay</td>
 <td>rvoronoi, voronoifortune</td>
 </tr>
 <tr class="odd">
-<td>Delaunator</td>
+<td><a
+href="https://github.com/mapbox/delaunator"><strong>Delaunator</strong></a></td>
 <td>sweep-hull</td>
 <td>lasR</td>
 </tr>
 <tr class="even">
-<td>boost::polygon</td>
+<td><a
+href="https://github.com/boostorg/polygon"><strong>boost::polygon</strong></a></td>
 <td>exact integer Voronoi</td>
 <td>lidR</td>
 </tr>
 <tr class="odd">
-<td>hmm (MIT)</td>
+<td><a
+href="https://github.com/fogleman/hmm"><strong>hmm</strong></a><br><small>MIT</small></td>
 <td>greedy-insertion TIN</td>
 <td>terrainmeshr</td>
 </tr>
@@ -656,64 +753,77 @@ only), cdtr, trowel, laridae</td>
 </thead>
 <tbody>
 <tr class="odd">
-<td>triangle</td>
+<td><a
+href="https://pypi.org/project/triangle/"><strong>triangle</strong></a></td>
 <td>Triangle</td>
 <td>same table shape as the contract; PyPI says LGPL-3.0 but the C code
 is non-commercial</td>
 </tr>
 <tr class="even">
-<td>meshpy</td>
+<td><a
+href="https://pypi.org/project/meshpy/"><strong>meshpy</strong></a></td>
 <td>Triangle, TetGen</td>
 <td>Triangle licence; TetGen AGPL (upstream docs)</td>
 </tr>
 <tr class="odd">
-<td>scipy.spatial.Delaunay</td>
+<td><a
+href="https://pypi.org/project/scipy/"><strong>scipy</strong></a><br><code>scipy.spatial.Delaunay</code></td>
 <td>Qhull</td>
 <td>as geometry</td>
 </tr>
 <tr class="even">
-<td>matplotlib.tri</td>
+<td><a
+href="https://pypi.org/project/matplotlib/"><strong>matplotlib</strong></a><br><code>matplotlib.tri</code></td>
 <td>Qhull, or any triangle array</td>
 <td>contract output plugs into
 <code>Triangulation(x, y, triangles)</code></td>
 </tr>
 <tr class="odd">
-<td>shapely 2.1</td>
+<td><a
+href="https://pypi.org/project/shapely/"><strong>shapely</strong></a><br><small>2.1</small></td>
 <td>GEOS</td>
 <td>same polygon triangulation as sf</td>
 </tr>
 <tr class="even">
-<td>mapbox-earcut</td>
+<td><a
+href="https://pypi.org/project/mapbox-earcut/"><strong>mapbox-earcut</strong></a></td>
 <td>earcut</td>
 <td>as decido</td>
 </tr>
 <tr class="odd">
-<td>PythonCDT (GitHub)</td>
+<td><a
+href="https://github.com/artem-ogre/PythonCDT"><strong>PythonCDT</strong></a><br><small>GitHub</small></td>
 <td>CDT</td>
 <td>by the CDT author; refinement and depth exposure not checked</td>
 </tr>
 <tr class="even">
-<td>cgal (swig bindings, 5.6)</td>
+<td><a
+href="https://pypi.org/project/cgal/"><strong>cgal</strong></a><br><small>swig
+bindings, 5.6</small></td>
 <td>CGAL</td>
 <td>has Mesh_2; two releases behind</td>
 </tr>
 <tr class="odd">
-<td>pygalmesh</td>
+<td><a
+href="https://pypi.org/project/pygalmesh/"><strong>pygalmesh</strong></a></td>
 <td>CGAL</td>
 <td>mostly xyz meshing</td>
 </tr>
 <tr class="even">
-<td>jigsawpy (GitHub)</td>
+<td><a
+href="https://github.com/dengwirda/jigsaw-python"><strong>jigsawpy</strong></a><br><small>GitHub</small></td>
 <td>JIGSAW</td>
 <td>sizing-field refinement, like laridae's</td>
 </tr>
 <tr class="odd">
-<td>pydelatin</td>
+<td><a
+href="https://pypi.org/project/pydelatin/"><strong>pydelatin</strong></a></td>
 <td>hmm</td>
 <td>as terrainmeshr</td>
 </tr>
 <tr class="even">
-<td>dmsh</td>
+<td><a
+href="https://pypi.org/project/dmsh/"><strong>dmsh</strong></a></td>
 <td>own</td>
 <td>DistMesh style</td>
 </tr>
