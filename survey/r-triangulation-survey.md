@@ -65,46 +65,46 @@ more than speed.
 
 ## 2. Ear cutting
 
-| Package::function | Upstream code | Input | Holes / constraints | Output |
+| Package | Upstream code | Input | Holes / constraints | Output |
 |---|---|---|---|---|
-| decido::earcut() (CRAN 0.4.0, MIT) | mapbox earcut.hpp, vendored | x,y of one polygon, `holes` = start row of each hole ring | holes; no loose segments or points | vertex index, 3 per triangle |
-| rearcut (GitHub hypertidy) | earcut.js in V8 | x, y, holes | holes | index. Superseded by decido |
-| silicate::TRI(), TRI0() (CRAN 0.7.2) | decido | sf/sp/silicate models | holes via ring structure | TRI/TRI0 tables |
-| rgl::triangulate() (CRAN 1.3.36) | own ear clipping (Eberly) | rings separated by NA | holes and islands by nesting | 3 x n index |
-| tigers::triangulate() (CRAN, Paradis) | own R, Toussaint (1991) | one simple polygon | none | index |
-| interleave (CRAN, dcooley) | earcut.hpp via geometries | internal | holes | not a user API |
+| [**decido**](https://cran.r-project.org/package=decido)<br>`earcut()`<br><small>CRAN 0.4.0, MIT</small> | mapbox earcut.hpp, vendored | x,y of one polygon, `holes` = start row of each hole ring | holes; no loose segments or points | vertex index, 3 per triangle |
+| [**rearcut**](https://github.com/hypertidy/rearcut)<br><small>GitHub, superseded by decido</small> | earcut.js in V8 | x, y, holes | holes | index |
+| [**silicate**](https://cran.r-project.org/package=silicate)<br>`TRI()`, `TRI0()`<br><small>CRAN 0.7.2</small> | decido | sf/sp/silicate models | holes via ring structure | TRI/TRI0 tables |
+| [**rgl**](https://cran.r-project.org/package=rgl)<br>`triangulate()`<br><small>CRAN 1.3.36</small> | own ear clipping (Eberly) | rings separated by NA | holes and islands by nesting | 3 x n index |
+| [**tigers**](https://cran.r-project.org/package=tigers)<br>`triangulate()`<br><small>CRAN, Paradis</small> | own R, Toussaint (1991) | one simple polygon | none | index |
+| [**interleave**](https://cran.r-project.org/package=interleave)<br><small>CRAN, dcooley</small> | earcut.hpp via geometries | internal | holes | not a user API |
 
 decido is also used by anglr, raybevel and rayvertex.
 
 ## 3. Point Delaunay (unconstrained)
 
-| Package::function | Upstream code | Algorithm | Input | Output control |
+| Package | Upstream code | Algorithm | Input | Output control |
 |---|---|---|---|---|
-| deldir::deldir() (CRAN 2.0-4, GPL) | own Fortran (Turner) | Lee-Schachter incremental | x, y | window `rw`, dummy points, `eps`; drops duplicates and reports which were kept |
-| interp::tri.mesh() (CRAN 1.1-6) | S-hull (Sinclair), C++ | radial sweep, flips | x, y | `duplicate`, `jitter` |
-| geometry::delaunayn() (CRAN 0.5.2) | Qhull | Quickhull, any number of coordinates | n x d matrix | Qhull options |
-| tessellation::delaunay() (CRAN 2.3.0, Laurent) | Qhull | Quickhull | matrix | degenerate handling; rich output |
-| rvoronoi (GitHub coolbutuseless) | Fortune's C | sweepline | x, y | none |
-| voronoifortune (CRAN, Paradis) | Fortune's C | sweepline | matrix | none |
-| sf::st_triangulate(), terra::delaunay(), geos::geos_delaunay_triangles(), gdalraster::g_delaunay_triangulation() | GEOS | quad-edge incremental (upstream docs) | any geometry's vertices | `tolerance`, edges only; geometry out |
-| spatstat.geom::delaunay(), ggforce geom_delaunay_* | deldir | as deldir | ppp, aesthetics | none |
-| lasR triangulate() (r-universe) | Delaunator, vendored | sweep-hull | LAS/LAZ, streaming | `max_edge`; 2.5D TIN |
-| lidR (CRAN 4.3.3), internal | boost::polygon Voronoi on integers; incremental (hporro) | dual of exact Voronoi | LAS | `trim` |
+| [**deldir**](https://cran.r-project.org/package=deldir)<br>`deldir()`<br><small>CRAN 2.0-4, GPL</small> | own Fortran (Turner) | Lee-Schachter incremental | x, y | window `rw`, dummy points, `eps`; drops duplicates and reports which were kept |
+| [**interp**](https://cran.r-project.org/package=interp)<br>`tri.mesh()`<br><small>CRAN 1.1-6</small> | S-hull (Sinclair), C++ | radial sweep, flips | x, y | `duplicate`, `jitter` |
+| [**geometry**](https://cran.r-project.org/package=geometry)<br>`delaunayn()`<br><small>CRAN 0.5.2</small> | Qhull | Quickhull, any number of coordinates | n x d matrix | Qhull options |
+| [**tessellation**](https://cran.r-project.org/package=tessellation)<br>`delaunay()`<br><small>CRAN 2.3.0, Laurent</small> | Qhull | Quickhull | matrix | degenerate handling; rich output |
+| [**rvoronoi**](https://github.com/coolbutuseless/rvoronoi)<br><small>GitHub, coolbutuseless</small> | Fortune's C | sweepline | x, y | none |
+| [**voronoifortune**](https://cran.r-project.org/package=voronoifortune)<br><small>CRAN, Paradis</small> | Fortune's C | sweepline | matrix | none |
+| [**sf**](https://cran.r-project.org/package=sf), [**terra**](https://cran.r-project.org/package=terra), [**geos**](https://cran.r-project.org/package=geos), [**gdalraster**](https://cran.r-project.org/package=gdalraster)<br>`st_triangulate()`, `delaunay()`, `geos_delaunay_triangles()`, `g_delaunay_triangulation()` | GEOS | quad-edge incremental (upstream docs) | any geometry's vertices | `tolerance`, edges only; geometry out |
+| [**spatstat.geom**](https://cran.r-project.org/package=spatstat.geom), [**ggforce**](https://cran.r-project.org/package=ggforce)<br>`delaunay()`, `geom_delaunay_*` | deldir | as deldir | ppp, aesthetics | none |
+| [**lasR**](https://github.com/r-lidar/lasR)<br>`triangulate()`<br><small>r-universe</small> | Delaunator, vendored | sweep-hull | LAS/LAZ, streaming | `max_edge`; 2.5D TIN |
+| [**lidR**](https://cran.r-project.org/package=lidR)<br><small>CRAN 4.3.3, internal</small> | boost::polygon Voronoi on integers; incremental (hporro) | dual of exact Voronoi | LAS | `trim` |
 
 None of these accept segments. gdalraster reaches GEOS through GDAL's OGR
 layer, so its GEOS is the one GDAL was built with.
 
 ## 4. Constrained Delaunay, without refinement
 
-| Package::function | Upstream code | Input | Holes / outside | Output |
+| Package | Upstream code | Input | Holes / outside | Output |
 |---|---|---|---|---|
-| tripack::tri.mesh() + add.constraint() (CRAN, ACM licence) | Renka TRIPACK (TOMS 751) | x, y; closed constraint curves | curve orientation | `tri` object |
-| akima (CRAN, ACM licence) | Renka inside ACM 761 | x, y, z | none | interpolation only |
-| RCDT::delaunay() (CRAN 1.3.0, Laurent) | artem-ogre/CDT | points, 2-column `edges` index | parity | list with rgl mesh, edges |
-| delaunay::delaunay() (CRAN 2.0.0, Laurent) | CGAL CDT via RcppCGAL; gmp, mpfr | points, `constraints` index; 2.5D `elevation`; xyz to tetrahedra | nesting level, odd inside | list with mesh, edges |
-| sf::st_triangulate_constrained(), geos::geos_constrained_delaunay_triangles(), terra::delaunay(constrained = TRUE), gdalraster::g_delaunay_triangulation(constrained = TRUE) | GEOS >= 3.10 (gdalraster: GDAL >= 3.12): ear clipping then flips (upstream docs) | valid polygons, one at a time | holes joined to shell | triangle polygons |
-| cgalPolygons (CRAN 0.1.1) `$convexParts(method = "triangle")` | CGAL Polygon_triangulation_decomposition_2 | R6 polygon with holes | holes | coordinate matrices |
-| spatstat.geom::triangulate.owin() | deldir, recursive clipping | owin | holes | tess |
+| [**tripack**](https://cran.r-project.org/package=tripack)<br>`tri.mesh()` + `add.constraint()`<br><small>CRAN, ACM licence</small> | Renka TRIPACK (TOMS 751) | x, y; closed constraint curves | curve orientation | `tri` object |
+| [**akima**](https://cran.r-project.org/package=akima)<br><small>CRAN, ACM licence</small> | Renka inside ACM 761 | x, y, z | none | interpolation only |
+| [**RCDT**](https://cran.r-project.org/package=RCDT)<br>`delaunay()`<br><small>CRAN 1.3.0, Laurent</small> | artem-ogre/CDT | points, 2-column `edges` index | parity | list with rgl mesh, edges |
+| [**delaunay**](https://cran.r-project.org/package=delaunay)<br>`delaunay()`<br><small>CRAN 2.0.0, Laurent</small> | CGAL CDT via RcppCGAL; gmp, mpfr | points, `constraints` index; 2.5D `elevation`; xyz to tetrahedra | nesting level, odd inside | list with mesh, edges |
+| [**sf**](https://cran.r-project.org/package=sf), [**geos**](https://cran.r-project.org/package=geos), [**terra**](https://cran.r-project.org/package=terra), [**gdalraster**](https://cran.r-project.org/package=gdalraster)<br>`st_triangulate_constrained()`, `geos_constrained_delaunay_triangles()`, `delaunay(constrained = TRUE)`, `g_delaunay_triangulation(constrained = TRUE)` | GEOS >= 3.10 (gdalraster: GDAL >= 3.12): ear clipping then flips (upstream docs) | valid polygons, one at a time | holes joined to shell | triangle polygons |
+| [**cgalPolygons**](https://cran.r-project.org/package=cgalPolygons)<br>`$convexParts(method = "triangle")`<br><small>CRAN 0.1.1</small> | CGAL Polygon_triangulation_decomposition_2 | R6 polygon with holes | holes | coordinate matrices |
+| [**spatstat.geom**](https://cran.r-project.org/package=spatstat.geom)<br>`triangulate.owin()` | deldir, recursive clipping | owin | holes | tess |
 
 GEOS's "constrained" Delaunay is a polygon triangulation: no Steiner
 points, no loose segments, each polygon on its own, so shared edges in a
@@ -113,16 +113,16 @@ taking an arbitrary segment index without refinement.
 
 ## 5. Quality meshing
 
-| Package::function | Upstream code | Input | Output control |
+| Package | Upstream code | Input | Output control |
 |---|---|---|---|
-| RTriangle::pslg() + triangulate() (CRAN 1.6-0.15, CC BY-NC-SA, Sterratt) | Shewchuk's Triangle 1.6 | points, markers, attributes, segments, hole seeds | `a` area, `q` angle, `Y`, `j`, `D` conforming, `S` Steiner limit; attributes onto Steiner points |
-| fdaPDE::create.mesh.2D(), refine.mesh.2D() (CRAN 1.1-24) | Triangle, vendored (licence still non-commercial) | nodes, attributes, segments, holes | `minimum_angle`, `maximum_area`; quadratic elements |
-| sfdct::ct_triangulate() (r-universe, archived) | RTriangle | sf | `trim`, RTriangle options |
-| anglr::DEL(), DEL0() (r-universe, archived) | RTriangle; cdtr via `triangulator` | sf/sp/silicate | `max_area` |
-| retistruct (Sterratt) | RTriangle | outlines | area, angle |
-| fmesher::fm_mesh_2d(), fm_rcdt_2d() (CRAN 0.8.0, MPL-2.0, Lindgren) | own C++ (ex-INLA) | points, sf/sp, boundary and interior segments, crs | `max.edge` (inner, outer), `min.angle`, `cutoff`, `offset`, `max.n`, `quality.spec`, sphere meshes |
-| tulpaMesh::tulpa_mesh(), refine_mesh() (CRAN 0.1.3, MIT, Colling) | artem-ogre/CDT plus its own off-centre Ruppert loop | points, boundary (matrix or sf) | `max_edge`, `cutoff`, `extend`, `min_angle`, `max_area`, `max_steiner`, adaptive refine; sphere; 1D meshes |
-| geometry::distmesh2d(), distmeshnd() | DistMesh port, Qhull per iteration | distance function `fd`, size `fh`, fixed points | size function; no exact segments |
+| [**RTriangle**](https://cran.r-project.org/package=RTriangle)<br>`pslg()` + `triangulate()`<br><small>CRAN 1.6-0.15, CC BY-NC-SA, Sterratt</small> | Shewchuk's Triangle 1.6 | points, markers, attributes, segments, hole seeds | `a` area, `q` angle, `Y`, `j`, `D` conforming, `S` Steiner limit; attributes onto Steiner points |
+| [**fdaPDE**](https://cran.r-project.org/package=fdaPDE)<br>`create.mesh.2D()`, `refine.mesh.2D()`<br><small>CRAN 1.1-24</small> | Triangle, vendored (licence still non-commercial) | nodes, attributes, segments, holes | `minimum_angle`, `maximum_area`; quadratic elements |
+| [**sfdct**](https://github.com/hypertidy/sfdct)<br>`ct_triangulate()`<br><small>r-universe, archived</small> | RTriangle | sf | `trim`, RTriangle options |
+| [**anglr**](https://github.com/hypertidy/anglr)<br>`DEL()`, `DEL0()`<br><small>r-universe, archived</small> | RTriangle; cdtr via `triangulator` | sf/sp/silicate | `max_area` |
+| [**retistruct**](https://cran.r-project.org/package=retistruct)<br><small>CRAN, Sterratt</small> | RTriangle | outlines | area, angle |
+| [**fmesher**](https://cran.r-project.org/package=fmesher)<br>`fm_mesh_2d()`, `fm_rcdt_2d()`<br><small>CRAN 0.8.0, MPL-2.0, Lindgren</small> | own C++ (ex-INLA) | points, sf/sp, boundary and interior segments, crs | `max.edge` (inner, outer), `min.angle`, `cutoff`, `offset`, `max.n`, `quality.spec`, sphere meshes |
+| [**tulpaMesh**](https://cran.r-project.org/package=tulpaMesh)<br>`tulpa_mesh()`, `refine_mesh()`<br><small>CRAN 0.1.3, MIT, Colling</small> | artem-ogre/CDT plus its own off-centre Ruppert loop | points, boundary (matrix or sf) | `max_edge`, `cutoff`, `extend`, `min_angle`, `max_area`, `max_steiner`, adaptive refine; sphere; 1D meshes |
+| [**geometry**](https://cran.r-project.org/package=geometry)<br>`distmesh2d()`, `distmeshnd()` | DistMesh port, Qhull per iteration | distance function `fd`, size `fh`, fixed points | size function; no exact segments |
 
 Triangle is behind every mature xy quality mesher in R except fmesher and
 tulpaMesh, and its licence is why anglr, sfdct and RTriangle carry
@@ -141,9 +141,9 @@ error or triangle budget. lasR and lidR build TINs from point clouds
 
 | Package | Upstream code | Algorithm | Output control | Output |
 |---|---|---|---|---|
-| cdtr (hypertidy/cdtr) | artem-ogre/CDT, MPL-2.0 | CDT, conforming, CDT's refinement (one criterion per pass) | `max_area`, `min_angle`, `max_steiner`, `min_edge_length`; `unrefined` report; attributes | vertices with origin, triangles with depth, segments |
-| trowel (hypertidy/trowel) | spade 2.15 (Rust) | live CDT handle, insert and remove, spade refinement | `min_angle`, `max_area`, `max_steiner` | same tables, stable ids across edits |
-| laridae (hypertidy/laridae) | CGAL Constrained_triangulation_plus_2 + Delaunay_mesher_2 | fully dynamic CDT, exact predicates, step-wise mesher | angle, area, edge floor, sizing function or grid, seeds, `max_steiner`, `lari_step()` | same tables, `lari_depth()` |
+| [**cdtr**](https://github.com/hypertidy/cdtr)<br><small>GitHub, hypertidy</small> | artem-ogre/CDT, MPL-2.0 | CDT, conforming, CDT's refinement (one criterion per pass) | `max_area`, `min_angle`, `max_steiner`, `min_edge_length`; `unrefined` report; attributes | vertices with origin, triangles with depth, segments |
+| [**trowel**](https://github.com/hypertidy/trowel)<br><small>GitHub, hypertidy</small> | spade 2.15 (Rust) | live CDT handle, insert and remove, spade refinement | `min_angle`, `max_area`, `max_steiner` | same tables, stable ids across edits |
+| [**laridae**](https://github.com/hypertidy/laridae)<br><small>GitHub, hypertidy</small> | CGAL Constrained_triangulation_plus_2 + Delaunay_mesher_2 | fully dynamic CDT, exact predicates, step-wise mesher | angle, area, edge floor, sizing function or grid, seeds, `max_steiner`, `lari_step()` | same tables, `lari_depth()` |
 
 All three take `x, y, s0, s1` and return the triangle form of the
 [mesh spec v0.1](https://github.com/hypertidy/meshcore/blob/main/docs/mesh-spec-v0.1.md).
@@ -154,23 +154,23 @@ vendored crates under CRAN's Rust policy.
 
 ## 8. Lineage
 
-| Upstream library (licence) | Algorithm class | R packages |
+| Upstream library | Algorithm class | R packages |
 |---|---|---|
-| Shewchuk's Triangle (non-commercial) | CDT, conforming, Ruppert/Chew | RTriangle, fdaPDE; via RTriangle: sfdct, anglr, retistruct |
-| artem-ogre/CDT (MPL-2.0) | CDT, conforming, simple refinement | RCDT, tulpaMesh, cdtr |
-| CGAL (GPL/LGPL parts) | CDT, dynamic CDT, mesher, decomposition | delaunay, cgalPolygons, laridae, raybevel (skeletons) |
-| spade (MIT/Apache) | dynamic CDT, refinement | trowel |
-| fmesher core (MPL-2.0) | CDT with refinement, sphere | fmesher, and through it INLA, inlabru, sdmTMB |
-| GEOS (LGPL) | point Delaunay, polygon CDT | sf, geos, terra; gdalraster via GDAL |
-| Qhull | Quickhull, any number of coordinates | geometry, tessellation |
-| mapbox earcut (ISC) | ear cutting | decido, interleave, rearcut; via decido: silicate, anglr, raybevel |
-| Renka TRIPACK / Akima (ACM) | incremental Delaunay, constraint curves | tripack, akima |
-| S-hull | radial sweep | interp, alphahull |
-| deldir (Fortran) | Lee-Schachter | deldir, spatstat.geom, ggforce |
-| Fortune's sweepline | Voronoi / Delaunay | rvoronoi, voronoifortune |
-| Delaunator | sweep-hull | lasR |
-| boost::polygon | exact integer Voronoi | lidR |
-| hmm (MIT) | greedy-insertion TIN | terrainmeshr |
+| [**Shewchuk's Triangle**](https://www.cs.cmu.edu/~quake/triangle.html)<br><small>non-commercial</small> | CDT, conforming, Ruppert/Chew | RTriangle, fdaPDE; via RTriangle: sfdct, anglr, retistruct |
+| [**artem-ogre/CDT**](https://github.com/artem-ogre/CDT)<br><small>MPL-2.0</small> | CDT, conforming, simple refinement | RCDT, tulpaMesh, cdtr |
+| [**CGAL**](https://github.com/CGAL/cgal)<br><small>GPL/LGPL parts</small> | CDT, dynamic CDT, mesher, decomposition | delaunay, cgalPolygons, laridae, raybevel (skeletons) |
+| [**spade**](https://github.com/Stoeoef/spade)<br><small>MIT/Apache</small> | dynamic CDT, refinement | trowel |
+| [**fmesher core**](https://github.com/inlabru-org/fmesher)<br><small>MPL-2.0</small> | CDT with refinement, sphere | fmesher, and through it INLA, inlabru, sdmTMB |
+| [**GEOS**](https://github.com/libgeos/geos)<br><small>LGPL</small> | point Delaunay, polygon CDT | sf, geos, terra; gdalraster via GDAL |
+| [**Qhull**](https://github.com/qhull/qhull) | Quickhull, any number of coordinates | geometry, tessellation |
+| [**mapbox earcut**](https://github.com/mapbox/earcut)<br><small>ISC</small> | ear cutting | decido, interleave, rearcut; via decido: silicate, anglr, raybevel |
+| [**Renka TRIPACK**](https://www.netlib.org/toms/751) / Akima<br><small>ACM</small> | incremental Delaunay, constraint curves | tripack, akima |
+| **S-hull** | radial sweep | interp, alphahull |
+| [**deldir**](https://cran.r-project.org/package=deldir)<br><small>Fortran</small> | Lee-Schachter | deldir, spatstat.geom, ggforce |
+| **Fortune's sweepline** | Voronoi / Delaunay | rvoronoi, voronoifortune |
+| [**Delaunator**](https://github.com/mapbox/delaunator) | sweep-hull | lasR |
+| [**boost::polygon**](https://github.com/boostorg/polygon) | exact integer Voronoi | lidR |
+| [**hmm**](https://github.com/fogleman/hmm)<br><small>MIT</small> | greedy-insertion TIN | terrainmeshr |
 | own code | various | rgl, tigers, geometry::distmesh2d |
 
 ## 9. Capability matrix
@@ -201,18 +201,18 @@ From PyPI metadata and repositories, not run.
 
 | Package | Upstream | Note |
 |---|---|---|
-| triangle | Triangle | same table shape as the contract; PyPI says LGPL-3.0 but the C code is non-commercial |
-| meshpy | Triangle, TetGen | Triangle licence; TetGen AGPL (upstream docs) |
-| scipy.spatial.Delaunay | Qhull | as geometry |
-| matplotlib.tri | Qhull, or any triangle array | contract output plugs into `Triangulation(x, y, triangles)` |
-| shapely 2.1 | GEOS | same polygon triangulation as sf |
-| mapbox-earcut | earcut | as decido |
-| PythonCDT (GitHub) | CDT | by the CDT author; refinement and depth exposure not checked |
-| cgal (swig bindings, 5.6) | CGAL | has Mesh_2; two releases behind |
-| pygalmesh | CGAL | mostly xyz meshing |
-| jigsawpy (GitHub) | JIGSAW | sizing-field refinement, like laridae's |
-| pydelatin | hmm | as terrainmeshr |
-| dmsh | own | DistMesh style |
+| [**triangle**](https://pypi.org/project/triangle/) | Triangle | same table shape as the contract; PyPI says LGPL-3.0 but the C code is non-commercial |
+| [**meshpy**](https://pypi.org/project/meshpy/) | Triangle, TetGen | Triangle licence; TetGen AGPL (upstream docs) |
+| [**scipy**](https://pypi.org/project/scipy/)<br>`scipy.spatial.Delaunay` | Qhull | as geometry |
+| [**matplotlib**](https://pypi.org/project/matplotlib/)<br>`matplotlib.tri` | Qhull, or any triangle array | contract output plugs into `Triangulation(x, y, triangles)` |
+| [**shapely**](https://pypi.org/project/shapely/)<br><small>2.1</small> | GEOS | same polygon triangulation as sf |
+| [**mapbox-earcut**](https://pypi.org/project/mapbox-earcut/) | earcut | as decido |
+| [**PythonCDT**](https://github.com/artem-ogre/PythonCDT)<br><small>GitHub</small> | CDT | by the CDT author; refinement and depth exposure not checked |
+| [**cgal**](https://pypi.org/project/cgal/)<br><small>swig bindings, 5.6</small> | CGAL | has Mesh_2; two releases behind |
+| [**pygalmesh**](https://pypi.org/project/pygalmesh/) | CGAL | mostly xyz meshing |
+| [**jigsawpy**](https://github.com/dengwirda/jigsaw-python)<br><small>GitHub</small> | JIGSAW | sizing-field refinement, like laridae's |
+| [**pydelatin**](https://pypi.org/project/pydelatin/) | hmm | as terrainmeshr |
+| [**dmsh**](https://pypi.org/project/dmsh/) | own | DistMesh style |
 
 Python has no editable constrained mesh, no spade binding, and nothing
 that reports depth. The PyPI names `spade`, `pyspade` and `cdt` belong to
