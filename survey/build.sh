@@ -38,6 +38,8 @@ render notes.md notes "Notes: dimension and interpolation" notes \
   "Coordinate versus topological dimension, triangles on the sphere, and what linear interpolation on a mesh promises."
 render curves.md curves "Curves: bigcurve and s2" curves \
   "What an edge between two longitude, latitude points is, how s2 measures it, and how bigcurve draws it in any map projection."
+render validity.md validity "Polygon validity" validity \
+  "What invalid means for polygons under OGC, ESRI and s2 rules, the three readings a repair can choose, what GEOS make_valid does from R and Python, and how triangulation reads parity."
 render dev-drafts/geoarrow-triangles.md dev-drafts/geoarrow-triangles \
   "Triangles in GeoArrow (draft)" "dev draft" \
   "Development draft: what building triangle meshes with wkpool, laridae and cdtr suggests for storing triangles in GeoArrow." \
