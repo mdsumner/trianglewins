@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SedonaDB and GDAL multidim: development plan (draft)</title>
-<meta name="description" content="Development draft: planned issues and PRs connecting sedona-db's chunk-level N-D model with GDAL multidim enumeration and byte-reference virtual datasets.">
+<title>Moved: SedonaDB and GDAL multidim plan</title>
+<meta http-equiv="refresh" content="3; url=https://github.com/mdsumner/sedonadb-lab/blob/main/mdim/plan.md">
 <style>
 :root {
   color-scheme: light;
@@ -71,153 +71,16 @@ td:first-child strong { font-size: 14px; }
 </style>
 </head>
 <body>
-
 <main>
-<h1>SedonaDB and GDAL multidim: a development plan</h1>
-<p class="muted">Dev draft, parked here during a site restructure. 2026-10-20.
-Anchored to apache/sedona-db at PR #1449 (merged, closes #1395) and design
-issue #746.</p>
-
-<p class="muted"><strong>Moving:</strong> this draft's home is becoming
-<a href="https://github.com/mdsumner/sedonadb-hpc">mdsumner/sedonadb-hpc</a>
-(drafts/plan.md), indexed from
+<h1>This draft has moved</h1>
+<p>The SedonaDB and GDAL multidim development plan now lives with its
+working assets at
+<a href="https://github.com/mdsumner/sedonadb-lab">mdsumner/sedonadb-lab</a>
+(<a href="https://github.com/mdsumner/sedonadb-lab/blob/main/mdim/plan.md">mdim/plan.md</a>),
+indexed from
 <a href="https://www.hypertidy.org/writing">hypertidy.org/writing</a>.
-This parked copy remains until the move completes.</p>
-<h2>Where things stand</h2>
-<p>sedona-db's N-dimensional path is a native Zarr reader: the
-<code>sedona-raster-zarr</code> crate on <code>zarrs</code> and
-<code>object_store</code> (file, s3, http), one table row per storage chunk,
-envelopes derived from coordinate arrays, pixels decoded on demand. GDAL
-appears only through the classic 2-D API: a MEM-dataset path (a pinned
-<code>MEMDataset::Create</code> symbol as of #1449) used as the compute
-escape hatch once a plane has been sliced out of the cube. The multidim API
-(<code>GDALGroup</code>, <code>GDALMDArray</code>) appears nowhere, so every
-format multidim reaches - NetCDF, HDF4/5, GRIB, multidim VRT, /vsi
-composition - is invisible to the cube path, and reference stores
-(kerchunk-parquet, Icechunk manifests) do not read either.</p>
-<p>#1449 also moved GDAL/PROJ runtime discovery into a shared Rust module
-(<code>native_library.rs</code>) used by all bindings, added
-<code>sd_configure_gdal()</code> to the R package with load-time
-auto-configuration, and made the system preset find versioned runtime
-libraries (<code>libgdal.so.NN</code>) without a dev symlink. The Zarr
-extension itself remains a Python-only wheel.</p>
-
-<h2>The thesis</h2>
-<p>One chunk relation sits under all of this. Live Zarr metadata, multidim
-chunk enumeration (OSGeo/gdal#14677), kerchunk-parquet, Icechunk manifests
-and ad hoc byte-reference harvests are serializations of the same relation:
-array identity, integer chunk indices, byte location, codec recipe,
-georeferencing. sedona-db currently derives that relation from exactly one
-source - live Zarr metadata, at query time. Two schema additions make the
-relation an input rather than a derivation, at which point GDAL multidim
-becomes the universal feeder and virtual datasets become first-class:
-byte-range references, and chunk indices as columns.</p>
-
-<h2>Planned items</h2>
-<table>
-<tr><th></th><th>target</th><th>kind</th><th>one line</th><th>status</th></tr>
-<tr><td>P1</td><td>apache/sedona-db</td><td>issue + small PR</td>
-<td>defer runtime configuration from package import to first use</td>
-<td>draft written; needs post-#1449 refresh</td></tr>
-<tr><td>P2</td><td>apache/sedona-db</td><td>design issue, then PR</td>
-<td>byte-range outdb references and chunk-index columns</td>
-<td>scoped; evidence ready</td></tr>
-<tr><td>P3</td><td>apache/sedona-db #746</td><td>comments</td>
-<td>dims-as-struct, coordinate descriptors, read/regrid contract</td>
-<td>time-sensitive: before Phase 1 ossifies the schema</td></tr>
-<tr><td>P4</td><td>OSGeo/gdal #14677</td><td>PR (in flight)</td>
-<td>multidim chunk byte-reference enumeration</td>
-<td>under review upstream</td></tr>
-<tr><td>P5</td><td>apache/sedona-db</td><td>issue</td>
-<td>R surface for the Zarr extension</td>
-<td>opportunistic</td></tr>
-</table>
-
-<h3>P1. Defer runtime configuration to first use</h3>
-<p>The Python package runs <code>configure_proj("auto")</code> and
-<code>configure_gdal("auto")</code> at import. The auto preset probes
-rasterio, pyogrio, conda, homebrew and system in order and eagerly dlopens
-the first libgdal found. Where that libgdal is dynamically linked against a
-shared, unmangled Arrow C++ (the common institutional recipe: distro
-<code>libarrow-dev</code> plus GDAL built with the Parquet driver), the
-system libarrow soname registers in the process before pyarrow can load its
-own copy; a later <code>import pyarrow</code> reuses it (soname
-first-load-wins) and fails with an undefined abseil symbol, even at
-identical Arrow versions. Clearing <code>LD_LIBRARY_PATH</code> does not
-help; import order does.</p>
-<p>Evidence in hand: a two-line ordered-import reproducer; process-map
-attribution; and a four-environment matrix run with one test file - the
-project's published image (contains no GDAL: immune by absence, and warns on
-every import), pip wheel installs (mangled sonames, plus pyogrio importing
-pyarrow as a side effect: doubly immune), the osgeo/gdal ubuntu-full image
-(eager load fires, Arrow statically linked: immune), and a source-built
-GDAL against shared libarrow (collision). The project's own docstrings state
-configuration has no effect after the first GDAL-backed operation, so
-deferring it there is semantics-preserving. Post-#1449 the discovery logic
-is centralized in <code>native_library.rs</code>, which is the natural
-landing zone; the import-time calls themselves are unchanged, so the draft
-needs its implementation references refreshed before filing.</p>
-
-<h3>P2. Byte-range references and chunk-index columns</h3>
-<p>The band struct's <code>outdb_uri</code> names a whole storage object,
-with chunk identity buried in a URI fragment. Two additions: a byte-range
-reference (<code>uri</code>, <code>offset</code>, <code>length</code>,
-<code>codec_chain</code>), and integer chunk indices as relational columns.
-That unlocks, in one mechanism: Zarr v3 shards addressed directly;
-kerchunk-parquet and Icechunk manifests read as the chunk table (archives
-queryable without a Zarr rewrite; snapshots as time travel; no metadata
-round-trips at plan time); and the output of multidim enumeration (P4) fed
-straight in. Codec belongs in the schema, not the loader: a missing codec
-column is silent garbage. Motivating dataset: a REMA v2 reference store of
-roughly 19.5 million chunk references.</p>
-
-<h3>P3. Schema comments on #746</h3>
-<p>Three points, best made while the Arrow encoding is still an issue
-rather than a codebase. First, <code>dim_names</code> / <code>shape</code> /
-<code>strides</code> as parallel lists leave nowhere to hang per-dimension
-metadata; a list of dim structs (name, size, coordinate descriptor) gives
-the deferred "coordinate label arrays" phase a home. Second, a coordinate
-descriptor union - affine(offset, step), explicit reference, none -
-subsumes the raster-level y/x transform as a special case, covers irregular
-1-D spacing, and the explicit-reference case is the only representation
-that works for curvilinear 2-D coordinates (ocean and model grids, where no
-affine exists). Third, the read contract for the GDAL-backed execution
-path: shape is an output, not an input, and anything that changes the grid
-is a named regrid operation - determinism matters more in a database than
-anywhere.</p>
-
-<h3>P4. Multidim enumeration upstream</h3>
-<p>OSGeo/gdal#14677 adds a multidim chunk byte-reference subcommand: the
-chunk relation, emitted by GDAL, for every format multidim reaches. With P2
-in place the mapping from enumerator output onto band structs is nearly
-mechanical for regular grids, and sedona-db gains the long tail of formats
-without writing per-format readers.</p>
-
-<h3>P5. R surface for the Zarr extension</h3>
-<p>With #1449, GDAL-backed raster functions work from a stock R install.
-The N-dimensional path is still Python-only (the Zarr extension ships as a
-wheel). The ask: an R binding surface for the Zarr reader and the dimension
-functions, so the R-first datacube path reaches the cube, not just the
-plane.</p>
-
-<h2>Sequencing</h2>
-<p>P3 first (schema windows close); P1 next (refresh, then file - it is
-small, self-contained and already evidenced); P4 continues on its own
-track; P2 is the substantive design conversation and lands strongest with
-P1 filed and P4 visible; P5 whenever convenient. Working assets - the
-container and slurm kit, a generate-and-verify fixture script
-(enumerate / slice / decode against any store), and the ordered-import
-reproducer with per-image mechanism reporting - live in a working kit repo
-(sedonadb-hpc) alongside the issue draft.</p>
+Redirecting shortly.</p>
+<p class="muted">Parked here briefly during a site restructure, 2026-10-20.</p>
 </main>
-
-<script>
-document.querySelectorAll("table").forEach(function (t) {
-  var w = document.createElement("div");
-  w.className = "tablewrap";
-  t.parentNode.insertBefore(w, t);
-  w.appendChild(t);
-});
-</script>
 </body>
 </html>
