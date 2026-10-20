@@ -131,7 +131,8 @@ edges and large across a continent, near a pole or across the
 antimeridian. Choose the coordinates on purpose. Transforming there and
 back is one PROJ call each way, and geographiclib vectorises projection
 centres, so a local projection per feature costs no more than a global
-one.
+one. [Grids as meshes](../grids/) measures this on one polar grid
+block in three frames.
 
 For a reprojection mesh, test a point in each triangle against the exact
 transformation and split where the error exceeds a tolerance; rims, poles

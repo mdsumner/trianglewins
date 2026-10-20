@@ -26,6 +26,8 @@ and the benchmark:
   laridae on the same inputs, the silicate and anglr history, and why
   CGAL (figures from [survey/context/figures.R](survey/context/figures.R));
 - [notes](survey/notes.md) on dimension and interpolation;
+- [grids as meshes](survey/grids.md): where gridded data meets
+  triangulation, and "Delaunay in what?" measured on one polar grid block;
 - the [benchmark](bench/) at scale on geoBoundaries country boundaries.
 
 The articles are rendered by `sh survey/build.sh` (pandoc), which also
