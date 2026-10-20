@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grids as meshes: Delaunay in what?</title>
+<meta name="description" content="Every logically rectangular grid is a mesh; triangulating its points gives a different mesh in every frame, measured on one polar grid block.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 code, h2 code, h3 code, h4 code { font-size: 0.9em; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+  border-bottom: 1px solid var(--grid); line-height: 1.45; }
+th:first-child, td:first-child { min-width: 12em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; background: var(--surface-0);
+  border-bottom: 1px solid var(--border); }
+td code { font-size: 12px; color: var(--text-secondary); }
+td small { color: var(--text-muted); font-size: 12px; }
+td:first-child a { text-decoration: none; }
+td:first-child a:hover { text-decoration: underline; }
+td:first-child strong { font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../">trianglewins</a> / grids</p>
+<h1 id="grids-as-meshes-delaunay-in-what">Grids as meshes: Delaunay in
+what?</h1>
+<p>A gridded dataset is a mesh that never had to say so. This page is
+about where grids and triangulations meet, and about one question they
+share. The companion book <a
+href="https://hypertidy.github.io/regular-in-what/">Regular in what?</a>
+argues that a grid is regular, rectilinear or curvilinear only <em>in a
+frame</em>. A triangulation is Delaunay, has straight edges and
+interpolates linearly only in a frame too. "Delaunay in what?" is the
+same question.</p>
+<h2 id="every-logically-rectangular-grid-is-already-a-mesh">Every
+logically rectangular grid is already a mesh</h2>
+<p>A regular, rectilinear or curvilinear grid has an (i, j) index, and
+the index gives the topology for free: each cell is a quad, its corners
+are the vertices, and neighbours are i + 1 and j + 1. Turning that into
+triangles needs no Delaunay at all. Split each quad into two triangles,
+and the only choice is the diagonal.</p>
+<p>The diagonal matters. Bilinear interpolation in a cell is not linear
+on either pair of triangles, and the two splits give different values at
+the cell centre (see <a href="../notes/#interpolation">notes</a>). A
+split is a choice to record, not a detail to leave to the mesher.</p>
+<p>Where the values sit changes which mesh you have. Values at cell
+corners (PixelIsPoint, a DEM read as heights) are a field on the mesh's
+nodes. Values as cell averages (PixelIsArea) are a field on its faces.
+The grid words "centre" and "corner" are the mesh words "face" and
+"node".</p>
+<h2 id="delaunay-in-what">Delaunay in what?</h2>
+<p>Triangulate the points of a grid instead of splitting its cells, and
+the index is thrown away. What comes back depends on the frame the
+mesher saw. The figure takes one 10 x 10 block of the NSIDC 25 km south
+polar stereographic grid (EPSG:3412, regular in that frame),
+triangulates the cell centres three ways, and draws every result in the
+grid's own index space:</p>
+<ul>
+<li>in longitude and latitude, treated as planar x and y;</li>
+<li>in EPSG:3412, the grid's native frame;</li>
+<li>in geocentric xyz, as the convex hull of unit vectors, which is the
+spherical Delaunay triangulation (see <a
+href="../notes/#triangles-on-the-sphere">notes</a>).</li>
+</ul>
+<p><img src="delaunay-in-what.png"
+alt="One 10 x 10 block of the NSIDC grid, near the pole and near 60S, triangulated in three frames and drawn in index space" /></p>
+<table>
+<thead>
+<tr class="header">
+<th>Block</th>
+<th>Frame</th>
+<th>Triangles</th>
+<th>Inside one cell</th>
+<th>Same as xyz</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>around the pole</td>
+<td>lonlat</td>
+<td>182</td>
+<td>31%</td>
+<td>3%</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>3412</td>
+<td>162</td>
+<td>100%</td>
+<td>56%</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>xyz</td>
+<td>162</td>
+<td>100%</td>
+<td>100%</td>
+</tr>
+<tr class="even">
+<td>near 60S</td>
+<td>lonlat</td>
+<td>186</td>
+<td>87%</td>
+<td>4%</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>3412</td>
+<td>162</td>
+<td>100%</td>
+<td>52%</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>xyz</td>
+<td>162</td>
+<td>100%</td>
+<td>100%</td>
+</tr>
+</tbody>
+</table>
+<p>"Inside one cell" counts triangles whose three vertices lie in one
+index cell, that is, halves of a grid quad. A 10 x 10 block has 81 cells
+and so 162 halves.</p>
+<p>Three things show up.</p>
+<ol type="1">
+<li><strong>Longitude and latitude is the wrong frame, badly near the
+pole.</strong> Around the pole the block's longitudes run all the way
+round, the antimeridian cuts it open, and most triangles fan across many
+cells. Near 60S every quad half is there, but the block is not convex in
+longitude and latitude, so 24 extra sliver triangles fill in its concave
+edges.</li>
+<li><strong>The native frame and the sphere agree on the cells.</strong>
+In EPSG:3412 the cells are squares; on the sphere they are nearly
+squares. Both give exactly one pair of triangles per cell.</li>
+<li><strong>They do not agree on the diagonals, and neither is
+wrong.</strong> The four corners of a square are on one circle, so both
+diagonals are equally Delaunay. Stereographic projection maps circles on
+the sphere to circles on the plane, so the tie survives on the sphere as
+well. Which diagonal each run picked is decided by rounding, which is
+why "same as xyz" is about half. This is the diagonal choice from the
+previous section, arriving uninvited.</li>
+</ol>
+<p>A regular grid can be recovered by finding the frame it is regular
+in. A triangulation built in the wrong frame cannot: it is simply a
+different triangulation. So for meshes the frame is a decision made
+before meshing, not bookkeeping added afterwards.</p>
+<p>The figure and numbers come from <a
+href="https://github.com/mdsumner/trianglewins/blob/main/survey/grids/figures.py">survey/grids/figures.py</a>
+(numpy, scipy, matplotlib, pyproj).</p>
+<h2 id="what-survives-a-change-of-frame">What survives a change of
+frame</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Property</th>
+<th>Survives a transform?</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>connectivity (which triangles touch)</td>
+<td>yes</td>
+</tr>
+<tr class="even">
+<td>regular, rectilinear, curvilinear</td>
+<td>sometimes: a grid can be regular in another frame</td>
+</tr>
+<tr class="odd">
+<td>straight edges</td>
+<td>no: straight in one frame is curved in another (<a
+href="../curves/">curves</a>)</td>
+</tr>
+<tr class="even">
+<td>Delaunay (empty circumcircle)</td>
+<td>no, except under circle-preserving maps such as stereographic</td>
+</tr>
+<tr class="odd">
+<td>area and angle bounds</td>
+<td>no: in longitude and latitude they are in degrees</td>
+</tr>
+<tr class="even">
+<td>linear interpolation</td>
+<td>no: barycentric weights are linear in the mesh's coordinates</td>
+</tr>
+</tbody>
+</table>
+<p>Topology survives; geometry does not. Transforming a mesh keeps its
+triangles and is lossless. Claims about their shape have to be made
+again in the new frame.</p>
+<h2 id="where-else-grids-and-triangles-meet">Where else grids and
+triangles meet</h2>
+<p><strong>Inverting a curvilinear grid.</strong> Finding which cell of
+a curvilinear grid contains a point is a point location problem. The
+grid's own triangulation (quads split, in the target frame) answers it
+directly: find the triangle, and its barycentric weights give fractional
+(i, j). That is a triangulation whose vertices carry their index as an
+attribute, which is exactly what the harness's attribute carry check
+measures.</p>
+<p><strong>Reprojection meshes.</strong> GDAL's approximate transformer
+and the browser raster reprojectors (deck.gl-raster, OpenLayers) build
+an error-bounded triangle mesh in the target projection. New vertices
+there should be evaluated through the transformation, not interpolated
+from the triangle they fall in, and rims, poles and seams are better
+inserted as constraints than found by refinement (<a
+href="../notes/#linear-in-which-coordinates">notes</a>).</p>
+<p><strong>Swaths.</strong> Satellite swaths and tripolar ocean grids
+are curvilinear in every frame, so there is no frame to retreat to.
+Triangulate them in geocentric xyz, or in a local projection per
+scene.</p>
+<p><strong>Discrete global grids.</strong> Icosahedral grids start from
+20 spherical triangles, HEALPix and the cubed sphere from quads, and
+their vertices and neighbours are computed from the cell id. They are
+meshes whose triangulation is a formula, as a regular grid is a
+curvilinear grid whose positions are a formula.</p>
+<p><strong>Coverages.</strong> The harness cases
+<code>grid3_doubled</code> and <code>grid3_dedup</code> are a 3 x 3
+regular grid written out as polygons, with shared edges given twice or
+once. Recovering those shared edges is work a mesher has to do, and work
+the grid never needed: its identity was computed from the index.</p>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>
