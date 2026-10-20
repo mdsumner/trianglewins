@@ -13,7 +13,9 @@ project, and then looks at a real dataset. The short version:
 
 - **Most "invalid" data is not ambiguous.** Every one of the 9,841 invalid
   polygons in DEA Waterbodies breaks the same rule: a ring touches itself
-  at a vertex, where two water pixels meet only at a corner.
+  at a vertex, where two water pixels meet only at a corner. Every GEOS
+  repair gives each one the same area, but controlledburn misses 1,042 of
+  them by more than 1 m2 until they are repaired, and then misses none.
 - **When data is ambiguous, there are three readings**: parity (inside if
   you cross an odd number of edges to get there), ring roles (union the
   shells, subtract the holes) and winding (count signed turns). GEOS
@@ -279,7 +281,7 @@ to: each one reads its input in a definite way. The point is to know which.
 | **trowel** | Inserts crossings as vertices with origin "crossing". Coincident segments become one edge, so its depth is the distinct count, matching GEOS linework. |
 | **polymer** | Dedupes segments before triangulating, then labels each triangle by the parity of the rings of each feature that contain its centroid. Parity per feature, so overlapping parts of one multipolygon leave a hole, and a duplicated part cancels to nothing (area 0 above). |
 | **wkpool** | Exact vertex identity, no repair. `classify_cycles()` uses ring roles from path provenance when it has it. Its fallback for pools without provenance labels a counter-clockwise ring a hole under `convention = "sf"`, which is the reverse of sf's own convention (shells counter-clockwise, per `sf::st_read(check_ring_dir)`). |
-| **controlledburn** | Adds each ring's signed coverage per cell. Exact for valid input; on invalid input an overlapping part counts twice (nested shells 136, duplicate part 200) and cells near a crossing come out a little off (bowtie 47.6). |
+| **controlledburn** | Adds each ring's signed coverage per cell. Exact for valid input; on invalid input an overlapping part counts twice (nested shells 136, duplicate part 200) and cells near a crossing or a self-touch come out a little off (bowtie 47.6, and 1,042 DEA polygons below). Repairing first makes it exact. |
 
 Two of those are probably worth a small change: polymer's duplicate part
 vanishing, and wkpool's fallback label. Every mesher already reports
@@ -301,7 +303,22 @@ are inverted holes and nothing else. The other 1,806 become "Interior is
 disconnected" under that rule: the touches form a hole that pinches the
 water body into pieces joined only at corners, which is still unambiguous.
 
-*The area comparison across repair methods for these 9,841 polygons is still running and will be added here.*
+Every repair agrees on these polygons. GEOS linework, GEOS structure and
+`buffer(0)` give the same area to within 0.00001 m2 on all 9,841, and match
+DEA's own `area_m2` column to within 0.003 m2. Clipper's evenodd and
+positive fills differ by 1 to 16 m2 on 34 of the largest ones (up to 4,820
+km2, so about 3 parts in a billion). Shifting the polygon to the origin
+changes nothing, so this is most likely Clipper rounding coordinates to its
+integer grid, not a different reading.
+
+controlledburn is where it matters. Burned on the ABARES 50 m grid, 1,042
+of the invalid polygons come out more than 1 m2 off their area, 1.94 km2 of
+absolute error in all. These are the same 1,042 polygons as in the
+controlledburn Australia article. Running `st_make_valid()` first and
+burning the repaired polygons, **all 1,042 burn to their exact area**
+(`dea-followup.R`). Errors appear for polygons that pass the ESRI rule
+(633) as well as those that don't (409), so the problem is not only the
+disconnected interiors.
 
 The polygon that was left with an area error in the
 [controlledburn Australia article](https://github.com/hypertidy/controlledburn)
@@ -342,8 +359,9 @@ and gaps as triangles inside none (this is what polymer's index records).
   both ways (`st_make_valid()` with each `geos_method`, or shapely with each
   `method`) and compare areas. If they agree, the method doesn't matter.
 - **Raster-derived polygons and shapefiles**: expect self-touching rings.
-  They are unambiguous; any repair, or the ESRI rule in
-  `geos_is_valid_detail()`, is fine.
+  They are unambiguous, so any repair is fine. Repair them anyway before
+  algorithms that assume valid input: controlledburn's area errors on DEA
+  Waterbodies all went away after `st_make_valid()`.
 - **Overlapping parts from merged or dissolved data**: the union was almost
   certainly meant, which is ring roles (structure).
 - **Hand-digitized rings that cross**: parity usually matches what was
