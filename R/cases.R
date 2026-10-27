@@ -9,15 +9,18 @@
 ##   area_div   max_area for the refinement scenarios is bbox area / area_div
 ##   expect  optional named list of expected results (e.g. depth table)
 ##   note    one line on what the case is for
+##   ij      optional two-column grid index (i, j) of each vertex, for cases
+##           built from a grid (see tw_in_cell())
 
 new_case <- function(name, x, y, s0 = integer(0), s1 = integer(0),
                      region = c("outer", "hull"), area_div = 200,
-                     expect = list(), note = "") {
-  stopifnot(length(x) == length(y), length(s0) == length(s1))
+                     expect = list(), note = "", ij = NULL) {
+  stopifnot(length(x) == length(y), length(s0) == length(s1),
+            is.null(ij) || nrow(ij) == length(x))
   list(name = name, x = as.double(x), y = as.double(y),
        s0 = as.integer(s0), s1 = as.integer(s1),
        region = match.arg(region), area_div = area_div,
-       expect = expect, note = note)
+       expect = expect, note = note, ij = ij)
 }
 
 ## closed rings -> one case's x, y, s0, s1 (each ring is a two-column matrix,
@@ -41,6 +44,41 @@ dedupe_pslg <- function(x, y, s0, s1) {
   s <- cbind(pmin(a, b), pmax(a, b))
   keep <- !duplicated(s) & s[, 1] != s[, 2]
   list(x = x[u], y = y[u], s0 = s[keep, 1], s1 = s[keep, 2])
+}
+
+## the edges of an ni x nj grid of nodes, node (i, j) (from 0) being row
+## i + ni * j + 1: every (i, j)-(i + 1, j) and (i, j)-(i, j + 1)
+quad_edges <- function(ni, nj) {
+  id <- function(i, j) as.integer(i + ni * j + 1L)
+  h <- expand.grid(i = seq_len(ni - 1L) - 1L, j = seq_len(nj) - 1L)
+  v <- expand.grid(i = seq_len(ni) - 1L, j = seq_len(nj - 1L) - 1L)
+  list(s0 = c(id(h$i, h$j), id(v$i, v$j)), s1 = c(id(h$i + 1L, h$j), id(v$i, v$j + 1L)))
+}
+
+## longitude and latitude of south polar stereographic x, y on an ellipsoid:
+## Snyder (1987) eq. 21-39 and 7-9 for the north pole, by symmetry. The
+## defaults are EPSG:3412 (NSIDC, Hughes 1980 ellipsoid, true scale at 70 S),
+## which this matches PROJ to 1e-8 degrees over the grid.
+ps_south_inverse <- function(x, y, a = 6378273, rf = 298.279411123064, lat_ts = -70) {
+  f <- 1 / rf; e2 <- f * (2 - f); e <- sqrt(e2)
+  x <- -x; y <- -y; pc <- -lat_ts * pi / 180
+  tc <- tan(pi / 4 - pc / 2) / ((1 - e * sin(pc)) / (1 + e * sin(pc)))^(e / 2)
+  mc <- cos(pc) / sqrt(1 - e2 * sin(pc)^2)
+  chi <- pi / 2 - 2 * atan(sqrt(x^2 + y^2) * tc / (a * mc))
+  phi <- chi + (e2 / 2 + 5 * e2^2 / 24 + e2^3 / 12) * sin(2 * chi) +
+    (7 * e2^2 / 48 + 29 * e2^3 / 240) * sin(4 * chi) + (7 * e2^3 / 120) * sin(6 * chi)
+  cbind(lon = -atan2(x, -y) * 180 / pi, lat = -phi * 180 / pi)
+}
+
+## an n x n block of NSIDC 25 km cell centres starting at (x0, y0) in
+## EPSG:3412, with each one's longitude and latitude and grid index. The
+## default block is the 60 S block of survey/grids.md.
+nsidc_block <- function(x0 = -112500, y0 = 3300000, n = 10L, step = 25000) {
+  ij <- expand.grid(i = seq_len(n) - 1L, j = seq_len(n) - 1L)
+  x <- x0 + ij$i * step; y <- y0 + ij$j * step
+  ll <- ps_south_inverse(x, y)
+  list(x = x, y = y, lon = unname(ll[, "lon"]), lat = unname(ll[, "lat"]),
+       ij = cbind(i = ij$i, j = ij$j), edges = quad_edges(n, n))
 }
 
 square <- function(x0, y0, w, h = w) cbind(x0 + c(0, w, w, 0), y0 + c(0, 0, h, h))
@@ -136,6 +174,33 @@ synthetic_cases <- list(
     p <- rings_pslg(list(star, sliver))
     new_case("sharp_corner", p$x, p$y, p$s0, p$s1,
              note = "star with sharp spikes and a 1 degree sliver: refinement cascades")
+  },
+  grid_quads = function() {
+    b <- nsidc_block()
+    new_case("grid_quads", b$lon, b$lat, b$edges$s0, b$edges$s1, ij = b$ij,
+             expect = list(n_triangles = 162L, in_cell = 1),
+             note = paste("10 x 10 NSIDC 3412 cell centres near 60 S in longitude and",
+                          "latitude, the index's quad edges as constraints"))
+  },
+  grid_frames_lonlat = function() {
+    b <- nsidc_block()
+    new_case("grid_frames_lonlat", b$lon, b$lat, region = "hull", ij = b$ij,
+             expect = list(n_triangles = 186L, in_cell = 162 / 186),
+             note = "the same grid's points only, in longitude and latitude")
+  },
+  grid_frames_3412 = function() {
+    b <- nsidc_block()
+    new_case("grid_frames_3412", b$x, b$y, region = "hull", ij = b$ij,
+             expect = list(n_triangles = 162L, in_cell = 1),
+             note = "the same grid's points only, in EPSG:3412 where it is regular")
+  },
+  grid_diagonal = function() {
+    ij <- as.matrix(expand.grid(i = 0:3, j = 0:3))
+    e <- quad_edges(4L, 4L)
+    new_case("grid_diagonal", ij[, 1], ij[, 2], e$s0, e$s1, ij = ij,
+             expect = list(n_triangles = 18L, in_cell = 1),
+             note = paste("3 x 3 unit cells with their edges as constraints: both",
+                          "diagonals of every cell are Delaunay, so diag_ne is a tie-break"))
   },
   points_only = function() {
     ## a fixed low-discrepancy pattern, no RNG dependence

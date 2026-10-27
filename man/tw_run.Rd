@@ -32,7 +32,8 @@ a data frame, one row per backend x case x scenario
 \description{
 Every backend on every case under every scenario. Each run is measured
 with \code{\link[=tw_measure]{tw_measure()}}, timed with a median over repeats, and run once more
-with a linear attribute for \code{\link[=tw_attr_error]{tw_attr_error()}}. A backend that is not
+with a linear attribute for \code{\link[=tw_attr_error]{tw_attr_error()}}; grid cases are also
+measured with \code{\link[=tw_in_cell]{tw_in_cell()}}. A backend that is not
 installed gives rows with \code{status = "skipped"}; an error gives
 \code{status = "error"} and the message.
 }

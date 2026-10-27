@@ -130,3 +130,8 @@ whose positions are a formula.
 3 x 3 regular grid written out as polygons, with shared edges given twice
 or once. Recovering those shared edges is work a mesher has to do, and
 work the grid never needed: its identity was computed from the index.
+
+**Grid cases.** `grid_quads`, `grid_frames_lonlat`, `grid_frames_3412`
+and `grid_diagonal` put this page's 60S block (and a unit grid) in the
+harness, and `tw_in_cell()` judges each backend's triangles in the grid's
+index, as the figure does.

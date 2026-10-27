@@ -59,6 +59,9 @@ alone:
 * attribute carry: every case is run again with `z = x + 2y` on the input
   vertices. Linear interpolation reproduces a linear field exactly, so any
   deviation on crossing or Steiner vertices is an interpolation error
+* grid cells (`tw_in_cell()`, grid cases only): the share of triangles that
+  are half of one grid quad, judged in the grid's own index, and of those
+  the share using the (i, j)-(i + 1, j + 1) diagonal
 * time: median over repeats, including reading the tables back
 
 ## Cases
@@ -76,6 +79,10 @@ alone:
 | dangling | an open polyline inside a square |
 | sharp_corner | a star with sharp spikes and a 1 degree sliver |
 | points_only | 500 points, no segments |
+| grid_quads | 10 x 10 NSIDC 3412 cell centres near 60 S in lon/lat, the index's quad edges as constraints |
+| grid_frames_lonlat | the same points only, in lon/lat: Delaunay gives 186 triangles, 87% of them quad halves |
+| grid_frames_3412 | the same points only, in EPSG:3412 where the grid is regular: 162 triangles, all quad halves |
+| grid_diagonal | 3 x 3 unit cells: both diagonals of each are Delaunay, so the diagonal is a tie-break |
 | nc | North Carolina counties, shared boundaries once (1255 vertices) |
 | nc_rings | the same counties as rings in full (2421 vertices, everything shared twice) |
 | cont_tas | Tasmanian contours (anglr), open lines meshed over their hull |

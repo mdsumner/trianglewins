@@ -37,7 +37,8 @@ time_call <- function(f, min_time = 0.2, max_reps = 25L) {
 #'
 #' Every backend on every case under every scenario. Each run is measured
 #' with [tw_measure()], timed with a median over repeats, and run once more
-#' with a linear attribute for [tw_attr_error()]. A backend that is not
+#' with a linear attribute for [tw_attr_error()]; grid cases are also
+#' measured with [tw_in_cell()]. A backend that is not
 #' installed gives rows with `status = "skipped"`; an error gives
 #' `status = "error"` and the message.
 #'
@@ -87,6 +88,8 @@ tw_run <- function(backends = names(tw_backends()), cases = NULL, scenarios = NU
         m$time_ms <- if (time) 1000 * time_call(function() suppressWarnings(f()), min_time) else NA_real_
         oa <- tryCatch(suppressWarnings(f(attr = TRUE)), error = function(e) NULL)
         m$attr_err <- if (is.null(oa)) NA_real_ else tw_attr_error(oa, case)
+        ic <- tw_in_cell(out, case)
+        m$in_cell <- ic[["in_cell"]]; m$diag_ne <- ic[["diag_ne"]]
         row <- cbind(row, m)
         if (verbose) message(sprintf("%-9s %-17s %-11s %7d tris %8.2f ms", b, case$name, snm,
                                      row$n_triangles, row$time_ms))
