@@ -50,7 +50,11 @@ render dev-drafts/geoarrow-triangles-proposal.md dev-drafts/geoarrow-triangles-p
   "Proposal: geoarrow.triangles (draft)" "dev draft" \
   "Development draft: a geoarrow.triangles extension type, written in the shape of a GeoArrow spec proposal, with reference checks." \
   ../../
-redirect choose ../start/#which-package
+render dev-drafts/geoarrow-pointclouds.md dev-drafts/geoarrow-pointclouds \
+  "Point clouds and the vertex pool (draft)" "dev draft" \
+  "Development draft: whether the geoarrow.triangles vertex pool suits point clouds, and prior art for compressed tiles of points indexed by a table (COPC, pgpointcloud, Zarr sharding, zarr-vectors)." \
+  ../../
+redirect choose../start/#which-package
 redirect dimension ../notes/#dimension
 redirect interpolation ../notes/#interpolation
 redirect roadmap https://github.com/hypertidy/meshcore/blob/main/docs/roadmap.md

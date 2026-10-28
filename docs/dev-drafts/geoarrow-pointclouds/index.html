@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Point clouds and the vertex pool (draft)</title>
+<meta name="description" content="Development draft: whether the geoarrow.triangles vertex pool suits point clouds, and prior art for compressed tiles of points indexed by a table (COPC, pgpointcloud, Zarr sharding, zarr-vectors).">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 code, h2 code, h3 code, h4 code { font-size: 0.9em; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+  border-bottom: 1px solid var(--grid); line-height: 1.45; }
+th:first-child, td:first-child { min-width: 12em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; background: var(--surface-0);
+  border-bottom: 1px solid var(--border); }
+td code { font-size: 12px; color: var(--text-secondary); }
+td small { color: var(--text-muted); font-size: 12px; }
+td:first-child a { text-decoration: none; }
+td:first-child a:hover { text-decoration: underline; }
+td:first-child strong { font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../../">trianglewins</a> / dev draft</p>
+<h1
+id="point-clouds-and-the-vertex-pool-notes-for-the-geoarrow-discussion">Point
+clouds and the vertex pool: notes for the GeoArrow discussion</h1>
+<p><em>Development draft, 28 October 2026. Not submitted anywhere. A
+companion to <a href="../geoarrow-triangles-proposal/">Proposal:
+geoarrow.triangles</a> and its background page <a
+href="../geoarrow-triangles/">Triangles in GeoArrow</a>. It asks nothing
+new of that proposal. It asks whether the vertex pool (the dictionary of
+coordinates that a mesh indexes into) has anything to offer point
+clouds, and, since a point cloud likely needs a much more compact form
+than a plain coordinate array, what the prior art is for compressed
+tiles of points indexed by a small table.</em></p>
+<p><em>Facts here are marked by how they were established. "Checked"
+means run here (pyarrow 24) or read from the specification or
+documentation linked. The rest is from working knowledge of the formats
+and should be confirmed before it is quoted.</em></p>
+<h2 id="1-the-question">1. The question</h2>
+<p>The triangles proposal stores a mesh as</p>
+<pre><code>FixedSizeList&lt;Dictionary&lt;int32, Coordinate&gt;&gt;[3]</code></pre>
+<p>so the dictionary is the vertex pool, and triangles are rows of three
+ids into it. A point cloud is a vertex pool with nothing pointing into
+it. Does that mean the pool type is the natural home for point clouds?
+Or is a cloud different enough, in size, attributes, access pattern and
+compression, that it needs its own representation, perhaps a chunked,
+compressed blob with an Arrow vector as the index?</p>
+<p>Short answer: the pool by itself adds nothing for a bare cloud. It
+does matter when something else (a TIN, a mesh, a set of breaklines)
+refers to the cloud's points. The compact representation is a separate
+problem, with a lot of prior art. Almost all of it has the same shape:
+compressed tiles, plus a small table saying where each tile is, what it
+covers and how many points it holds. That is "very Zarr", and Zarr is
+one of the best places to look.</p>
+<h2 id="2-what-the-pool-does-and-does-not-give-a-cloud">2. What the pool
+does and does not give a cloud</h2>
+<p><strong>A bare cloud does not need the dictionary.</strong> With no
+triangles, a <code>Dictionary&lt;int32, Coordinate&gt;</code> is a
+coordinate array with an identity index on top. The indirection costs
+four bytes a point and buys nothing. A bare cloud is just its dictionary
+values: <code>geoarrow.point</code> (separated or interleaved) with
+sibling attribute columns, which is what PDAL writes today (section
+4).</p>
+<p><strong>A cloud with something referring to it does fit the
+pool.</strong> The common case is a TIN or constrained triangulation
+over lidar ground returns: the triangles index a subset of the cloud's
+points. The proposal already allows it ("the dictionary may contain
+vertices that no triangle references"). Other cases: breaklines or
+hydro-flattening edges snapped to cloud points; neighbourhood graphs (k
+nearest neighbours, segment adjacency in classification); a mesh
+reconstructed from a terrestrial scan, where the cloud is far denser
+than the mesh.</p>
+<p>Here the current proposal runs into four things:</p>
+<ol type="1">
+<li><strong>The Parquet default throws the cloud away.</strong> The
+decoded layout drops unreferenced vertices. For a ground TIN over a full
+cloud, that is most of the points: vegetation, buildings, noise,
+everything not in the TIN. For point clouds, the proposal's option (c)
+(vertices stored apart from triangle indices) is the only one that keeps
+the data, not just the one that is 30% smaller. This is the strongest
+argument for (c) found so far.</li>
+<li><strong>Arrow dictionaries are decoded in memory.</strong> Arrow has
+no lazy or compressed child arrays. The only compression in the Arrow
+format is per-buffer LZ4 or ZSTD in IPC, which is a transport feature:
+the reader decompresses on receipt. So the pool cannot itself be the
+compact form.</li>
+<li><strong><code>int32</code> ids stop at about 2.1 billion.</strong>
+That is fine for a tile and not for a survey: national lidar programmes
+run to hundreds of billions of points. The proposal allows
+<code>int64</code>, which works in memory, but a survey is never one
+in-memory array. That points to ids of the form (tile, local index),
+which is chunking again (section 8).</li>
+<li><strong>The vertex identity rules (<code>vertex_identity</code>) do
+not apply.</strong> In a mesh, two equal coordinates are presumed to be
+one vertex and the pool should not hold duplicates. In a cloud, two
+returns at the same quantized position are two measurements (different
+times, intensities, return numbers). A cloud used as a pool must allow
+duplicate coordinates. "The dictionary should not contain two entries
+with equal coordinates" would have to be a "should" for meshes and not
+apply to clouds.</li>
+</ol>
+<p><strong>IPC dictionary deltas already stream tiles.</strong> In the
+proposal, later record batches may add vertices by dictionary delta, and
+ids stay valid across the stream. Read as a cloud, each delta is a tile
+of points appended to the pool, and a vertex's id is its tile's offset
+plus its local index. So the pool already has the shape of a tiled
+cloud. What it lacks is compression at rest, lazy access, and a spatial
+index over the deltas.</p>
+<h2 id="3-how-a-cloud-differs-from-a-meshs-vertex-pool">3. How a cloud
+differs from a mesh's vertex pool</h2>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th>mesh vertex pool</th>
+<th>point cloud</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>size</td>
+<td>thousands to millions</td>
+<td>millions per tile, billions per survey</td>
+</tr>
+<tr class="even">
+<td>identity</td>
+<td>equal coordinates are one vertex</td>
+<td>duplicates are legitimate</td>
+</tr>
+<tr class="odd">
+<td>coordinates</td>
+<td>float64, often constructed (crossings, Steiner points)</td>
+<td>measured, quantized: LAS stores <code>int32</code> with a per-file
+scale and offset</td>
+</tr>
+<tr class="even">
+<td>attributes</td>
+<td>few (origin, z, input row)</td>
+<td>many: intensity, return number, number of returns, classification,
+flags, scan angle, GPS time, RGB, NIR, waveform pointers, plus extra
+bytes</td>
+</tr>
+<tr class="odd">
+<td>order</td>
+<td>first appearance, or input order</td>
+<td>scan or acquisition order, often re-sorted spatially for access</td>
+</tr>
+<tr class="even">
+<td>access</td>
+<td>by id, from the triangles</td>
+<td>by space (bbox, tile) and by level of detail</td>
+</tr>
+<tr class="odd">
+<td>multi-resolution</td>
+<td>rarely</td>
+<td>usually (octrees for rendering and fast overviews)</td>
+</tr>
+<tr class="even">
+<td>compression</td>
+<td>generic is fine</td>
+<td>specialised codecs (LAZ) beat generic ones by a large margin</td>
+</tr>
+</tbody>
+</table>
+<p>Two of these change the design: access is <strong>by space, not by
+id</strong>, and the coordinates are <strong>quantized
+integers</strong>, not doubles. A design that serves point clouds well
+puts a spatial index next to the tiles, and either keeps the integers or
+says how the doubles were made.</p>
+<h2 id="4-prior-art">4. Prior art</h2>
+<p>Every design below has compressed or packed tiles of points, and a
+small index of where each tile is, what it covers and how many points it
+holds.</p>
+<h3 id="files">Files</h3>
+<table>
+<thead>
+<tr class="header">
+<th>design</th>
+<th>tile</th>
+<th>index</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>LAZ</strong> (LASzip)</td>
+<td>chunks of points, 50,000 by default, each compressed
+independently</td>
+<td>chunk table at the end of the file: byte offsets, and point counts
+for variable-size chunks</td>
+<td>point-to-point predictive coding: each field is predicted from the
+previous point and the residual entropy-coded. Typically 7 to 20% of LAS
+size</td>
+</tr>
+<tr class="even">
+<td><strong>COPC</strong> (<a href="https://copc.io/">copc.io</a>)</td>
+<td>one LAZ chunk per octree node</td>
+<td>hierarchy pages of 32-byte entries:
+<code>VoxelKey{level, x, y, z}</code>, <code>offset</code>,
+<code>byteSize</code>, <code>pointCount</code>.
+<code>pointCount = -1</code> means the entry points to a child hierarchy
+page, so the hierarchy is fetched lazily (checked)</td>
+<td>a valid LAZ 1.4 file that is also range-readable over HTTP. The
+hierarchy is a table already</td>
+</tr>
+<tr class="odd">
+<td><strong>EPT</strong> (Entwine Point Tiles)</td>
+<td>one file per octree node, encoded as LAZ, raw binary or zstandard
+binary</td>
+<td>JSON hierarchy files, keyed <code>level-x-y-z</code>, values are
+point counts</td>
+<td>COPC took its keys from EPT. Many objects instead of one file</td>
+</tr>
+<tr class="even">
+<td><strong>Potree 2</strong></td>
+<td>octree nodes as byte ranges in one <code>octree.bin</code></td>
+<td><code>hierarchy.bin</code>: per node, type, child mask, point count,
+byte offset, byte size</td>
+<td>built for the browser renderer</td>
+</tr>
+<tr class="odd">
+<td><strong>I3S point cloud layers</strong> (OGC)</td>
+<td>nodes, geometry and attributes in separate resources,
+LEPCC-compressed</td>
+<td>node pages</td>
+<td>LEPCC is Esri's limited-error point cloud compression: lossy within
+a stated error</td>
+</tr>
+<tr class="even">
+<td><strong>3D Tiles / glTF</strong></td>
+<td><code>pnts</code> tiles (3D Tiles 1.0), or glTF point primitives
+(1.1)</td>
+<td>the tileset JSON tree with bounding volumes</td>
+<td>glTF buffers can use Draco
+(<code>KHR_draco_mesh_compression</code>), meshopt
+(<code>EXT_meshopt_compression</code>) and integer quantization
+(<code>KHR_mesh_quantization</code>)</td>
+</tr>
+<tr class="odd">
+<td><strong>E57</strong></td>
+<td>scans as compressed vectors</td>
+<td>XML section describing scans and poses</td>
+<td>terrestrial scanner interchange; not tiled spatially</td>
+</tr>
+</tbody>
+</table>
+<h3 id="databases-and-array-stores">Databases and array stores</h3>
+<table>
+<thead>
+<tr class="header">
+<th>design</th>
+<th>tile</th>
+<th>index</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>pgpointcloud</strong></td>
+<td><code>PcPatch</code>: one row per patch, compressed as none,
+dimensional (run-length, common-bits removal, zlib, chosen per
+dimension) or LAZ (checked)</td>
+<td>patch bounds plus a GiST index on the patch envelope; the schema is
+stored once in <code>pointcloud_formats</code> and each patch carries
+only its <code>pcid</code> (checked)</td>
+<td><strong>the closest prior art to "a compressed blob per row, indexed
+by a table".</strong> The schema-once, key-per-row pattern is exactly an
+Arrow schema plus a dictionary</td>
+</tr>
+<tr class="even">
+<td><strong>Oracle <code>SDO_PC</code></strong></td>
+<td>blocks of points in a block table</td>
+<td>spatial index on block extents</td>
+<td>same pattern, earlier</td>
+</tr>
+<tr class="odd">
+<td><strong>TileDB</strong></td>
+<td>sparse array tiles, compressed per attribute</td>
+<td>built-in spatial index on tile MBRs</td>
+<td>PDAL can write and read it directly</td>
+</tr>
+<tr class="even">
+<td><strong>Zarr v3 sharding</strong> (<a
+href="https://zarr-specs.readthedocs.io/en/latest/v3/codecs/sharding-indexed/index.html">spec</a>)</td>
+<td>inner chunks packed into a shard object</td>
+<td>the shard index: per inner chunk, <code>offset</code> and
+<code>nbytes</code> as uint64, at the start or end of the shard; an
+empty chunk is both set to 2^64 - 1 (checked)</td>
+<td>the COPC hierarchy without the octree: a byte-range table over
+compressed tiles</td>
+</tr>
+<tr class="odd">
+<td><strong>zarr-vectors</strong> (<a
+href="https://zarr-vectors-py.readthedocs.io/en/latest/spec/geometry_types/point_cloud.html">point
+cloud type</a>)</td>
+<td><code>vertices/</code> (N, D) float32 per spatial chunk;
+<code>attributes/&lt;name&gt;/</code> per vertex; a
+<code>vertex_fragments/</code> uint8 blob per chunk indexing bins inside
+the chunk (checked)</td>
+<td>spatial chunks (e.g. 200 units) with bins inside them (e.g. 50
+units), and a multi-resolution pyramid that replaces each bin's points
+with one point at the centroid (checked)</td>
+<td>from the Allen Institute ecosystem. A worked Zarr answer to "tiles
+of points"</td>
+</tr>
+<tr class="even">
+<td><strong>CF ragged arrays</strong> (discrete sampling
+geometries)</td>
+<td>a contiguous ragged array: all elements in one 1-D array, with a
+<code>count</code> variable giving each instance's length</td>
+<td>the count variable: its cumulative sum gives offsets</td>
+<td>the netCDF answer to variable-length groups, decades old and widely
+read. Also an indexed variant, where each element carries its instance
+number</td>
+</tr>
+<tr class="odd">
+<td><strong>Kerchunk / VirtualiZarr</strong></td>
+<td>any byte range in any file</td>
+<td>a manifest of (path, offset, length) per chunk</td>
+<td>a way to give existing files a Zarr view without copying them</td>
+</tr>
+</tbody>
+</table>
+<h3 id="arrow-and-parquet-today">Arrow and Parquet today</h3>
+<ul>
+<li><strong>PDAL <a
+href="https://pdal.io/en/latest/stages/writers.arrow.html"><code>writers.arrow</code></a></strong>
+writes Feather or Parquet with one column per dimension, in batches of
+262,144 points by default. For Feather it can write a GeoArrow struct of
+the coordinates (named by <code>geoarrow_dimension_name</code>, default
+<code>xyz</code>). For Parquet with GeoParquet metadata, current
+documentation says it always writes WKB points instead (checked). There
+is a matching <code>readers.arrow</code>. Batches carry no spatial
+meaning.</li>
+<li><strong>copc-core</strong> (Rust) decodes COPC's LAZ chunks into
+owned column buffers and <a
+href="https://docs.rs/crate/copc-core/latest">leaves Arrow conversion
+out on purpose</a> (checked).</li>
+<li>No GeoArrow or GeoParquet discussion of point clouds was found in a
+short search. It looks like open ground, not something already
+settled.</li>
+</ul>
+<h3 id="codecs-for-coordinates-in-general">Codecs for coordinates in
+general</h3>
+<ul>
+<li><strong>Parquet <code>BYTE_STREAM_SPLIT</code></strong> splits each
+value's bytes into separate streams before compression, which helps
+floats and, more recently, integers. pyarrow 24 writes it for
+<code>int32</code> and <code>float64</code> columns (checked).</li>
+<li><strong>Float codecs</strong>: ALP (adaptive lossless floating
+point) and FastLanes integer encodings, used by newer columnar formats
+(Vortex; Lance has similar aims), give random access to compressed
+values. DuckDB uses ALP internally.</li>
+<li><strong>Quantize, then delta-code</strong>: what LAZ, Draco and
+meshopt all do in some form. Spatially sorted, quantized coordinates
+have small deltas, and small deltas compress well under any entropy
+coder.</li>
+</ul>
+<h2 id="5-the-common-shape">5. The common shape</h2>
+<p>All of this prior art reduces to five parts:</p>
+<ol type="1">
+<li><strong>A schema, stated once.</strong> LAS point formats and extra
+bytes, the pgpointcloud <code>pcid</code>, a Zarr array's metadata, an
+Arrow schema.</li>
+<li><strong>Tiles.</strong> A set of points, encoded and compressed as
+one unit.</li>
+<li><strong>An index of tiles.</strong> Per tile: a key, its bounds, its
+point count, and where its bytes are (or the bytes themselves).</li>
+<li><strong>A codec name.</strong> How to decode a tile: LAZ, Draco,
+dimensional, zstd, none.</li>
+<li><strong>Optionally, a hierarchy.</strong> Octree keys and coarse
+levels for rendering and overviews (COPC, EPT, Potree, I3S, 3D Tiles,
+zarr-vectors pyramids).</li>
+</ol>
+<p>Part 3 is always a small, regular table, and Arrow is very good at
+small regular tables. Written as Arrow:</p>
+<pre><code>tile_index: struct&lt;
+  key:       struct&lt;level: int8, x: int32, y: int32, z: int32&gt;  -- or a plain tile id
+  bbox:      struct&lt;xmin, ymin, zmin, xmax, ymax, zmax: double&gt;
+  count:     int64
+  offset:    int64        -- cumulative count: global id of the tile&#39;s first point
+  codec:     dictionary&lt;int8, utf8&gt;
+  location:  one of
+               binary                                   -- the tile bytes inline
+               struct&lt;path: utf8, byte_offset: int64, byte_length: int64&gt;  -- a reference
+&gt;</code></pre>
+<p>That is the COPC hierarchy, the pgpointcloud patch table, a Zarr
+shard index and a Kerchunk manifest, written as one Arrow table. The
+question for GeoArrow is not whether this table can be written (it
+obviously can) but whether anything in it deserves a name, and if so
+which part.</p>
+<h2 id="6-the-zarr-reading">6. The Zarr reading</h2>
+<p>Compressed tiles of points are the easiest thing to put in object
+storage and keep track of, and that is exactly what Zarr does for
+arrays. Read as Zarr:</p>
+<ul>
+<li><strong>Each dimension is a 1-D array</strong> of length N
+(<code>x</code>, <code>y</code>, <code>z</code>, <code>intensity</code>,
+<code>classification</code>, ...), as zarr-vectors and the <a
+href="https://github.com/mdsumner/trianglewins/tree/main/survey/dev-drafts/ugrid-zarr">UGRID-in-Zarr
+pilot</a> do for mesh nodes.</li>
+<li><strong>Sort the points by tile</strong>, so each tile is a
+contiguous run.</li>
+<li><strong>Zarr chunks are the tiles.</strong> Each chunk is compressed
+with its own codec pipeline. Quantized <code>int32</code> coordinates
+with a delta filter and zstd are plain Zarr today. A LAZ-like predictive
+codec would be a new Zarr codec.</li>
+<li><strong>The index comes free.</strong> A Zarr chunk's key is its
+position in the chunk grid, and the store (or a shard index) knows where
+its bytes are. Only bounds and counts need to be added: a small
+<code>tile_bbox</code> array and a CF-style <code>tile_count</code>
+array, whose cumulative sum is the offset array.</li>
+</ul>
+<p>The difficulty is that <strong>tiles hold different numbers of
+points, and Zarr chunks are regular in index space.</strong> Three ways
+around that:</p>
+<ol type="1">
+<li><strong>Rectilinear chunk grids</strong> (ZEP 0003, variable chunk
+sizes). zarr-python implements them behind an experimental flag
+(<code>array.rectilinear_chunks</code>), zarrs (Rust) supports the draft
+ZEP, and the extension's status in the spec is still being worked out
+(checked against the <a
+href="https://zarr.readthedocs.io/en/stable/release-notes/">zarr-python
+release notes</a>). With them, chunk <em>i</em> is exactly tile
+<em>i</em>, and the chunk sizes are the count array.</li>
+<li><strong>Regular chunks plus a ragged index.</strong> Keep chunks of
+a fixed point count (like LAZ's 50,000), sort points spatially, and keep
+a CF contiguous ragged count per tile. A tile then spans one or more
+chunks, read by byte range. This is how LAZ works.</li>
+<li><strong>Sharding with ragged inner chunks</strong>, i.e. a padded
+grid where each inner chunk is a tile and empty space is the fill value.
+This wastes the index on empty chunks, but the shard index already marks
+empty chunks as 2^64 - 1.</li>
+</ol>
+<p><strong>Virtual Zarr over COPC.</strong> A COPC file's hierarchy is
+already a list of (offset, byte size, point count) per node. A
+VirtualiZarr-style manifest could point Zarr chunks at COPC's LAZ chunks
+without copying anything, given a LAZ chunk codec (LAZ chunks depend on
+the file's point format and LASzip settings, which would have to go in
+the codec configuration). The cloud stays a COPC file, readable by every
+lidar tool, and gains a Zarr and Arrow-friendly index. Icechunk could
+then version it. Nobody seems to have done this yet; it is a small,
+concrete experiment.</p>
+<p><strong>Where Zarr and Arrow meet.</strong> In Zarr the chunk is the
+compressed unit and the index is the store. In Arrow the record batch is
+the decoded unit, and there is no index across batches. The tile-index
+table above can sit in either. A mesh over the cloud is then exactly the
+UGRID-in-Zarr pilot, with <code>mesh_node</code> chunked by tile and
+<code>mesh_face_nodes</code> holding global ids.</p>
+<h2 id="7-arrow-side-options">7. Arrow-side options</h2>
+<p>From least to most new.</p>
+<h3 id="a-plain-columns-record-batch--tile">A. Plain columns, record
+batch = tile</h3>
+<p>One Arrow table, a <code>geoarrow.point</code> column plus attribute
+columns, with each record batch holding one spatial tile. Tile bounds
+and keys go in per-batch custom metadata: Arrow IPC messages carry it,
+and pyarrow writes and reads it
+(<code>write_batch(batch, custom_metadata=...)</code>,
+<code>read_next_batch_with_custom_metadata()</code>; checked). IPC body
+compression (LZ4 or ZSTD per buffer) gives some compression at rest.</p>
+<ul>
+<li>For: nothing new; any Arrow reader reads it; a mesh pool is the same
+thing with dictionary deltas.</li>
+<li>Against: per-batch metadata is an IPC detail that most tools drop;
+Parquet has no per-row-group custom metadata (only statistics); generic
+compression of floats is weak; an IPC file has to be read in order to
+find a tile, unless a footer or side index is added.</li>
+</ul>
+<h3 id="b-one-row-per-tile-decoded">B. One row per tile, decoded</h3>
+<pre><code>struct&lt;
+  key:    ...,
+  bbox:   ...,
+  points: list&lt;geoarrow.point&gt;,     -- or a struct of lists, one per dimension
+  intensity: list&lt;uint16&gt;, ...
+&gt;</code></pre>
+<p>The decoded form of a pgpointcloud patch, and the point-cloud twin of
+the per-feature mesh (form B in the background page).</p>
+<ul>
+<li>For: the table is the index; spatial filters work row by row; a
+GeoParquet bbox covering column filters tiles.</li>
+<li>Against: rows are huge (a million points per row), which many tools
+handle badly; the same weak compression as A.</li>
+</ul>
+<h3 id="c-one-row-per-tile-opaque-bytes">C. One row per tile, opaque
+bytes</h3>
+<pre><code>key, bbox, count, offset, codec: dictionary&lt;int8, utf8&gt;, payload: binary</code></pre>
+<p>with the extension name on <code>payload</code>, say
+<code>geoarrow.pointpatch</code> (a placeholder), and the codec and
+schema in the extension metadata or the codec column.
+<code>geoarrow.wkb</code> is the precedent: GeoArrow already names an
+opaque binary encoding.</p>
+<p>Payload codecs, each a real choice:</p>
+<table>
+<thead>
+<tr class="header">
+<th>codec</th>
+<th>for</th>
+<th>against</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>a LAZ chunk</td>
+<td>best compression for lidar; COPC chunks copy in without
+re-encoding</td>
+<td>needs the LAS point format and LASzip settings as shared metadata;
+LAS attribute model only</td>
+</tr>
+<tr class="even">
+<td>Draco or meshopt</td>
+<td>what glTF and renderers already read; quantization built in</td>
+<td>lossy by default; aimed at rendering, not archives</td>
+</tr>
+<tr class="odd">
+<td>LEPCC</td>
+<td>bounded-error compression; I3S compatibility</td>
+<td>Esri specification; lossy</td>
+</tr>
+<tr class="even">
+<td>a nested Arrow IPC stream</td>
+<td>self-describing; any attributes; decodes to option A; IPC
+compression inside</td>
+<td>tile schema repeated per row unless stripped; generic compression
+only</td>
+</tr>
+<tr class="odd">
+<td>a Zarr codec pipeline (e.g. delta then zstd on quantized ints)</td>
+<td>reuses Zarr codec definitions and names</td>
+<td>an Arrow column depending on Zarr codec metadata is new</td>
+</tr>
+<tr class="even">
+<td>a Parquet file per tile</td>
+<td>best generic compression and encodings</td>
+<td>heavy per-tile overhead (footer, schema)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>For: compact; tiles are independent; the index is ordinary Arrow and
+queryable by any engine; the bytes can move between COPC, glTF and Arrow
+without re-encoding.</li>
+<li>Against: opaque to every engine that does not know the codec (as WKB
+is to engines without geometry support); "the cloud" is no longer
+columns; a codec registry becomes part of the spec.</li>
+</ul>
+<h3 id="d-index-in-arrow-payload-elsewhere">D. Index in Arrow, payload
+elsewhere</h3>
+<p>As C, but <code>payload</code> is replaced by
+<code>struct&lt;path, byte_offset, byte_length&gt;</code> referring to
+COPC files, LAZ chunks, Zarr chunks or EPT nodes. The Arrow table is a
+manifest, as in Kerchunk and VirtualiZarr.</p>
+<ul>
+<li>For: no copy; existing archives stay authoritative; the manifest is
+small enough to put in a catalogue, a STAC item or a GeoParquet
+file.</li>
+<li>Against: GeoArrow has never had external references; a reader needs
+storage access and the payload's decoder; consistency between the
+manifest and the files is someone else's problem (Icechunk does solve
+this for Zarr).</li>
+</ul>
+<h3 id="e-quantized-coordinates">E. Quantized coordinates</h3>
+<p>Independent of tiling: a coordinate stored as <code>int32</code> with
+a scale and offset, like LAS and <code>KHR_mesh_quantization</code>. As
+GeoArrow this could be a storage type for <code>Coordinate</code>
+(separated <code>int32</code> children) with <code>scale</code> and
+<code>offset</code> keys in the extension metadata, decoded as
+<code>value * scale + offset</code>.</p>
+<ul>
+<li>For: halves the size of float64 before any compression; integers
+compress far better under delta and byte-stream-split encodings; the
+original LAS values are kept exactly instead of being rounded through
+doubles. <strong>It helps the triangles proposal too:</strong> glTF and
+other renderers want quantized vertex buffers, and the triangle
+dictionary could hold quantized coordinates.</li>
+<li>Against: a change to coordinates, the most widely implemented part
+of GeoArrow; every kernel has to apply scale and offset or decode first;
+the rounding rule (round, not floor) has to be fixed; the scale is per
+array, which is awkward when merging arrays with different scales.
+Precision traps are well known from LAS: a value only fits if
+<code>(value - offset) / scale</code> is an integer.</li>
+</ul>
+<p>Possibly lighter: leave coordinates as doubles but record in metadata
+that they came from a quantized grid (<code>scale</code>,
+<code>offset</code>), so a writer can re-quantize exactly. That is
+information, not a new layout.</p>
+<h3 id="f-parquet-as-the-compressed-tile-store">F. Parquet as the
+compressed tile store</h3>
+<p>Use Parquet as it is: points sorted by a space-filling curve (Morton
+or Hilbert) at tile level, one row group (or a run of pages) per tile,
+quantized <code>int32</code> coordinates with
+<code>BYTE_STREAM_SPLIT</code> or delta encoding and zstd, column
+statistics, the page index, and a GeoParquet bbox covering column, so
+that readers prune by bounds. Parquet's newer native geometry types
+carry bounding-box statistics as well.</p>
+<ul>
+<li>For: no new type; every engine already reads it (DuckDB, Polars,
+Spark, SedonaDB); row groups and pages are the compressed chunks and the
+footer is the index; works today.</li>
+<li>Against: predictive codecs like LAZ will very likely still be
+smaller, though this has not been measured here (section 10); row groups
+are not addressable as tiles by key, only by statistics; no
+multi-resolution.</li>
+</ul>
+<h3 id="summary">Summary</h3>
+<table>
+<thead>
+<tr class="header">
+<th>option</th>
+<th>new in GeoArrow</th>
+<th>compact</th>
+<th>spatial index</th>
+<th>engines read it today</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A. batch = tile</td>
+<td>nothing</td>
+<td>weak</td>
+<td>per-batch metadata (IPC only)</td>
+<td>yes</td>
+</tr>
+<tr class="even">
+<td>B. row = decoded tile</td>
+<td>a convention</td>
+<td>weak</td>
+<td>the table</td>
+<td>yes, with big rows</td>
+</tr>
+<tr class="odd">
+<td>C. row = opaque tile</td>
+<td>an extension type plus codec list</td>
+<td>strong</td>
+<td>the table</td>
+<td>the index only</td>
+</tr>
+<tr class="even">
+<td>D. manifest</td>
+<td>external references</td>
+<td>as the source</td>
+<td>the table</td>
+<td>the index only</td>
+</tr>
+<tr class="odd">
+<td>E. quantized coordinates</td>
+<td>coordinate storage</td>
+<td>better, for A, B and F</td>
+<td>none</td>
+<td>no</td>
+</tr>
+<tr class="even">
+<td>F. Parquet as tile store</td>
+<td>nothing (a recipe)</td>
+<td>moderate</td>
+<td>row group statistics, bbox covering</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table>
+<p>These combine. A plausible stack: <strong>F for analysis, C or D for
+archives and streaming, E underneath both.</strong> Option A is what
+happens in memory once a tile is decoded.</p>
+<h2 id="8-ids-across-tiles-how-a-mesh-refers-to-a-tiled-cloud">8. Ids
+across tiles: how a mesh refers to a tiled cloud</h2>
+<p>If the triangles proposal is to index a tiled cloud, a vertex id must
+survive tiling. Choices:</p>
+<ol type="1">
+<li><strong>Global id = tile offset + local index.</strong> The
+<code>offset</code> column in the tile index is a cumulative count,
+exactly like Arrow <code>List</code> offsets: the cloud is a
+<code>List&lt;Coordinate&gt;</code> with list <em>i</em> being tile
+<em>i</em>, and flattening it gives global ids. Finding a vertex's tile
+is a binary search on the offsets. Ids change if tiles are re-cut or
+points added mid-stream, so they are valid only for one version of the
+tiling. This is what the proposal's IPC deltas already do.</li>
+<li><strong>A composite id</strong>,
+<code>struct&lt;tile: int32, index: int32&gt;</code>, as COPC addresses
+points by node key and position in the node. It survives appending tiles
+but not re-tiling. Triangles become
+<code>FixedSizeList&lt;struct&lt;tile, index&gt;&gt;[3]</code>, which is
+no longer a dictionary type.</li>
+<li><strong>A mesh per tile</strong>, with the tile's points as its
+dictionary. Simple and local, but the seams are the "batch seams" trap
+from the background page: triangles crossing a tile boundary need both
+tiles' points, or ids that agree across the seam.</li>
+<li><strong>A persistent point id column</strong> (GPS time plus return
+number is close to unique in lidar, or an explicit <code>uint64</code>).
+Survives anything, costs a column and a join.</li>
+</ol>
+<p>Choice 1 needs nothing new, and is the natural default. It should
+state that ids are tied to one version of the tiling, as the proposal
+already says that a dictionary replacement starts a new mesh.</p>
+<h2 id="9-what-this-suggests-for-the-triangles-proposal">9. What this
+suggests for the triangles proposal</h2>
+<p>No change is requested. Things to bear in mind:</p>
+<ul>
+<li><strong>Parquet option (c) gains weight.</strong> Two tables (or a
+vertex table plus index triangles) is the only Parquet layout that keeps
+a cloud a mesh was built on.</li>
+<li><strong>Duplicate coordinates.</strong> The rule against duplicate
+dictionary entries should stay a "should", and say that it is about
+meshes.</li>
+<li><strong><code>int64</code> indexes are real</strong>, not
+hypothetical, once clouds are involved.</li>
+<li><strong>Vertex attributes in a vertex table keyed by id</strong>
+already fits clouds: the vertex table <em>is</em> the cloud, with its
+intensity, classification and time.</li>
+<li><strong>Quantized coordinates (option E)</strong> would serve
+renderers of triangles as much as clouds.</li>
+</ul>
+<h2 id="10-not-measured-yet">10. Not measured yet</h2>
+<p>This page has no size or speed comparisons. The obvious experiment,
+on a public lidar tile (the PDAL test data, or a USGS 3DEP tile), would
+compare:</p>
+<ul>
+<li>LAZ and COPC as the baseline;</li>
+<li>Parquet with float64 coordinates, zstd;</li>
+<li>Parquet with quantized <code>int32</code> coordinates,
+<code>BYTE_STREAM_SPLIT</code> or delta, zstd, sorted spatially and
+not;</li>
+<li>Arrow IPC with ZSTD body compression;</li>
+<li>Zarr v3 with quantized <code>int32</code>, a delta filter and zstd,
+chunked by tile;</li>
+<li>one tile as a nested IPC blob (option C) against the same tile as a
+LAZ chunk;</li>
+</ul>
+<p>for size, time to decode one tile, and time to answer a bbox query
+from cold object storage. The machinery for the Arrow and Zarr cases is
+in the <a
+href="https://github.com/mdsumner/trianglewins/tree/main/survey/dev-drafts/pilot">pilot</a>
+and the <a
+href="https://github.com/mdsumner/trianglewins/tree/main/survey/dev-drafts/ugrid-zarr">UGRID-in-Zarr
+pilot</a>. LAZ needs laspy and lazrs, or PDAL.</p>
+<h2 id="to-do">To do</h2>
+<p>Follow-ups, roughly in order of cost:</p>
+<ul class="task-list">
+<li><label><input type="checkbox" /><strong>Measure</strong> (section
+10): LAZ and COPC against Parquet (float64; quantized <code>int32</code>
+with <code>BYTE_STREAM_SPLIT</code> or delta; sorted spatially and not),
+Arrow IPC with ZSTD, and Zarr v3 chunked by tile. Size, time to decode
+one tile, and a cold bbox query.</label></li>
+<li><label><input type="checkbox" /><strong>Option A pilot</strong>:
+write a tiled cloud as Arrow IPC with one tile per record batch and the
+tile key and bbox in per-batch custom metadata; check which readers
+(pyarrow, nanoarrow, arrow-rs, DuckDB) keep that metadata.</label></li>
+<li><label><input type="checkbox" /><strong>Option F recipe</strong>:
+Parquet with one row group per tile, a bbox covering column, quantized
+coordinates; check pruning in DuckDB and SedonaDB.</label></li>
+<li><label><input type="checkbox" /><strong>Option C pilot</strong>: the
+same tiles as one row each, payload a nested Arrow IPC stream and, for
+comparison, the tile's COPC LAZ chunk copied as is.</label></li>
+<li><label><input type="checkbox" /><strong>Option D / virtual Zarr over
+COPC</strong>: a manifest from a COPC hierarchy (offset, byte size,
+point count per node) as an Arrow table, and as a VirtualiZarr manifest.
+What would a LAZ chunk codec for Zarr need in its
+configuration?</label></li>
+<li><label><input type="checkbox" /><strong>Zarr layouts</strong>
+(section 6): rectilinear chunks against fixed-size chunks plus a ragged
+count, using the UGRID-in-Zarr pilot code; compare with zarr-vectors on
+the same tile.</label></li>
+<li><label><input type="checkbox" /><strong>Option E</strong>: quantized
+coordinates through the triangles pilot (an <code>int32</code>
+dictionary with scale and offset); round trip exactly against the LAS
+values.</label></li>
+<li><label><input type="checkbox" /><strong>Ids across tiles</strong>
+(section 8): a ground TIN over a two-tile cloud with global ids (offset
+plus local), written with IPC dictionary deltas; check seam
+triangles.</label></li>
+<li><label><input type="checkbox" />Confirm the facts marked "from
+working knowledge" before quoting them.</label></li>
+<li><label><input type="checkbox" />Decide whether any of this goes to
+the GeoArrow discussion, and in what form (questions only, or a tile
+index recommendation).</label></li>
+</ul>
+<h2 id="11-questions-for-the-geoarrow-side">11. Questions for the
+GeoArrow side</h2>
+<ol type="1">
+<li>Is a point cloud in scope for GeoArrow at all, beyond "a
+<code>geoarrow.point</code> column with attributes"? Or is it a
+GeoParquet (file-level) concern, or not a GeoArrow concern?</li>
+<li>Would a tile index convention (section 5) be welcome as a
+recommendation, without an extension type?</li>
+<li>Is an opaque binary extension type for tiles of points (option C),
+with a codec key, acceptable in the way <code>geoarrow.wkb</code> is? If
+so, which codecs would anyone implement: LAZ, Draco, nested IPC?</li>
+<li>Would quantized coordinate storage (option E) be considered, or the
+lighter form of recording the grid in metadata?</li>
+<li>Are external byte-range references (option D) ever in scope, or
+should that stay with Kerchunk, VirtualiZarr and STAC?</li>
+<li>For the triangles proposal: should vertex ids be defined as global
+across a tiled pool (offset plus local index), so that a mesh can refer
+to a tiled cloud?</li>
+</ol>
+<h2 id="sources">Sources</h2>
+<ul>
+<li><a href="https://copc.io/">COPC specification</a></li>
+<li><a
+href="https://zarr-specs.readthedocs.io/en/latest/v3/codecs/sharding-indexed/index.html">Zarr
+v3 sharding codec</a></li>
+<li><a
+href="https://zarr.readthedocs.io/en/stable/release-notes/">zarr-python
+release notes (rectilinear chunks)</a></li>
+<li><a
+href="https://zarr-vectors-py.readthedocs.io/en/latest/spec/geometry_types/point_cloud.html">zarr-vectors:
+point cloud type</a></li>
+<li><a href="https://pdal.io/en/latest/stages/writers.arrow.html">PDAL
+writers.arrow</a></li>
+<li><a href="https://pdal.io/stages/writers.pgpointcloud.html">PDAL
+writers.pgpointcloud</a></li>
+<li><a href="https://doc.pigsty.io/ext/e/pointcloud">pgpointcloud (via
+Pigsty extension docs)</a></li>
+<li><a href="https://docs.rs/crate/copc-core/latest">copc-core
+crate</a></li>
+<li>From working knowledge, to confirm before quoting: LAZ chunking and
+compression ratios, EPT, Potree 2, I3S and LEPCC, 3D Tiles and the glTF
+compression extensions, E57, Oracle <code>SDO_PC</code>, TileDB, CF
+ragged arrays, Kerchunk and VirtualiZarr, ALP, FastLanes, Vortex and
+Lance.</li>
+</ul>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>
