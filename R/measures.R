@@ -230,3 +230,31 @@ tw_attr_error <- function(out, case) {
   scale <- max(abs(case$x) + 2 * abs(case$y))
   max(abs(z - (out$vertices$x + 2 * out$vertices$y))) / scale
 }
+
+#' Grid cells kept
+#'
+#' For a case built from a grid (one with an `ij` index on its vertices),
+#' the share of triangles whose three vertices are grid nodes within one
+#' index cell, that is half of a grid quad, and of those the share using the
+#' (i, j)-(i + 1, j + 1) diagonal. A triangle with a vertex that is not an
+#' input node (a Steiner vertex) is not in a cell. A grid triangulated in a
+#' frame it is not regular in keeps fewer cells (see survey/grids.md).
+#' @param out backend output
+#' @param case the case
+#' @return named numeric `in_cell`, `diag_ne` (both NA for a case without `ij`)
+#' @export
+tw_in_cell <- function(out, case) {
+  na <- c(in_cell = NA_real_, diag_ne = NA_real_)
+  T <- out$triangles
+  if (is.null(case$ij) || !nrow(T)) return(na)
+  m <- match(paste(out$vertices$x, out$vertices$y), paste(case$x, case$y))
+  v <- cbind(T$v0, T$v1, T$v2)
+  ti <- matrix(case$ij[m, 1][v], ncol = 3)
+  tj <- matrix(case$ij[m, 2][v], ncol = 3)
+  lo_i <- pmin(ti[, 1], ti[, 2], ti[, 3]); hi_i <- pmax(ti[, 1], ti[, 2], ti[, 3])
+  lo_j <- pmin(tj[, 1], tj[, 2], tj[, 3]); hi_j <- pmax(tj[, 1], tj[, 2], tj[, 3])
+  cell <- hi_i - lo_i == 1 & hi_j - lo_j == 1
+  cell[is.na(cell)] <- FALSE
+  ne <- rowSums(ti == lo_i & tj == lo_j) > 0 & rowSums(ti == hi_i & tj == hi_j) > 0
+  c(in_cell = mean(cell), diag_ne = if (any(cell)) mean(ne[cell]) else NA_real_)
+}
