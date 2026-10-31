@@ -1,0 +1,274 @@
+<title>Breaklines in Terrain Meshes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fraunces:opsz,wght@9..144,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; a full-width 3D viewport sits between the lead and the evidence tables. */
+:root {
+  --bg: #f6f7f4;
+  --panel: #ffffff;
+  --fg: #1d2421;
+  --muted: #5b6661;
+  --rule: #d6dbd6;
+  --accent: #b2451f;      /* breakline / constraint colour */
+  --mesh: #2c5d63;        /* wireframe */
+  --chip: #e8ece7;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141917; --panel: #1b2220; --fg: #e3e8e4; --muted: #9aa6a0; --rule: #2f3a36;
+  --accent: #f08a5d; --mesh: #8fc7cc; --chip: #26302d; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141917; --panel: #1b2220; --fg: #e3e8e4; --muted: #9aa6a0; --rule: #2f3a36;
+  --accent: #f08a5d; --mesh: #8fc7cc; --chip: #26302d; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 16px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 56px; }
+main { max-width: 1040px; margin: 0 auto; display: grid; gap: 28px; }
+.prose { max-width: 68ch; display: grid; gap: 12px; }
+h1, h2 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); }
+h2 { font-size: 1.35rem; }
+p { margin: 0; }
+a { color: var(--accent); }
+.eyebrow { font: 600 0.75rem/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; background: var(--panel); }
+.seg button { font: 600 0.85rem var(--font-body); color: var(--fg); background: transparent; border: 0; padding: 7px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.seg button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+label.tog { display: inline-flex; gap: 6px; align-items: center; font-size: 0.9rem; color: var(--muted); }
+.stage { position: relative; height: clamp(360px, 62vh, 640px); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--panel); }
+#deck { position: absolute; inset: 0; }
+.readout { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px; pointer-events: none; }
+.readout span { font: 0.8rem var(--font-mono); background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; padding: 3px 8px; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.85rem; color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 6px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th, td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+th { font: 600 0.72rem var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+td { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+tr.current td { background: var(--chip); }
+td.win { color: var(--accent); font-weight: 600; }
+tbody tr:last-child td { border-bottom: 0; }
+.cols { display: grid; gap: 36px; }
+.cols > div { min-width: 0; display: grid; gap: 10px; align-content: start; }
+.cols .prose-part { max-width: 68ch; }
+.note { color: var(--muted); font-size: 0.9rem; }
+code { font-family: var(--font-mono); font-size: 0.88em; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+  <header class="prose">
+    <span class="eyebrow"><a href="../">Breaklines study</a> &middot; trianglewins dev draft</span>
+    <h1>Breaklines in terrain meshes</h1>
+    <p>Delatin keeps every <em>grid sample</em> within its error tolerance. Between samples it can be far off, and it has no way to follow a known line such as a cliff edge or a coastline. A constrained TIN built with <a href="https://github.com/hypertidy/cdtr">cdtr</a> takes those lines as breaklines. The same tolerance then holds along the feature too. Both examples below were meshed in R, and Delatin ran in Node.</p>
+  </header>
+
+  <section style="display:grid; gap:12px">
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Example">
+        <button id="fx-step" data-fx="step">Oblique cliff</button>
+        <button id="fx-hobart" data-fx="hobart">Hobart coast</button>
+      </div>
+      <div class="seg" role="group" aria-label="Mesh">
+        <button id="m-delatin" data-m="delatin">Delatin</button>
+        <button id="m-greedy" data-m="greedy">Greedy, no lines</button>
+        <button id="m-lines" data-m="lines">Greedy + breaklines</button>
+      </div>
+      <label class="tog"><input type="checkbox" id="wire" checked> Wireframe</label>
+      <label class="tog"><input type="checkbox" id="showlines" checked> Lines</label>
+      <label class="tog">Vertical &times; <input type="range" id="exag" min="1" max="8" step="0.5" value="1"> <span id="exagv">1</span></label>
+    </div>
+    <div class="stage"><div id="deck"></div><div class="readout" id="readout"></div></div>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i><span id="linelabel">Breaklines</span></span>
+      <span><i style="background:var(--mesh)"></i>Mesh edges</span>
+      <span>Drag to orbit, scroll to zoom.</span>
+    </div>
+  </section>
+
+  <section class="cols">
+    <div>
+      <h2>Oblique cliff</h2>
+      <p>This is the roadmap's <em>step</em> fixture: a 40-unit cliff, 4 cells wide, at 30&deg; across a 257 &times; 257 grid with curved terrain behind it. The breaklines are the top and bottom edges of the cliff as 3D lines, with a vertex every 4 cells. <b>Surface error</b> is measured against the analytic surface on a lattice 4 &times; finer than the samples.</p>
+      <div class="table-wrap"><table id="t-step"></table></div>
+      <p class="note">At a 0.25 tolerance Delatin meets the sample check, but it is 2.4 off the true surface along the cliff. With breaklines the surface error matches the tolerance, and at 0.5 or finer the mesh is also smaller than Delatin's.</p>
+    </div>
+    <div>
+      <h2>Hobart coast</h2>
+      <p>This window covers kunanyi/Mt Wellington and the Derwent estuary: 513 &times; 513 samples from the AWS open terrain tiles at zoom 10, about 56 m on the ground. The coastline is height 0, simplified to within one cell. It is both a breakline at 0 m and the edge of the mesh, so the sea is left out as nodata. Error is measured on land only: at the samples, and against the bilinear surface between them on a 4 &times; finer lattice.</p>
+      <div class="table-wrap"><table id="t-hobart"></table></div>
+      <p class="note">Delatin's coastline drifts by up to tens of metres from sea level. Between 1,115 and 2,734 of its triangles join land and sea samples, and it has to mesh the sea as well. The constrained mesh holds the coastline exactly.</p>
+    </div>
+  </section>
+
+  <section class="prose">
+    <h2>How this was made</h2>
+    <p>The constrained mesh uses greedy Garland&ndash;Heckbert refinement, the same family as Delatin, on top of cdtr's constrained Delaunay triangulation. Each round inserts the worst grid sample in each triangle over tolerance. Breakline vertices go in first and their segments stay fixed. One evaluator measures every mesh, and it matches Delatin's own reported error. The <em>Greedy, no lines</em> column runs the same R code without constraints. It needs about 35% more triangles than Delatin, because this prototype inserts points in batches rather than one at a time. That gap comes from the batching, not from the constraints.</p>
+    <p>The meshes are plain arrays: Float32 positions and 0-based Uint32 triangle indices, counter-clockwise in xy. That is the same shape as math.gl's <code>TerrainGridMesh</code> and the <a href="https://github.com/hypertidy/meshcore/blob/main/docs/mesh-spec-v0.2.md">mesh spec v0.2</a>. Context: <a href="https://github.com/visgl/math.gl/issues/341">visgl/math.gl#341</a>.</p>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/deck.gl@9.1.14/dist.min.js"></script>
+<script id="viewer-data" type="application/json">__DATA__</script>
+<script>
+(function () {
+  const DATA = JSON.parse(document.getElementById('viewer-data').textContent);
+  const KEYS = { delatin: 'delatin', greedy: 'greedy', lines: null };
+  const state = { fx: 'step', m: 'lines', wire: true, showlines: true, exag: 1 };
+  try { const s = JSON.parse(localStorage.getItem('breaklines-view') || 'null'); if (s) Object.assign(state, s); } catch (e) {}
+
+  function b64(s, T) {
+    const bin = atob(s); const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return new T(u8.buffer);
+  }
+  const cache = {};
+  function meshKey(fx, m) {
+    const names = Object.keys(DATA.fixtures[fx].meshes);
+    if (m === 'lines') return names.find(n => n !== 'delatin' && n !== 'greedy');
+    return m;
+  }
+  function getMesh(fx, m) {
+    const k = fx + '/' + m;
+    if (cache[k]) return cache[k];
+    const src = DATA.fixtures[fx].meshes[meshKey(fx, m)];
+    const pos = b64(src.positions, Float32Array), idx = b64(src.indices, Uint32Array);
+    let zmin = Infinity, zmax = -Infinity;
+    for (let i = 2; i < pos.length; i += 3) { zmin = Math.min(zmin, pos[i]); zmax = Math.max(zmax, pos[i]); }
+    // unique edges
+    const seen = new Set(), edges = [];
+    for (let t = 0; t < idx.length; t += 3) for (let e = 0; e < 3; e++) {
+      const a = idx[t + e], b = idx[t + (e + 1) % 3]; const key = a < b ? a * 4294967296 + b : b * 4294967296 + a;
+      if (!seen.has(key)) { seen.add(key); edges.push(a, b); }
+    }
+    return (cache[k] = { pos, idx, zmin, zmax, edges: Uint32Array.from(edges), triangles: src.triangles, vertices: src.vertices });
+  }
+
+  function cssColor(name) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const n = parseInt(v.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  // hypsometric ramp: sea blues below 0, then greens to browns to pale grey
+  const RAMP = [[-1, [40, 84, 130]], [0, [96, 150, 170]], [0.0001, [86, 130, 78]], [0.35, [168, 160, 98]], [0.7, [146, 104, 72]], [1, [236, 232, 226]]];
+  function ramp(t) {
+    for (let i = 1; i < RAMP.length; i++) if (t <= RAMP[i][0]) {
+      const [t0, c0] = RAMP[i - 1], [t1, c1] = RAMP[i]; const f = t1 === t0 ? 0 : (t - t0) / (t1 - t0);
+      return c0.map((c, j) => c + f * (c1[j] - c0[j]));
+    }
+    return RAMP[RAMP.length - 1][1];
+  }
+
+  function buildGeometry(mesh, fx, exag) {
+    const { pos, idx, zmin, zmax } = mesh; const n = pos.length / 3;
+    const P = new Float32Array(pos.length), N = new Float32Array(pos.length), C = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) { P[3 * i] = pos[3 * i]; P[3 * i + 1] = pos[3 * i + 1]; P[3 * i + 2] = pos[3 * i + 2] * exag; }
+    for (let t = 0; t < idx.length; t += 3) {
+      const a = 3 * idx[t], b = 3 * idx[t + 1], c = 3 * idx[t + 2];
+      const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2];
+      const vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      for (const k of [a, b, c]) { N[k] += nx; N[k + 1] += ny; N[k + 2] += nz; }
+    }
+    const top = fx === 'hobart' ? zmax : zmax, bottom = fx === 'hobart' ? 0 : zmin;
+    for (let i = 0; i < n; i++) {
+      const l = Math.hypot(N[3 * i], N[3 * i + 1], N[3 * i + 2]) || 1;
+      N[3 * i] /= l; N[3 * i + 1] /= l; N[3 * i + 2] /= l;
+      const z = pos[3 * i + 2];
+      const t = fx === 'hobart' ? (z <= 0 ? Math.max(-1, z / 50) : z / top) : 0.0001 + 0.999 * (z - bottom) / (top - bottom);
+      const c = ramp(t); C[4 * i] = c[0] / 255; C[4 * i + 1] = c[1] / 255; C[4 * i + 2] = c[2] / 255; C[4 * i + 3] = 1;
+    }
+    return { attributes: { positions: { value: P, size: 3 }, normals: { value: N, size: 3 }, colors: { value: C, size: 4 } },
+             indices: { value: idx, size: 1 } };
+  }
+
+  function edgeAttributes(mesh, exag, lift) {
+    const e = mesh.edges, p = mesh.pos, S = new Float32Array(e.length / 2 * 3), T = new Float32Array(e.length / 2 * 3);
+    for (let i = 0, j = 0; i < e.length; i += 2, j += 3) {
+      const a = 3 * e[i], b = 3 * e[i + 1];
+      S[j] = p[a]; S[j + 1] = p[a + 1]; S[j + 2] = p[a + 2] * exag + lift;
+      T[j] = p[b]; T[j + 1] = p[b + 1]; T[j + 2] = p[b + 2] * exag + lift;
+    }
+    return { length: e.length / 2, attributes: { getSourcePosition: { value: S, size: 3 }, getTargetPosition: { value: T, size: 3 } } };
+  }
+
+  const {Deck, OrbitView, SimpleMeshLayer, LineLayer, PathLayer, COORDINATE_SYSTEM} = deck;
+  const views = {
+    step: { target: [0, 0, 10], rotationOrbit: -20, rotationX: 55, zoom: 0.9 },
+    hobart: { target: [0, 0, 150], rotationOrbit: -10, rotationX: 60, zoom: -5.4 }
+  };
+  const deckgl = new Deck({
+    parent: document.getElementById('deck'),
+    views: new OrbitView({ orbitAxis: 'Z', fovy: 40 }),
+    initialViewState: Object.assign({ minZoom: -12, maxZoom: 6 }, views[state.fx]),
+    controller: true,
+    layers: []
+  });
+
+  function render() {
+    const fx = DATA.fixtures[state.fx], mesh = getMesh(state.fx, state.m), exag = state.exag;
+    const span = Math.sqrt(mesh.pos.length);
+    const lift = (state.fx === 'hobart' ? 6 : 0.15) * exag;
+    const wireRGB = cssColor('--mesh'), lineRGB = cssColor('--accent');
+    const layers = [
+      new SimpleMeshLayer({ id: 'surface-' + state.fx + state.m + exag, data: [{}], mesh: buildGeometry(mesh, state.fx, exag),
+        coordinateSystem: COORDINATE_SYSTEM.CARTESIAN, getPosition: [0, 0, 0], getColor: [255, 255, 255],
+        material: { ambient: 0.6, diffuse: 0.55, shininess: 8, specularColor: [20, 20, 20] } })
+    ];
+    if (state.wire) layers.push(new LineLayer({ id: 'edges-' + state.fx + state.m + exag, data: edgeAttributes(mesh, exag, lift),
+      coordinateSystem: COORDINATE_SYSTEM.CARTESIAN, getColor: [...wireRGB, 210], getWidth: 1, widthUnits: 'pixels' }));
+    if (state.showlines) layers.push(new PathLayer({ id: 'lines-' + state.fx + exag,
+      data: fx.lines.map(l => { const out = []; for (let i = 0; i < l.length; i += 3) out.push([l[i], l[i + 1], l[i + 2] * exag + lift * 2]); return out; }),
+      getPath: d => d, coordinateSystem: COORDINATE_SYSTEM.CARTESIAN, getColor: lineRGB, getWidth: 3, widthUnits: 'pixels' }));
+    deckgl.setProps({ layers });
+
+    const row = DATA.stats[state.fx].find(r => r.tol === fx.tol && r.method === meshKey(state.fx, state.m));
+    const ro = document.getElementById('readout');
+    const bits = [mesh.triangles.toLocaleString() + ' triangles', 'tolerance ' + fx.tol + (state.fx === 'hobart' ? ' m' : '')];
+    if (row && row.cont_max !== undefined) bits.push('surface error max ' + row.cont_max.toFixed(2));
+    if (row && row.coast_max_abs_z !== undefined) bits.push('coast height max ' + row.coast_max_abs_z.toFixed(1) + ' m');
+    ro.innerHTML = bits.map(b => '<span>' + b + '</span>').join('');
+    document.getElementById('linelabel').textContent = state.fx === 'hobart' ? 'Coastline (0 m)' : 'Breaklines';
+    document.querySelectorAll('[data-fx]').forEach(b => b.setAttribute('aria-pressed', b.dataset.fx === state.fx));
+    document.querySelectorAll('[data-m]').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === state.m));
+    document.getElementById('m-lines').textContent = state.fx === 'hobart' ? 'Greedy + coastline' : 'Greedy + breaklines';
+    document.querySelectorAll('tr[data-key]').forEach(tr => tr.classList.toggle('current', tr.dataset.key === state.fx + '|' + fx.tol + '|' + meshKey(state.fx, state.m)));
+    try { localStorage.setItem('breaklines-view', JSON.stringify(state)); } catch (e) {}
+  }
+
+  function table(fxName, cols) {
+    const rows = DATA.stats[fxName];
+    const best = {};
+    const el = document.getElementById('t-' + fxName);
+    let h = '<thead><tr>' + cols.map(c => '<th>' + c[1] + '</th>').join('') + '</tr></thead><tbody>';
+    for (const r of rows) {
+      h += '<tr data-key="' + fxName + '|' + r.tol + '|' + r.method + '">' + cols.map(c => {
+        const v = r[c[0]]; const txt = typeof v === 'number' ? (Number.isInteger(v) ? v.toLocaleString() : v.toFixed(c[2] ?? 2)) : v;
+        const win = c[3] && c[3](r, rows) ? ' class="win"' : '';
+        return '<td' + win + '>' + txt + '</td>';
+      }).join('') + '</tr>';
+    }
+    el.innerHTML = h + '</tbody>';
+  }
+  const isLines = r => r.method !== 'delatin' && r.method !== 'greedy';
+  table('step', [['tol', 'Tol', 2], ['method', 'Mesh'], ['triangles', 'Triangles'], ['max_err', 'Sample max', 2], ['cont_max', 'Surface max', 2, isLines], ['cont_rmse', 'Surface RMSE', 3]]);
+  table('hobart', [['tol', 'Tol m', 0], ['method', 'Mesh'], ['triangles', 'Triangles'], ['land_max_err', 'Land max m', 1], ['land_rmse', 'Land RMSE m', 2], ['bilinear_max', 'Surface max m', 1], ['coast_max_abs_z', 'Coast max m', 1, isLines], ['straddle_tris', 'Land/sea tris', 0, isLines]]);
+
+  document.querySelectorAll('[data-fx]').forEach(b => b.addEventListener('click', () => {
+    state.fx = b.dataset.fx; deckgl.setProps({ initialViewState: Object.assign({ minZoom: -12, maxZoom: 6, transitionDuration: 0 }, views[state.fx]) }); render(); }));
+  document.querySelectorAll('[data-m]').forEach(b => b.addEventListener('click', () => { state.m = b.dataset.m; render(); }));
+  const wire = document.getElementById('wire'), sl = document.getElementById('showlines'), ex = document.getElementById('exag');
+  wire.checked = state.wire; sl.checked = state.showlines; ex.value = state.exag; document.getElementById('exagv').textContent = state.exag;
+  wire.addEventListener('change', () => { state.wire = wire.checked; render(); });
+  sl.addEventListener('change', () => { state.showlines = sl.checked; render(); });
+  ex.addEventListener('input', () => { state.exag = +ex.value; document.getElementById('exagv').textContent = ex.value; render(); });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+  render();
+})();
+</script>

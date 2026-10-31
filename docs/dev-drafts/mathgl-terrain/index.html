@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>math.gl terrain, read from the mesh side (draft)</title>
+<meta name="description" content="Development draft: the math.gl terrain roadmap read against the mesh spec, cdtr and laridae, and the questions we test on our side first.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 code, h2 code, h3 code, h4 code { font-size: 0.9em; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+  border-bottom: 1px solid var(--grid); line-height: 1.45; }
+th:first-child, td:first-child { min-width: 12em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; background: var(--surface-0);
+  border-bottom: 1px solid var(--border); }
+td code { font-size: 12px; color: var(--text-secondary); }
+td small { color: var(--text-muted); font-size: 12px; }
+td:first-child a { text-decoration: none; }
+td:first-child a:hover { text-decoration: underline; }
+td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../../">trianglewins</a> / dev draft</p>
+<h1 id="mathgl-terrain-read-from-the-mesh-side">math.gl terrain, read
+from the mesh side</h1>
+<p><em>Development draft, 31 October 2026. A study suite, not a
+proposal: we read the <a
+href="https://github.com/visgl/math.gl/issues/341">math.gl terrain
+roadmap</a> against our own mesh work and test what we can on our side
+first. Nothing here has been sent upstream. Studies so far: <a
+href="../mathgl-breaklines/">Breaklines in terrain meshes</a>.</em></p>
+<h2 id="what-mathgl-is-building">What math.gl is building</h2>
+<p><a
+href="https://github.com/visgl/math.gl/issues/341">visgl/math.gl#341</a>
+(Ib Green, 27 October 2026) plans a terrain substrate in
+<code>@math.gl/geospatial/terrain</code>. The long form is <a
+href="https://github.com/visgl/math.gl/blob/master/dev-docs/terrain-roadmap.md">dev-docs/terrain-roadmap.md</a>,
+with tranches T0 to T7. This reading is of commit <code>c9cc7d6</code>
+(28 October 2026).</p>
+<p>A lot has already landed:</p>
+<ul>
+<li>height fields with explicit cell or vertex registration, validity
+and a height reference;</li>
+<li>tiled snapshots with halos;</li>
+<li>regular meshes, plus MARTINI and Delatin adaptive meshes (Delatin
+moved over from loaders.gl);</li>
+<li>BVH ray and contact queries;</li>
+<li>slope and aspect checked against GDAL 3.9.3;</li>
+<li>contours and profiles;</li>
+<li>vertex-tile reconciliation, mixed-resolution seam stitching and
+skirts.</li>
+</ul>
+<p>The next steps are a mesh lab (regular, MARTINI and Delatin on more
+DEMs), tile continuity, and adoption in loaders.gl, luma.gl and deck.gl.
+Last, and only once real consumers exist, comes T7: constrained TINs,
+breaklines, incremental edits, hydrologic conditioning, and metrics for
+finite-volume solvers.</p>
+<p>The roadmap is careful about error. It separates <em>measured</em>,
+<em>estimated</em> and <em>bounded</em> error. It keeps source terrain,
+displayed geometry and simulation resolution apart. It also says plainly
+that "a vertical error measured at original samples does not by itself
+certify every point of an interpolated surface". Our first study
+measures exactly that.</p>
+<h2 id="where-it-meets-our-work">Where it meets our work</h2>
+<table>
+<thead>
+<tr class="header">
+<th>math.gl</th>
+<th>ours</th>
+<th>how close</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>TerrainGridMesh</code>: Float64 <code>positions</code>
+relative to <code>origin</code>, 0-based Uint32 <code>indices</code>,
+CCW in world XY</td>
+<td><a
+href="https://github.com/hypertidy/meshcore/blob/main/docs/mesh-spec-v0.2.md">mesh
+spec</a> drawable form: positions with <code>local_origin</code>
+subtracted, 0-based uint32 indices, CCW (decisions 2 and 3)</td>
+<td>Same shape. They chose the same index base, winding and origin
+handling on their own</td>
+</tr>
+<tr class="even">
+<td><code>gridCoordinates</code>: integer (column, row) per vertex;
+fractional after seam stitching</td>
+<td><code>origin = grid</code> / <code>lattice</code>, and the drawable
+form's <code>uv</code> into the source grid</td>
+<td>Same idea. Theirs is per vertex and numeric, ours is a provenance
+label plus <code>uv</code></td>
+</tr>
+<tr class="odd">
+<td>Registration: cell or vertex, "a 256-pixel DEM and a 257-vertex mesh
+are not interchangeable"</td>
+<td>meshcore GRID model; <a href="../../grids/">Grids as meshes</a></td>
+<td>Same concern, in nearly the same words</td>
+</tr>
+<tr class="even">
+<td>T7 constrained TINs and breaklines; CGAL named as the validation
+reference</td>
+<td>cdtr, laridae, the <code>constraints</code> table</td>
+<td>Direct: we have working engines</td>
+</tr>
+<tr class="odd">
+<td>Mixed-resolution seam stitching: union knots on an authoritative
+edge, boundary triangles split</td>
+<td><code>edge_sources</code> (spec v0.2): every mesh edge maps to the
+input segments that cover it</td>
+<td>Their seam is one constrained boundary. Provenance per edge would
+record which side owns it</td>
+</tr>
+<tr class="even">
+<td>Vertex-tile reconciliation: canonical ownership, a disagreement
+budget</td>
+<td>The vertex identity ladder: exact, snapped, noded, exact
+constructions</td>
+<td>They are on the snapped rung, with a budget we do not yet
+record</td>
+</tr>
+<tr class="odd">
+<td>Delatin and MARTINI refuse a grid with any invalid sample
+(<code>validCount</code> must equal the sample count); only the regular
+mesh keeps nodata holes</td>
+<td>Constraint boundaries with <code>erase = "holes"</code></td>
+<td>An opening: a boundary as a constraint lets an adaptive mesh skip
+nodata</td>
+</tr>
+<tr class="even">
+<td>T7 finite-volume metrics: "a good rendering mesh is not a good
+numerical mesh"</td>
+<td>UGRID model, MDAL and GDAL multidim bridge</td>
+<td>Same direction</td>
+</tr>
+<tr class="odd">
+<td>Contour welding across tiles, isobands</td>
+<td>polymer, wkpool</td>
+<td>Partly: cross-tile welding is a shared-vertex problem</td>
+</tr>
+<tr class="even">
+<td><code>subdivideTriangleMesh</code> in
+<code>@math.gl/geometry</code>: refine in source space to a target-space
+tolerance, three source vertices recorded per output vertex</td>
+<td>bigcurve, and <a href="../../curves/">Curves</a></td>
+<td>Same tolerance question, for triangles rather than edges</td>
+</tr>
+</tbody>
+</table>
+<h2 id="questions-to-work-through-here">Questions to work through
+here</h2>
+<p>Each question gets a study page, with code under
+<code>survey/dev-drafts/mathgl-terrain/</code> in this repository.</p>
+<ol type="1">
+<li><strong>What does a breakline buy over sample-only meshing?</strong>
+Done: <a href="../mathgl-breaklines/">Breaklines in terrain meshes</a>.
+On an analytic cliff and on the Hobart coast, it covers sample error,
+true-surface error, coastline height and triangle count.</li>
+<li><strong>How far is sample error from surface error on real
+DEMs?</strong> Partly done in study 1, against the bilinear surface for
+Hobart. Next: MARTINI, and their own N43 DTED fixture.</li>
+<li><strong>Can the greedy mesher match Delatin's triangle count with
+constraints?</strong> The R prototype inserts points in batches and
+needs about 35% more triangles. A one-at-a-time version would settle
+whether constraints cost anything at all.</li>
+<li><strong>Seams as constraints.</strong> Two tiles that share a
+boundary constraint mesh independently and still conform. How does that
+compare with stitching after the fact? What does
+<code>edge_sources</code> record for the shared edge?</li>
+<li><strong>Registration in the mesh.</strong> Cell-registered DEM
+samples give a mesh that stops half a cell short of the tile's edge.
+Write this down for the GRID model, alongside their 256/257 note.</li>
+<li><strong>Exactness.</strong> Shewchuk predicates are their CPU
+baseline. Where do float breakline vertices from a projected vector
+source break a constrained mesh, and does laridae's exact path matter
+for terrain at all?</li>
+<li><strong>Interchange.</strong> Would a mesh written in the
+triangle-form tables (or geoarrow.triangles) carry everything
+<code>TerrainGridMesh</code> and <code>AdaptiveTerrainMesh</code> carry?
+Map field by field, including <code>heightReference</code> and the error
+record.</li>
+</ol>
+<h2 id="not-doing-yet">Not doing yet</h2>
+<ul>
+<li>No comments, issues or pull requests to math.gl, loaders.gl or
+deck.gl.</li>
+<li>No JavaScript port of the constrained mesher. The studies use cdtr
+from R, and Delatin from npm (the same algorithm math.gl vendors) for
+comparison.</li>
+</ul>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>

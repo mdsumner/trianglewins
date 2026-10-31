@@ -2,3 +2,6 @@
 .Rhistory
 *.tar.gz
 *.Rcheck/
+survey/dev-drafts/mathgl-terrain/cache/
+survey/dev-drafts/mathgl-terrain/node_modules/
+survey/dev-drafts/mathgl-terrain/package-lock.json
