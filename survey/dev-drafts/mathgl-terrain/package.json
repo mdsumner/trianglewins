@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "description": "Delatin for the math.gl terrain dev draft",
+  "type": "module",
+  "dependencies": { "delatin": "0.2.0" }
+}

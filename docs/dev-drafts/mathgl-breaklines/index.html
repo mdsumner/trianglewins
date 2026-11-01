@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Breaklines in terrain meshes (draft)</title>
+<meta name="description" content="Development draft: Delatin against a constrained TIN from cdtr on an analytic cliff and the Hobart coast, with sample, surface and coastline error.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 code, h2 code, h3 code, h4 code { font-size: 0.9em; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+  border-bottom: 1px solid var(--grid); line-height: 1.45; }
+th:first-child, td:first-child { min-width: 12em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; background: var(--surface-0);
+  border-bottom: 1px solid var(--border); }
+td code { font-size: 12px; color: var(--text-secondary); }
+td small { color: var(--text-muted); font-size: 12px; }
+td:first-child a { text-decoration: none; }
+td:first-child a:hover { text-decoration: underline; }
+td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../../">trianglewins</a> / dev draft</p>
+<h1 id="breaklines-in-terrain-meshes">Breaklines in terrain meshes</h1>
+<p><em>Development draft, 31 October 2026. Study 1 of <a
+href="../mathgl-terrain/">math.gl terrain, read from the mesh side</a>.
+Interactive version: <a href="viewer/">the deck.gl viewer</a>. Code and
+results: <code>survey/dev-drafts/mathgl-terrain/</code> in this
+repository.</em></p>
+<p>Delatin, the adaptive mesher in math.gl's terrain module, keeps every
+<em>grid sample</em> within a vertical tolerance. It cannot follow a
+line it is given, such as a cliff edge or a coastline. A constrained TIN
+can. We built one in R: greedy refinement on top of <a
+href="https://github.com/hypertidy/cdtr">cdtr</a>, with the lines as
+breaklines. We then measured both on the same grids with one
+evaluator.</p>
+<p>The short answer has three parts:</p>
+<ul>
+<li><strong>On a cliff,</strong> a breakline makes the tolerance hold on
+the true surface. Without one, Delatin's 0.25 tolerance becomes 2.4
+between samples.</li>
+<li><strong>On a coast,</strong> the coastline goes into the mesh
+exactly, and the sea drops out as nodata. Delatin's shoreline sits up to
+43 m off sea level, and up to 2,734 of its triangles join land and sea
+samples.</li>
+<li><strong>On real terrain,</strong> every mesh here is 67 to 106 m off
+the bilinear surface at its worst point, even at a 5 m sample tolerance.
+Breaklines do not change that. A sample tolerance is not a surface
+bound, just as the math.gl roadmap says.</li>
+</ul>
+<h2 id="the-meshers">The meshers</h2>
+<table>
+<thead>
+<tr class="header">
+<th>mesh</th>
+<th>what it is</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Delatin</td>
+<td><code>delatin</code> 0.2.0 from npm, run in Node. It is the
+algorithm math.gl vendored from loaders.gl. Greedy Garland-Heckbert
+insertion, one point at a time</td>
+</tr>
+<tr class="even">
+<td>greedy</td>
+<td>Our R version of the same greedy idea on cdtr, without constraints.
+Each round inserts the worst sample of each triangle over tolerance, but
+only candidates within 70 to 85% of the round's worst</td>
+</tr>
+<tr class="odd">
+<td>greedy + breaklines</td>
+<td>The same, with the lines inserted first as fixed constraint
+segments, carrying their own heights</td>
+</tr>
+</tbody>
+</table>
+<p>One function measures every mesh. It rasterizes the triangles over
+the grid and interpolates heights barycentrically. On Delatin's meshes
+it reproduces Delatin's own <code>getMaxError()</code>. The batched
+greedy needs about 35% more triangles than Delatin without constraints.
+That comes from inserting in batches, not from cdtr, and it is study
+question 3.</p>
+<h2 id="example-1-an-oblique-cliff">Example 1: an oblique cliff</h2>
+<p>The fixture is the roadmap's <em>step</em>: a 40-unit cliff, 4 cells
+wide, at 30 degrees across a 257 by 257 grid. Gentle curved terrain lies
+behind it. The breaklines are the top and bottom edges of the cliff, as
+3D lines with a vertex every 4 cells. Because the surface is analytic,
+we can measure the error <em>between</em> samples, on a lattice 4 times
+finer.</p>
+<p><img src="cliff.png"
+alt="Surface error near the cliff at a 0.5 tolerance. Delatin&#39;s error concentrates in slivers along both edges of the cliff; with breaklines the cliff is two clean bands." /></p>
+<table>
+<thead>
+<tr class="header">
+<th>tolerance</th>
+<th>mesh</th>
+<th style="text-align: right;">triangles</th>
+<th style="text-align: right;">sample max</th>
+<th style="text-align: right;">surface max</th>
+<th style="text-align: right;">surface RMSE</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0.25</td>
+<td>Delatin</td>
+<td style="text-align: right;">2,415</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;">2.43</td>
+<td style="text-align: right;">0.109</td>
+</tr>
+<tr class="even">
+<td>0.25</td>
+<td>greedy</td>
+<td style="text-align: right;">3,287</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;">3.12</td>
+<td style="text-align: right;">0.110</td>
+</tr>
+<tr class="odd">
+<td>0.25</td>
+<td>greedy + breaklines</td>
+<td style="text-align: right;">2,246</td>
+<td style="text-align: right;">0.25</td>
+<td style="text-align: right;"><strong>0.29</strong></td>
+<td style="text-align: right;">0.094</td>
+</tr>
+<tr class="even">
+<td>0.5</td>
+<td>Delatin</td>
+<td style="text-align: right;">1,360</td>
+<td style="text-align: right;">0.50</td>
+<td style="text-align: right;">2.43</td>
+<td style="text-align: right;">0.199</td>
+</tr>
+<tr class="odd">
+<td>0.5</td>
+<td>greedy</td>
+<td style="text-align: right;">1,868</td>
+<td style="text-align: right;">0.50</td>
+<td style="text-align: right;">3.29</td>
+<td style="text-align: right;">0.191</td>
+</tr>
+<tr class="even">
+<td>0.5</td>
+<td>greedy + breaklines</td>
+<td style="text-align: right;">1,335</td>
+<td style="text-align: right;">0.50</td>
+<td style="text-align: right;"><strong>0.50</strong></td>
+<td style="text-align: right;">0.181</td>
+</tr>
+<tr class="odd">
+<td>1</td>
+<td>Delatin</td>
+<td style="text-align: right;">737</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">2.43</td>
+<td style="text-align: right;">0.392</td>
+</tr>
+<tr class="even">
+<td>1</td>
+<td>greedy + breaklines</td>
+<td style="text-align: right;">829</td>
+<td style="text-align: right;">0.99</td>
+<td style="text-align: right;"><strong>1.00</strong></td>
+<td style="text-align: right;">0.361</td>
+</tr>
+<tr class="odd">
+<td>2</td>
+<td>Delatin</td>
+<td style="text-align: right;">397</td>
+<td style="text-align: right;">2.00</td>
+<td style="text-align: right;">2.35</td>
+<td style="text-align: right;">0.686</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>greedy + breaklines</td>
+<td style="text-align: right;">576</td>
+<td style="text-align: right;">2.00</td>
+<td style="text-align: right;"><strong>2.00</strong></td>
+<td style="text-align: right;">0.693</td>
+</tr>
+</tbody>
+</table>
+<p>Delatin's surface error stays near 2.4 at every tolerance. The
+cliff's kinks fall between samples, and no choice of sample vertices can
+place them. With breaklines the surface error equals the tolerance. At
+0.5 and finer the mesh is also smaller than Delatin's, despite the
+batching overhead. At coarse tolerances the breakline vertices (one
+every 4 cells) dominate the count, and a sparser breakline would do.</p>
+<h2 id="example-2-the-hobart-coast">Example 2: the Hobart coast</h2>
+<p>The grid covers kunanyi/Mt Wellington and the Derwent estuary: 513 by
+513 samples from four z10 tiles of the <a
+href="https://registry.opendata.aws/terrain-tiles/">AWS open terrain
+tiles</a>, about 56 m on the ground. Land is height above 0. The
+coastline is the boundary of the land, with islets under 25 cells
+dropped, simplified to within one cell. It enters the mesh twice over:
+as a breakline at height 0, and as the mesh boundary, so sea samples are
+treated as nodata. Error is measured on land only. "Surface max"
+compares each mesh with the bilinear surface through the samples, on a 4
+times finer lattice.</p>
+<p><img src="coast.png"
+alt="Where each mesh puts the sea (blue, mesh height at or below 0) along part of the western shore of the Derwent, at a 10 m tolerance. Delatin&#39;s shoreline wanders either side of the coastline (red); the constrained mesh stops at it. The one blue sliver on the right is a triangle with all three corners on the coastline, so it is flat at 0 m." /></p>
+<table>
+<thead>
+<tr class="header">
+<th>tolerance</th>
+<th>mesh</th>
+<th style="text-align: right;">triangles</th>
+<th style="text-align: right;">land max</th>
+<th style="text-align: right;">land RMSE</th>
+<th style="text-align: right;">surface max</th>
+<th style="text-align: right;">coast max</th>
+<th style="text-align: right;">land/sea triangles</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>5 m</td>
+<td>Delatin</td>
+<td style="text-align: right;">57,974</td>
+<td style="text-align: right;">5.0</td>
+<td style="text-align: right;">1.87</td>
+<td style="text-align: right;">66.8</td>
+<td style="text-align: right;">42.6</td>
+<td style="text-align: right;">2,734</td>
+</tr>
+<tr class="even">
+<td>5 m</td>
+<td>greedy</td>
+<td style="text-align: right;">70,012</td>
+<td style="text-align: right;">5.0</td>
+<td style="text-align: right;">1.80</td>
+<td style="text-align: right;">66.8</td>
+<td style="text-align: right;">50.7</td>
+<td style="text-align: right;">3,028</td>
+</tr>
+<tr class="odd">
+<td>5 m</td>
+<td>greedy + coastline</td>
+<td style="text-align: right;">68,028</td>
+<td style="text-align: right;">5.0</td>
+<td style="text-align: right;">1.79</td>
+<td style="text-align: right;">82.1</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td style="text-align: right;"><strong>0</strong></td>
+</tr>
+<tr class="even">
+<td>10 m</td>
+<td>Delatin</td>
+<td style="text-align: right;">26,887</td>
+<td style="text-align: right;">10.0</td>
+<td style="text-align: right;">3.55</td>
+<td style="text-align: right;">66.8</td>
+<td style="text-align: right;">42.6</td>
+<td style="text-align: right;">1,936</td>
+</tr>
+<tr class="odd">
+<td>10 m</td>
+<td>greedy</td>
+<td style="text-align: right;">34,263</td>
+<td style="text-align: right;">10.0</td>
+<td style="text-align: right;">3.40</td>
+<td style="text-align: right;">66.8</td>
+<td style="text-align: right;">50.7</td>
+<td style="text-align: right;">2,155</td>
+</tr>
+<tr class="even">
+<td>10 m</td>
+<td>greedy + coastline</td>
+<td style="text-align: right;">33,386</td>
+<td style="text-align: right;">10.0</td>
+<td style="text-align: right;">3.37</td>
+<td style="text-align: right;">82.1</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td style="text-align: right;"><strong>0</strong></td>
+</tr>
+<tr class="odd">
+<td>20 m</td>
+<td>Delatin</td>
+<td style="text-align: right;">11,686</td>
+<td style="text-align: right;">20.0</td>
+<td style="text-align: right;">6.59</td>
+<td style="text-align: right;">86.0</td>
+<td style="text-align: right;">42.6</td>
+<td style="text-align: right;">1,115</td>
+</tr>
+<tr class="even">
+<td>20 m</td>
+<td>greedy</td>
+<td style="text-align: right;">15,964</td>
+<td style="text-align: right;">20.0</td>
+<td style="text-align: right;">6.42</td>
+<td style="text-align: right;">105.9</td>
+<td style="text-align: right;">50.7</td>
+<td style="text-align: right;">1,230</td>
+</tr>
+<tr class="odd">
+<td>20 m</td>
+<td>greedy + coastline</td>
+<td style="text-align: right;">16,297</td>
+<td style="text-align: right;">20.0</td>
+<td style="text-align: right;">6.21</td>
+<td style="text-align: right;">82.1</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td style="text-align: right;"><strong>0</strong></td>
+</tr>
+</tbody>
+</table>
+<p>"Coast max" is the mesh height along the supplied coastline, which
+should be 0. For the constrained mesh it is 0 by construction: every
+coast segment survives as an unsplit mesh edge with 0 m at both ends,
+and the script checks this. Delatin's triangle counts include the sea,
+which it must mesh because its math.gl adapter refuses grids with
+invalid samples. The constrained mesh covers land only, at about the
+same count as the unconstrained greedy over the whole window.</p>
+<p><strong>Surface error on real terrain.</strong> At its worst point,
+every mesh is 67 to 106 m off the bilinear surface, at any tolerance
+from 5 to 20 m. The worst points sit beside single-sample spikes, where
+a triangle's diagonal and the bilinear patch disagree. Away from those
+spots the two agree closely: the 99th percentile is about 8 m at a 10 m
+tolerance. Breaklines do not address this. A per-triangle check against
+the interpolant would, which is the roadmap's "full-surface error
+certificates".</p>
+<h2 id="what-this-suggests">What this suggests</h2>
+<ol type="1">
+<li>For T7, a breakline's main value is <em>fidelity</em>, not triangle
+count. The cliff shows it on an analytic surface, and the coast on a
+real one.</li>
+<li>A boundary given as a constraint is also a nodata strategy for
+adaptive meshes. math.gl's adaptive adapters do not have one today.</li>
+<li>Sample error and surface error differ on real DEMs as well as on
+analytic ones. This applies to every mesher here, including ours.</li>
+<li>A constrained mesher would want to keep provenance: which edges are
+breaklines, and which vertices came from vector input rather than the
+grid. That is the spec's <code>origin</code> and
+<code>edge_sources</code>. <code>TerrainGridMesh</code> has
+<code>gridCoordinates</code>, but nothing yet for vertices that are not
+on the grid.</li>
+</ol>
+<h2 id="reproduce">Reproduce</h2>
+<p>From the repository root, with R (cdtr, terra, jsonlite), Node and
+GDAL:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sh</span> survey/dev-drafts/mathgl-terrain/fetch-tiles.sh</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> install <span class="at">--prefix</span> survey/dev-drafts/mathgl-terrain</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> survey/dev-drafts/mathgl-terrain/step.R</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> survey/dev-drafts/mathgl-terrain/coast.R      <span class="co"># about 10 minutes</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> survey/dev-drafts/mathgl-terrain/figures.R</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> survey/dev-drafts/mathgl-terrain/export-viewer.R</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> survey/dev-drafts/mathgl-terrain/build-viewer.py</span></code></pre></div>
+<p>Results land in
+<code>survey/dev-drafts/mathgl-terrain/results/</code>
+(<code>step.csv</code>, <code>coast.csv</code>). Large intermediates go
+to <code>cache/</code>, which git ignores.</p>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>

@@ -50,6 +50,14 @@ render dev-drafts/geoarrow-triangles-proposal.md dev-drafts/geoarrow-triangles-p
   "Proposal: geoarrow.triangles (draft)" "dev draft" \
   "Development draft: a geoarrow.triangles extension type, written in the shape of a GeoArrow spec proposal, with reference checks." \
   ../../
+render dev-drafts/mathgl-terrain.md dev-drafts/mathgl-terrain \
+  "math.gl terrain, read from the mesh side (draft)" "dev draft" \
+  "Development draft: the math.gl terrain roadmap read against the mesh spec, cdtr and laridae, and the questions we test on our side first." \
+  ../../
+render dev-drafts/mathgl-breaklines.md dev-drafts/mathgl-breaklines \
+  "Breaklines in terrain meshes (draft)" "dev draft" \
+  "Development draft: Delatin against a constrained TIN from cdtr on an analytic cliff and the Hobart coast, with sample, surface and coastline error." \
+  ../../
 redirect choose ../start/#which-package
 redirect dimension ../notes/#dimension
 redirect interpolation ../notes/#interpolation
