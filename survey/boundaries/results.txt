@@ -1,0 +1,11 @@
+US counties: 3224 features, 144029 ring segments, 90151 distinct edges (53878 shared, 36273 outer, 0 with more than two owners), 0.8 s
+county edges by rank: county 44562, outer 36273, state 9316
+counties + CAN/MEX provinces: 174483 edges; by rank: country 2060, county 44562, outer 107325, state 20536; more than two owners: 0
+NE admin0 USA/CAN/MEX shared edges vs county/province-derived country edges: exact 90.33%, on the line 0.97%, off 8.69%
+county/province outer edges lying on an admin0 land border (should have been shared): 20.93 degrees of 120.38
+NE US state polygons, shared edges vs county-derived state edges: exact 78.20%, on the line 21.77%, off 0.03%
+admin0: 475560 edges, 68618 shared, max owners 2; admin1: 847302 edges, 439371 shared, max owners 2
+outer length (degrees) admin0 13215.24, admin1 13214.59
+admin0 shared edges vs admin1-derived country edges: exact 96.83%, on the line 2.74%, off 0.43%, more than 0.1 degree off 0.09%
+largest disagreements (degrees of border): CNM-CYP 1.65, CHL-SPI 0.98, BRT-SDN 0.85, ARG-SPI 0.77, IRN-IRQ 0.63, JOR-SYR 0.47
+Figure 1: 32 counties, 762 ring segments, 421 edges, 92 arcs
