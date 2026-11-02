@@ -42,6 +42,8 @@ render grids.md grids "Grids as meshes: Delaunay in what?" grids \
   "Every logically rectangular grid is a mesh; triangulating its points gives a different mesh in every frame, measured on one polar grid block."
 render validity.md validity "Polygon validity" validity \
   "What invalid means for polygons under OGC, ESRI and s2 rules, the three readings a repair can choose, what GEOS make_valid does from R and Python, and how triangulation reads parity."
+render boundaries.md boundaries "Drawing each boundary once" boundaries \
+  "Shared polygon edges as a table of owners: county, state and country lines from one layer, each drawn once, and where vertex identity breaks between layers."
 render dev-drafts/geoarrow-triangles.md dev-drafts/geoarrow-triangles \
   "Triangles in GeoArrow (draft)" "dev draft" \
   "Development draft: what building triangle meshes with wkpool, laridae and cdtr suggests for storing triangles in GeoArrow." \

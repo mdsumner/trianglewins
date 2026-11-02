@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drawing each boundary once</title>
+<meta name="description" content="Shared polygon edges as a table of owners: county, state and country lines from one layer, each drawn once, and where vertex identity breaks between layers.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 code, h2 code, h3 code, h4 code { font-size: 0.9em; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+  border-bottom: 1px solid var(--grid); line-height: 1.45; }
+th:first-child, td:first-child { min-width: 12em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; background: var(--surface-0);
+  border-bottom: 1px solid var(--border); }
+td code { font-size: 12px; color: var(--text-secondary); }
+td small { color: var(--text-muted); font-size: 12px; }
+td:first-child a { text-decoration: none; }
+td:first-child a:hover { text-decoration: underline; }
+td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../">trianglewins</a> / boundaries</p>
+<h1
+id="drawing-each-boundary-once-shared-edges-arcs-and-nested-regions">Drawing
+each boundary once: shared edges, arcs and nested regions</h1>
+<p>Stroke a set of polygons and every shared border is drawn twice, once
+for each polygon on either side. With an opaque solid line nobody
+notices. With transparency the shared borders come out darker than the
+coast. With dashes the two copies run out of phase and the pattern turns
+to noise. With nested regions (counties inside states inside countries)
+a state line is drawn up to four times: two county outlines and two
+state outlines.</p>
+<p><img src="stroke-vs-arcs.png"
+alt="Counties around the Missouri River where Nebraska, Iowa and Missouri meet, stroked as polygons on the left with a dashed semi-transparent line, so shared borders are darker and their dashes collide; on the right the same borders drawn once as arcs, with even tone and clean dashes" /></p>
+<p>The usual fix is to get the lines from somewhere else. Natural Earth
+ships boundary line layers next to its polygon layers, partly for this
+reason. This page is about the other route: getting each boundary once,
+with its rank, from the polygons themselves. It is an old idea (ArcInfo
+coverages, TopoJSON, mapshaper and silicate all do it), but it is worth
+seeing in full, because the same table answers several questions at once
+and because the hard part is not where people expect.</p>
+<p>The short version:</p>
+<ul>
+<li><strong>A boundary is an edge with owners.</strong> Break every ring
+into segments and match each segment with its reverse. An edge with two
+owners is a shared border. An edge with one owner is a coast, a
+lakeshore or the edge of the data.</li>
+<li><strong>Nesting is a lookup, not more geometry.</strong> Give each
+polygon its parent ids (state, country). An edge's rank is the coarsest
+level at which its two owners differ. County, state and country lines
+then all come from the county polygons, each drawn once.</li>
+<li><strong>Arcs are the drawable form.</strong> Chain edges between
+junctions into arcs (TopoJSON's arcs, silicate's ARC model). Dashes,
+smoothing and labels then follow the line, not the polygon.</li>
+<li><strong>The hard part is vertex identity.</strong> Matching needs
+the two sides of a border to carry the same vertices. Within one Natural
+Earth layer they do: no edge has more than two owners anywhere in the
+world. Between layers they often don't, even in one curated
+product.</li>
+</ul>
+<p>The script for every number and figure here is <a
+href="https://github.com/mdsumner/trianglewins/blob/main/survey/boundaries/boundaries.R"><code>survey/boundaries/boundaries.R</code></a>.
+It uses sf and wkpool and reads Natural Earth 10m layers from
+GitHub.</p>
+<h2 id="a-boundary-is-an-edge-with-owners">A boundary is an edge with
+owners</h2>
+<p>A polygon layer stores each shared border twice: once in each
+polygon's ring, running in opposite directions. Pool the vertices, so
+that the same coordinate gets the same id in every ring, and the two
+copies of a segment become the same pair of vertex ids. Then count
+owners:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(wkpool)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>pool <span class="ot">&lt;-</span> <span class="fu">merge_coincident</span>(<span class="fu">establish_topology</span>(wk<span class="sc">::</span><span class="fu">as_wkb</span>(counties)))</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>s <span class="ot">&lt;-</span> <span class="fu">pool_segments</span>(pool)            <span class="co"># .vx0, .vx1, .feature</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>key <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="fu">pmin</span>(s<span class="sc">$</span>.vx0, s<span class="sc">$</span>.vx1), <span class="fu">pmax</span>(s<span class="sc">$</span>.vx0, s<span class="sc">$</span>.vx1))</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>owners <span class="ot">&lt;-</span> <span class="fu">split</span>(s<span class="sc">$</span>.feature, key)     <span class="co"># one entry per distinct edge</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fu">lengths</span>(owners)                 <span class="co"># 1 = outer, 2 = shared</span></span></code></pre></div>
+<p><code>find_shared_edges()</code> and
+<code>find_internal_boundaries()</code> in wkpool return the same thing
+in other shapes. For the 3,224 US counties in Natural Earth, the 144,029
+ring segments become 90,151 distinct edges: 53,878 shared, 36,273 with
+one owner, and none with more than two. The whole step takes under a
+second.</p>
+<p>The owner counts are a check in themselves. In a clean coverage
+(polygons that tile without gaps or overlaps) every edge has one or two
+owners. More than two means overlapping polygons. One owner where you
+expected two means a gap, a sliver, or two neighbours that don't share
+vertices, which is the subject of the last section.</p>
+<p>"One owner" mixes three things a map maker treats differently: a
+coast, a lakeshore and the edge of the dataset. The edge table can't
+tell them apart, and neither can the polygons. If the US counties are
+the whole dataset, the Canadian border has one owner just like the
+Pacific coast. Adding the neighbours is what turns it into a shared
+border.</p>
+<h2 id="nesting-is-a-lookup">Nesting is a lookup</h2>
+<p>Each county carries its state code. A shared edge between two
+counties in the same state is a county line. If the two states differ,
+it is a state line. Add the Canadian and Mexican provinces to the same
+pool, give every polygon a country, and an edge whose owners are in
+different countries is a country line:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>rank_of <span class="ot">&lt;-</span> <span class="cf">function</span>(a, b, levels) {</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># levels: named list of parent ids per polygon, coarsest first</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  r <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="st">&quot;outer&quot;</span>, <span class="fu">length</span>(a))</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (nm <span class="cf">in</span> <span class="fu">rev</span>(<span class="fu">names</span>(levels))) {</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    lv <span class="ot">&lt;-</span> levels[[nm]]</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    r[<span class="sc">!</span><span class="fu">is.na</span>(b) <span class="sc">&amp;</span> lv[a] <span class="sc">!=</span> lv[b]] <span class="ot">&lt;-</span> nm</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  r</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>(The loop runs finest first, so a coarser level overwrites it.) From
+one pool of 3,224 counties and 46 Canadian and Mexican provinces, the
+174,483 edges split into 44,562 county, 20,536 state or province, 2,060
+country and 107,325 outer. No geometry was computed beyond the vertex
+pool. The counties never had to be dissolved into states, and the states
+never had to be intersected with each other.</p>
+<p><img src="ranks.png"
+alt="The contiguous United States with parts of Canada and Mexico in an Albers projection, every line drawn once: county lines thin and light, state and province lines darker, the international border heaviest, and coasts and lakeshores in blue" /></p>
+<p>This is how the parent ids are meant to work. They need to be a true
+hierarchy, where every county is in exactly one state. They don't need
+to be complete. The provinces here have no counties, so a province is
+its own "county" and the county level adds nothing for them. Any number
+of levels works the same way: a statistical area inside a county inside
+a state. The levels don't even have to come from the same source, as
+long as the geometry does.</p>
+<p>The same rank is what mapshaper's <code>-lines</code> command
+computes when given a list of fields, and
+<code>rmapshaper::ms_lines(x, fields)</code> exposes it from R.
+TopoJSON's <code>mesh(topology, object, (a, b) =&gt; a !== b)</code>
+does the two-level case in the browser. If you need the lines today and
+your polygons share vertices, these work.</p>
+<h2 id="arcs-are-the-drawable-form">Arcs are the drawable form</h2>
+<p>An edge table is one row per segment, and drawing segments one at a
+time gives bad joins and restarts every dash. The drawable unit is the
+arc: a run of edges between junctions, where a junction is a vertex with
+three or more distinct edges, or the end of a line. Along an arc the
+owner pair doesn't change, because it can only change where a third
+polygon touches the line, and that is a junction. So an arc has one
+rank.</p>
+<p><code>find_arcs(pool, quotient = TRUE)</code> in wkpool returns the
+arcs as vertex id paths. The <code>quotient</code> argument collapses
+the two copies of each shared edge first, which is exactly the TopoJSON
+arc decomposition. The 32 counties in the first figure have 762 ring
+segments, 421 distinct edges and 92 arcs. That figure draws the 92 arcs
+with one <code>plot()</code> call.</p>
+<p>Arcs are also where simplification belongs. Simplify each polygon on
+its own and the two copies of a shared border move differently, opening
+gaps and slivers. Simplify each arc once, and both neighbours get the
+same result. This is why mapshaper and TopoJSON simplify topologically,
+and why GEOS 3.12 added coverage simplification.</p>
+<h2 id="the-hard-part-do-the-two-sides-share-vertices">The hard part: do
+the two sides share vertices?</h2>
+<p>Everything above needs both copies of a shared border to use the same
+vertices. Exact coordinate matching is the first rung of the project's
+vertex identity ladder: exact, then tolerance (snap nearby vertices),
+then noded (split segments where other vertices or segments touch them),
+then exact construction. Natural Earth is a good test because it is
+carefully built, and it still needs more than the first rung as soon as
+two layers meet.</p>
+<p><strong>Within one layer, exact matching works.</strong> In the world
+admin0 countries (475,560 edges) and the world admin1 states and
+provinces (847,302 edges) no edge has more than two owners. The two
+layers' outer lines agree to within 0.01%.</p>
+<p><strong>Between levels, the vertices drift.</strong> Take the country
+borders from the admin1 layer (the edges whose owners are in different
+countries) and look for each shared edge of the admin0 layer among
+them:</p>
+<table>
+<thead>
+<tr class="header">
+<th>admin0 shared edge length found in admin1</th>
+<th>share</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>as the same segment, exactly</td>
+<td>96.83%</td>
+</tr>
+<tr class="even">
+<td>on the same line, with different vertices</td>
+<td>2.74%</td>
+</tr>
+<tr class="odd">
+<td>on a different line</td>
+<td>0.43%</td>
+</tr>
+<tr class="even">
+<td>more than 0.1 degree away</td>
+<td>0.09%</td>
+</tr>
+</tbody>
+</table>
+<p>The middle row is the common failure. The line is the same, but one
+layer has a vertex partway along a segment of the other. The left panel
+below shows the US version: a straight stretch of the Kansas and
+Nebraska line in the Natural Earth state polygons is one segment, while
+the county polygons put a vertex at every county corner along it. Exact
+matching calls that segment unshared. Of the shared edge length in the
+state polygons, 78.20% is found exactly in the county layer, 21.77% lies
+on the county lines with different vertices, and 0.03% elsewhere.
+Snapping doesn't fix this, because no vertex is close to another vertex.
+Noding does: split each segment at the other layer's vertices that lie
+on it, and the pieces match.</p>
+<p><img src="mismatch.png"
+alt="Left, a Kansas and Nebraska state edge from the Natural Earth state polygons drawn as one thick segment between its two vertices, with the county corners along it marked; right, a world map of admin0 shared borders coloured by whether the admin1 layer repeats them exactly, on the same line with different vertices, or on a different line" /></p>
+<p>The bottom row is real disagreement, and it is not random. The
+largest pieces are around Cyprus's buffer zone, the Southern Patagonian
+Ice Field against Chile and Argentina, Bir Tawil against Sudan, and the
+Iran-Iraq and Jordan-Syria borders. These are disputed or
+specially-treated areas, and the two layers were edited at different
+times or for different viewpoints.</p>
+<p><strong>Across products, both happen at once.</strong> The US
+counties and the Canadian and Mexican provinces come from different
+Natural Earth layers. About 91% of the length of the land border in the
+admin0 layer is recovered as a shared country edge. Most of the rest has
+a county on one side and a province on the other that put their vertices
+in different places along the same line. Those pieces come out as
+"outer" and leave the gaps visible along the 49th parallel in the second
+figure.</p>
+<p>Three things follow:</p>
+<ul>
+<li><strong>Derive coarse lines from the finest level, not from separate
+layers.</strong> The county-derived state lines and the county lines are
+guaranteed to meet, because they are the same edges. Mixing a state
+layer with a county layer brings back the doubled-line problem, now with
+slightly different lines.</li>
+<li><strong>Check owner counts before trusting the result.</strong> One
+owner where the map says there is a neighbour is the signature of vertex
+drift. The owner table is a validity check for the coverage, the
+companion to the per-polygon checks on the <a
+href="../validity/">validity</a> page.</li>
+<li><strong>Noding is the rung that fixes it.</strong> A constrained
+triangulation of the pooled linework (cdtr, laridae) nodes as it goes:
+it splits each constraint where another vertex lies on it. The mesh
+spec's <code>edge_sources</code> table then records which input segments
+cover each mesh edge. That is this page's owner table, built on noded
+edges.</li>
+</ul>
+<h2 id="some-lines-are-not-polygon-edges">Some lines are not polygon
+edges</h2>
+<p>The edge table only finds borders that are polygon edges, and Natural
+Earth's line layers carry more than that:</p>
+<ul>
+<li><strong>Water boundaries.</strong> The US-Canada border through the
+Great Lakes is not an edge of any land polygon. Counties and provinces
+stop at the shore, and the lake is not a polygon in either layer. The
+lines layers have it because it is a line in its own right.</li>
+<li><strong>Viewpoints.</strong> The Natural Earth boundary layers carry
+<code>FCLASS_*</code> columns that say how each line should be drawn
+from the point of view of different countries: international, disputed,
+or not drawn. No owner table can derive that, because it is a fact about
+the line, not about the polygons on either side.</li>
+<li><strong>Lines with no area on one side.</strong> Lines of control,
+ceasefire lines and indefinite boundaries end in the middle of
+land.</li>
+</ul>
+<p>So the shipped line layers are not a workaround. They hold
+information the polygons don't have. Derived edges are for everything
+else: any polygon layer, any hierarchy of attributes, including your own
+regions, and lines that are guaranteed to agree with the polygons they
+came from.</p>
+<h2 id="tools">Tools</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Tool</th>
+<th>Gives</th>
+<th>Hierarchy</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="https://github.com/hypertidy/wkpool">wkpool</a></td>
+<td>vertex pool, owner table, <code>find_arcs()</code></td>
+<td>your own lookup, as above</td>
+<td>exact or tolerance (<code>merge_coincident(tolerance =)</code>)</td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/hypertidy/silicate">silicate</a></td>
+<td><code>SC</code>, <code>ARC</code> models: edges and arcs with object
+links</td>
+<td>your own lookup</td>
+<td>the models these ideas come from</td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/ateucher/rmapshaper">rmapshaper</a></td>
+<td><code>ms_innerlines()</code>, <code>ms_lines(fields =)</code></td>
+<td>yes, through fields</td>
+<td>runs mapshaper in V8</td>
+</tr>
+<tr class="even">
+<td><a
+href="https://github.com/topojson/topojson-client">TopoJSON</a></td>
+<td>arcs, <code>mesh()</code> with a filter</td>
+<td>two levels through the filter</td>
+<td>the web standard for shared arcs</td>
+</tr>
+<tr class="odd">
+<td>GEOS 3.12+</td>
+<td>coverage union and simplification</td>
+<td>no</td>
+<td>shapely <code>coverage_simplify()</code>; check your R binding</td>
+</tr>
+<tr class="even">
+<td>sf</td>
+<td><code>st_intersection()</code> of boundaries, pairwise</td>
+<td>no</td>
+<td>works, but slow and loses arc structure</td>
+</tr>
+</tbody>
+</table>
+<p>Lines derived in longitude and latitude are straight in those
+coordinates. When you draw them in a projection, as the second figure
+does, each segment is straight in longitude and latitude, not on the
+ground. The <a href="../curves/">curves</a> page has more on what that
+edge means.</p>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>
