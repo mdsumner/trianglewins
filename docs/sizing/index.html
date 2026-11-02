@@ -293,11 +293,98 @@ a projection bends hard (near its edge or a seam) can turn over when
 transformed. The sign of each triangle's orientation in the target
 catches it.</li>
 </ol>
+<h2 id="a-field-from-data-population-density">A field from data:
+population density</h2>
+<p>Triangles graded by population are a popular way to draw density: put
+vertices where people are and connect them. That is a sizing field, and
+a good test of everything above.</p>
+<p><strong>No projection can produce it.</strong> A conformal map's log
+scale is harmonic, and a harmonic function has no peaks or pits away
+from the edge of its domain (the maximum principle). Population has a
+pit in triangle size at every city, so no conformal map gives it with
+good shapes. A projection can put one fine spot at a singular point
+(Mercator at a pole, log-polar at its centre), never one per city. An
+area-only map (moving-mesh equidistribution) could match the density, at
+the cost of shape, as in panel (b) of the square above.</p>
+<p>So it is the engine's job. Below, the Americas mainland is meshed in
+an oblique stereographic CRS centred at 10N 80W, following the recipe:
+the ground density is a Gaussian kernel (sigma 120 km) over Natural
+Earth places weighted by population, plus a rural floor of 2 people per
+km2; the target ground area is about 63,000 people per triangle, held
+between 15 km and 600 km on a side; and the CRS area is that times the
+PROJ areal scale k^2. Three meshes:</p>
+<ul>
+<li><strong>sampled points:</strong> draw points in proportion to
+population, then a constrained Delaunay triangulation of them with the
+coastline, with no refinement. This is the usual way to make the
+picture.</li>
+<li><strong>refined, area only:</strong> Delaunay refinement to the
+field with no angle bound.</li>
+<li><strong>refined, min angle 30:</strong> the same with a
+smallest-angle bound of 30 degrees, using the same number of vertices as
+the sampled mesh.</li>
+</ul>
+<p><img src="population.png"
+alt="The Americas meshed by population density three ways: Delaunay of points sampled by population, refinement to the population sizing field without an angle bound, and with a 30 degree bound. Below, the US north east up close" /></p>
+<table>
+<thead>
+<tr class="header">
+<th>mesh</th>
+<th>vertices</th>
+<th>triangles</th>
+<th>obtuse</th>
+<th>smallest angle under 20</th>
+<th>smallest angle, 1st percentile</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>sampled points, Delaunay</td>
+<td>10,019</td>
+<td>18,499</td>
+<td>53%</td>
+<td>25%</td>
+<td>3.8</td>
+</tr>
+<tr class="even">
+<td>refined, area only</td>
+<td>7,807</td>
+<td>13,956</td>
+<td>22%</td>
+<td>3.1%</td>
+<td>10.3</td>
+</tr>
+<tr class="odd">
+<td>refined, min angle 30</td>
+<td>10,019</td>
+<td>17,200</td>
+<td>18%</td>
+<td>0.3%</td>
+<td>30.4</td>
+</tr>
+</tbody>
+</table>
+<p>All three show the same density pattern from a distance. Up close,
+the sampled mesh is mostly obtuse slivers, because random points land
+arbitrarily close to each other and Delaunay can only choose the best of
+a bad set. The refined meshes put each new vertex at the centre of a
+too-large or too-skinny triangle, so the points are spaced by
+construction; the angle bound removes most of what is left. The few
+triangles still under 20 degrees sit at sharp corners in the coastline,
+where the input angle itself is small. The sampled look is a fine
+aesthetic. For a mesh that will carry values (interpolation, a
+finite-volume model, a heat map that should not show the triangles),
+refinement gives the same grading without the slivers.</p>
+<p>The figure and numbers come from <a
+href="https://github.com/mdsumner/trianglewins/blob/main/survey/sizing/population.py">survey/sizing/population.py</a>
+(numpy, matplotlib, triangle, shapely, pyproj; it downloads Natural
+Earth from GitHub).</p>
 <h2 id="what-only-the-engine-can-do">What only the engine can do</h2>
 <ul>
 <li><strong>Any isotropic field whose log is not harmonic</strong>:
-data-driven density, distance to a feature, laridae's linear example.
-Use <code>size=</code> in <code>lari_refine()</code>.</li>
+data-driven density such as population above, distance to a feature,
+laridae's linear example. Use <code>size=</code> in
+<code>lari_refine()</code>.</li>
 <li><strong>Grading limits.</strong> Size should not change too fast, or
 quality suffers where it jumps. Meshers bound or smooth the field; a
 projection's grading is whatever it is.</li>
