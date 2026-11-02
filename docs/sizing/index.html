@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sizing fields and map projections</title>
+<meta name="description" content="When a map projection can stand in for a mesh sizing field, when it cannot, and what conformal and equal-area projections do to triangle size, shape and Delaunay.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 code, h2 code, h3 code, h4 code { font-size: 0.9em; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+  border-bottom: 1px solid var(--grid); line-height: 1.45; }
+th:first-child, td:first-child { min-width: 12em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; background: var(--surface-0);
+  border-bottom: 1px solid var(--border); }
+td code { font-size: 12px; color: var(--text-secondary); }
+td small { color: var(--text-muted); font-size: 12px; }
+td:first-child a { text-decoration: none; }
+td:first-child a:hover { text-decoration: underline; }
+td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../">trianglewins</a> / sizing</p>
+<h1 id="sizing-fields-and-map-projections">Sizing fields and map
+projections</h1>
+<p>laridae's refinement takes a <strong>sizing field</strong>: the
+largest triangle area allowed at each point, as a function or a grid (<a
+href="https://hypertidy.github.io/laridae/articles/laridae.html#refinement-angle-area-and-sizing-fields">laridae:
+refinement, angle, area and sizing fields</a>). A map projection already
+stretches space, so a mesh that is uniform in one CRS is graded
+somewhere else. When can a projection do the job of a sizing field, and
+what is left that only the mesh engine can do?</p>
+<p>The short version:</p>
+<ul>
+<li><strong>A projection carries shape, a sizing field carries size, and
+the engine carries everything tied to the input.</strong> Only a
+conformal projection keeps triangle shape, so it is the only kind that
+pairs cleanly with a scalar field.</li>
+<li><strong>A conformal projection is a sizing field, but a restricted
+one.</strong> It only produces fields whose log is harmonic, such as
+exponential grading or size proportional to distance from a point.
+laridae's own example, <code>0.0005 + 0.01 * x</code>, is not one of
+them.</li>
+<li><strong>An equal-area projection gets the areas right and the shapes
+wrong.</strong> A scalar sizing field cannot repair shape, so the angle
+guarantee is lost for good.</li>
+<li><strong>Constraints, holes, breaklines, grading limits and
+deliberate stretching are mesh requirements</strong>, and no projection
+stands in for them.</li>
+</ul>
+<h2 id="what-a-map-does-to-a-mesh">What a map does to a mesh</h2>
+<p>Mesh uniformly in a CRS and then transform the vertices. Close up,
+the transform is a linear map: a scale in each of two directions, the
+axes of the Tissot ellipse, a (the larger) and b. Then:</p>
+<ul>
+<li>triangle <strong>size</strong> changes with the scale (area by a
+times b),</li>
+<li>triangle <strong>shape</strong> changes with the ratio a/b, and
+angles are kept only when a = b, which is what conformal means,</li>
+<li><strong>straight edges</strong> come out as curves, and circles stop
+being circles, so a Delaunay mesh need not stay Delaunay.</li>
+</ul>
+<p>A laridae sizing field is one number per point. It asks for "this
+big, and still well shaped". Count what each side can supply:</p>
+<table>
+<thead>
+<tr class="header">
+<th>what you want</th>
+<th>functions to choose</th>
+<th>can a map supply it?</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>area only, shape does not matter</td>
+<td>1, any</td>
+<td>yes, always: some map has exactly that area density (the
+"equidistribution" map of moving-mesh methods)</td>
+</tr>
+<tr class="even">
+<td>size with good shape (laridae <code>size=</code>)</td>
+<td>1, any</td>
+<td>only if log of size is <strong>harmonic</strong>, using a conformal
+map</td>
+</tr>
+<tr class="odd">
+<td>deliberately stretched triangles (a metric)</td>
+<td>3</td>
+<td>only if the metric is <strong>flat</strong>, because a map has just
+2 functions</td>
+</tr>
+<tr class="even">
+<td>constraints, holes, breaklines, feature size, grading limits</td>
+<td>none</td>
+<td>no: these come from the input, not from space</td>
+</tr>
+</tbody>
+</table>
+<h2 id="conformal-the-right-shape-for-a-narrow-set-of-fields">Conformal:
+the right shape, for a narrow set of fields</h2>
+<p>In a conformal map a = b = k, so a uniform mesh comes out with edges
+scaled by 1/k and the same angles. The size field it implies is k
+itself. For a map from flat to flat, log k is always harmonic (its
+Laplacian is zero). That is a strong restriction:</p>
+<ul>
+<li>exponential grading, size proportional to exp(c x), is harmonic, via
+the map w = exp(z),</li>
+<li>size proportional to distance r from a point is harmonic, via
+log-polar, which is Mercator seen from polar stereographic,</li>
+<li><code>0.0005 + 0.01 * x</code> (as area) is not: the Laplacian of
+its log is never zero, so no map gives that field with good shapes,</li>
+<li>a field that follows data (fine near the coast, fine where the slope
+is steep) is almost never harmonic.</li>
+</ul>
+<p>On the sphere there is even less choice: the conformal maps to the
+plane are stereographic, Mercator, Lambert conformal conic and their
+relatives, each with its own fixed scale pattern.</p>
+<p><img src="square.png"
+alt="The unit square meshed four ways: laridae&#39;s linear area field by the engine and by a stretch map, and an exponential field by a conformal map and by the engine. Below each, the smallest angle of every triangle" /></p>
+<table>
+<thead>
+<tr class="header">
+<th>case</th>
+<th>how</th>
+<th>smallest angle (30 requested)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>(a) linear area field</td>
+<td>engine sizing field</td>
+<td>30.3</td>
+</tr>
+<tr class="even">
+<td>(b) the same field</td>
+<td>uniform mesh in x' = G(x), mapped back</td>
+<td><strong>8.8</strong></td>
+</tr>
+<tr class="odd">
+<td>(c) exponential field</td>
+<td>uniform mesh in w = exp(-z log(21) / 2), mapped back</td>
+<td>29.6</td>
+</tr>
+<tr class="even">
+<td>(d) exponential field</td>
+<td>engine sizing field</td>
+<td>30.3</td>
+</tr>
+</tbody>
+</table>
+<p>The stretch map in (b) gets the areas right (the median area is the
+same share of the target as the engine's), but the triangles are
+squashed at one end and pulled out at the other, 21 to 1 across the
+square. In (c) the field is log-linear, so a conformal map does it, and
+it matches the engine in both size and shape.</p>
+<h2 id="equal-area-the-right-size-the-wrong-shape">Equal-area: the right
+size, the wrong shape</h2>
+<p>An equal-area projection keeps a times b = 1, so a uniform mesh has
+uniform ground area. Away from the centre a and b part, though, so the
+angle guarantee is spent on the Tissot ellipse. A sizing field changes
+size, not shape, so nothing applied later gets the angles back.</p>
+<p><img src="hemisphere.png"
+alt="The northern hemisphere, meshed uniformly in polar stereographic, in polar stereographic with a compensating field, and uniformly in Lambert azimuthal equal-area. Colour is ground area on one scale; below, the smallest angle of every triangle measured on the sphere" /></p>
+<p>Northern hemisphere, polar aspect, smallest angle 30 requested in the
+CRS, everything measured on the sphere:</p>
+<table>
+<thead>
+<tr class="header">
+<th>case</th>
+<th>ground area, pole / equator</th>
+<th>smallest angle on the sphere</th>
+<th>edges not Delaunay on the sphere</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>stereographic, uniform</td>
+<td>2.89</td>
+<td>29.8</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>stereographic, area = target times k^2</td>
+<td><strong>1.06</strong></td>
+<td>29.3</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<td>Lambert azimuthal equal-area, uniform</td>
+<td>0.99</td>
+<td><strong>18.8</strong></td>
+<td>5.8%</td>
+</tr>
+</tbody>
+</table>
+<p>The middle row is the recipe: <strong>a conformal CRS plus a scalar
+field that compensates for its scale gives triangles that are the same
+size and well shaped on the ground.</strong> The projection supplies the
+shape and the field supplies the size. With an equal-area CRS the size
+comes free and the shape is gone for good.</p>
+<h2 id="do-angle-guarantees-survive">Do angle guarantees survive?</h2>
+<p>Refinement promises a smallest angle in the CRS it ran in. After the
+transform:</p>
+<ul>
+<li><strong>Conformal:</strong> angles are kept up to an error that
+shrinks with triangle size relative to how fast the scale changes. 30
+requested became 29.3 and 29.8 above.</li>
+<li><strong>Anything else:</strong> the promise weakens with a/b. For
+a/b = 2 a triangle with all angles at least 30 can drop to about 15
+degrees. You can read a/b off the Tissot ellipse before meshing and know
+the worst case.</li>
+</ul>
+<p>The Delaunay property is a sharper story. Stereographic maps circles
+to circles, so a Delaunay mesh in polar stereographic is exactly
+Delaunay on the sphere (no failures above). That is special to
+stereographic. Other conformal maps keep circles only approximately, and
+the equal-area map broke 5.8% of edges. If it matters downstream
+(interpolation, Voronoi cells), flip edges again on the target surface
+after the transform; the vertices stay where they are. <a
+href="../grids/">Grids as meshes</a> shows the same thing from the other
+direction: Delaunay in which frame is a choice made before meshing.</p>
+<h2 id="edges-after-the-transform">Edges after the transform</h2>
+<p>A straight edge in the CRS is a curve in the target. Measured as the
+gap between the transformed edge and the great circle at its midpoint,
+divided by edge length: about 0.003 typically and 0.01 to 0.013 at most
+for these meshes, smaller for smaller triangles. Three things follow,
+and they are about the mesh, not about stretching:</p>
+<ol type="1">
+<li><strong>Densify constraints in the meshing CRS.</strong> A breakline
+that is straight on the ground is a curve in the CRS. Give the engine
+that curve, densified, or the transformed mesh will not follow it. <a
+href="../curves/">Curves: bigcurve and s2</a> covers how.</li>
+<li><strong>Say which straight line you mean.</strong> The transformed
+chord, the great circle and the rhumb line differ by about the same
+amount as the gap above. A mesh stores vertices and connectivity, so an
+edge is straight in whatever space it is drawn in, and that is worth
+writing down.</li>
+<li><strong>Check for flipped triangles.</strong> Coarse triangles where
+a projection bends hard (near its edge or a seam) can turn over when
+transformed. The sign of each triangle's orientation in the target
+catches it.</li>
+</ol>
+<h2 id="what-only-the-engine-can-do">What only the engine can do</h2>
+<ul>
+<li><strong>Any isotropic field whose log is not harmonic</strong>:
+data-driven density, distance to a feature, laridae's linear example.
+Use <code>size=</code> in <code>lari_refine()</code>.</li>
+<li><strong>Grading limits.</strong> Size should not change too fast, or
+quality suffers where it jumps. Meshers bound or smooth the field; a
+projection's grading is whatever it is.</li>
+<li><strong>Constraints, holes, breaklines and local feature
+size</strong>, where refinement is driven by the input, such as two
+close coastlines. Projections act on all of space and know nothing about
+the input.</li>
+<li><strong>Stretching on purpose</strong>, such as triangles drawn out
+along a river or a front. That needs a three-part metric field, usually
+not flat, and an anisotropic mesher (BAMG, mmg2d, gmsh). laridae and
+cdtr do not do this.</li>
+</ul>
+<h2 id="a-recipe-for-laridae-and-cdtr">A recipe for laridae and
+cdtr</h2>
+<ol type="1">
+<li>Choose a <strong>conformal</strong> CRS for the region: polar
+stereographic, Lambert conformal conic, or Mercator for a band of
+latitude. Angles survive and, in polar stereographic, so does
+Delaunay.</li>
+<li>Densify the constraints in that CRS, following the curve they make
+on the ground (bigcurve).</li>
+<li>Write the target as a ground area <code>A(lon, lat)</code> and give
+laridae <code>size = function(x, y) A(inverse(x, y)) * k(x, y)^2</code>.
+PROJ reports the scale factors: for a conformal projection the areal
+scale is k^2.</li>
+<li>Transform the vertices, flip to Delaunay on the target if needed,
+and check that no triangle has turned over.</li>
+</ol>
+<p>cdtr refines to one global <code>max_area</code> and
+<code>min_angle</code>, with no field, so for cdtr the projection is the
+only lever for grading: choose a conformal CRS and accept its scale
+pattern, which is size proportional to 1/k on the ground.</p>
+<p>The figures and numbers come from <a
+href="https://github.com/mdsumner/trianglewins/blob/main/survey/sizing/experiments.py">survey/sizing/experiments.py</a>
+(numpy, matplotlib, triangle). It uses Shewchuk's Triangle, from the
+same Delaunay refinement family as laridae, so it runs without CGAL; an
+R version with laridae and PROJ scale factors on a real region is still
+to do.</p>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>
