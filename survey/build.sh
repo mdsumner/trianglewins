@@ -62,6 +62,10 @@ render dev-drafts/mathgl-breaklines.md dev-drafts/mathgl-breaklines \
   "Breaklines in terrain meshes (draft)" "dev draft" \
   "Development draft: Delatin against a constrained TIN from cdtr on an analytic cliff and the Hobart coast, with sample, surface and coastline error." \
   ../../
+render dev-drafts/polygons-are-lines.md dev-drafts/polygons-are-lines \
+  "Polygons are just lines (draft)" "dev draft" \
+  "Development draft: a polygon is segments plus a fill rule, why that holds because the plane is special, and where it stops holding for volumes, graphs in xyz and the sphere." \
+  ../../
 redirect choose ../start/#which-package
 redirect dimension ../notes/#dimension
 redirect interpolation ../notes/#interpolation

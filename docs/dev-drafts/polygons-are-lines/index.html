@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polygons are just lines (draft)</title>
+<meta name="description" content="Development draft: a polygon is segments plus a fill rule, why that holds because the plane is special, and where it stops holding for volumes, graphs in xyz and the sphere.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 code, h2 code, h3 code, h4 code { font-size: 0.9em; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+  border-bottom: 1px solid var(--grid); line-height: 1.45; }
+th:first-child, td:first-child { min-width: 12em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; background: var(--surface-0);
+  border-bottom: 1px solid var(--border); }
+td code { font-size: 12px; color: var(--text-secondary); }
+td small { color: var(--text-muted); font-size: 12px; }
+td:first-child a { text-decoration: none; }
+td:first-child a:hover { text-decoration: underline; }
+td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../../">trianglewins</a> / dev draft</p>
+<h1
+id="polygons-are-just-lines-and-why-that-is-a-fact-about-the-plane">Polygons
+are just lines (and why that is a fact about the plane)</h1>
+<p><em>Development draft, 4 November 2026.</em></p>
+<p>A polygon is a set of segments plus a fill rule. Rings, ring order,
+which hole belongs to which shell, and the multipolygon grouping are all
+bookkeeping on top of those segments, and the bookkeeping can be derived
+from them. This page argues for that claim from what the software
+already does. It then gives the reason it holds: the plane is special.
+The same reason explains why the fast algorithms of planar geometry have
+no equivalent for volumes in xyz.</p>
+<p>The sections:</p>
+<ol type="1">
+<li>what "just lines" means, exactly;</li>
+<li>the evidence: rasterizing, triangulating, sharing boundaries;</li>
+<li>why it works: a dimension count and three facts about the
+plane;</li>
+<li>where it stops working: volumes, graphs in xyz, and the sphere;</li>
+<li>what follows for data models.</li>
+</ol>
+<h2 id="what-just-lines-means">What "just lines" means</h2>
+<p>Take the vertices (x, y) and the segments (index pairs) of a polygon
+layer, the input contract used across this site. Drop the rings. What is
+left decides the region completely:</p>
+<ul>
+<li><strong>Even-odd fill</strong> needs only <em>unoriented</em>
+segments. A point is inside if a ray from it crosses an odd number of
+segments. Holes need no labels: a hole is wherever the count turns even
+again.</li>
+<li><strong>Nonzero (winding) fill</strong> needs <em>oriented</em>
+segments. A point is inside if the signed crossings sum to something
+other than zero. That is still one sign per segment, not a ring
+structure.</li>
+</ul>
+<p>What the rings add is a <em>decomposition</em>. They give one way to
+walk the segments as closed paths. Where more than two segments meet at
+a vertex, for example two shells touching at a point, more than one walk
+gives the same region. Simple features stores one of those walks and
+calls it the geometry. The region did not need the choice. That is the
+sense in which simple features is a rendering format: rings are the form
+that a stroking or filling library takes as input, not the
+information.</p>
+<h2 id="the-evidence">The evidence</h2>
+<p>The working code on this site and around it already treats polygons
+this way.</p>
+<ul>
+<li><strong>Rasterizing.</strong> A scanline rasterizer needs, for each
+row, where the segments cross it and with what sign. Ring membership
+never comes into it. Exact coverage fractions go through the same
+segment-by-cell walk. A line's length in a cell and a polygon's area in
+a cell are the same geometry-intersect-cell measure, taken at dimension
+1 and at dimension 2. See <a
+href="https://github.com/hypertidy/controlledburn">hypertidy/controlledburn</a>.</li>
+<li><strong>Triangulating.</strong> A constrained triangulation of all
+the segments, valid or not, gives each triangle a depth: the number of
+constraint edges crossed from outside. Odd depth is the even-odd
+reading. The mesh is never asked for valid rings, only segments. See <a
+href="../../validity/#triangles-read-parity">Triangles read
+parity</a>.</li>
+<li><strong>Sharing boundaries.</strong> A boundary is a segment with
+owners: the region on its left and the region on its right. County,
+state and country lines come from one table of edges, each drawn once.
+Nesting becomes a lookup, not a geometry operation. See <a
+href="../../boundaries/">Drawing each boundary once</a>.</li>
+<li><strong>Repairing.</strong> Choosing a repair for an invalid polygon
+is choosing a fill rule for its segments: parity, winding, or union of
+the rings. The segments are the same in every reading. See <a
+href="../../validity/#fixing-is-choosing-a-reading">Fixing is choosing a
+reading</a>.</li>
+</ul>
+<p>In each case the segments are the data and the rings are, at most, an
+output format.</p>
+<h2 id="why-it-works-the-plane-is-special">Why it works: the plane is
+special</h2>
+<p>All of this rests on a dimension count. Two pieces of dimension k in
+a space of dimension n, in general position, meet in a set of
+dimension</p>
+<pre><code>2k - n</code></pre>
+<p>(empty when that is negative). For segments (k = 1) in the plane (n =
+2) it is 0. Segments cross in isolated points, and a small move of a
+vertex cannot remove a crossing. Three facts about the plane come with
+that count, and every one of them gets used above.</p>
+<ul>
+<li><strong>A closed curve separates the plane</strong> (the Jordan
+curve theorem). It has an inside and an outside, so a boundary made of
+segments determines a region. That is why the fill rules work.</li>
+<li><strong>Segments meet in points.</strong> Overlay, noding and the
+depth labelling in a triangulation only add vertices; their output is
+still segments. The representation is closed under the operations we
+need.</li>
+<li><strong>Edges around a vertex have a cyclic order.</strong> Turning
+left at each vertex walks a face, so faces (rings) can be rebuilt from
+the edges at any time. This is what half-edge structures, and the ring
+reconstruction in polygonize, rely on.</li>
+</ul>
+<p>Euler's formula keeps all of it small. For a planar graph with at
+least three vertices, E &lt;= 3V - 6, so the segments, the faces, and
+any triangulation of them grow linearly with the number of vertices.</p>
+<p>The same facts explain the fast planar algorithms. A sweep line meets
+the segments in a total order (above and below), which gives sweeps,
+point location in O(log n) and trapezoidal maps. A simple polygon can
+always be triangulated using only its own vertices. Constrained Delaunay
+triangulations always exist.</p>
+<h2 id="where-it-stops-working">Where it stops working</h2>
+<h3 id="volumes-in-xyz">Volumes in xyz</h3>
+<p>A solid in xyz is bounded by surfaces, not lines. A closed curve in
+xyz separates nothing; the Jordan-Brouwer theorem has a closed
+<em>surface</em> separating space. So the version of the claim one
+dimension up is "solids are just triangles": a set of oriented boundary
+triangles plus a fill rule. The primitive moves up a dimension with the
+space.</p>
+<p>The cheap algorithms do not come with it.</p>
+<ul>
+<li>Crossings of two surfaces are curves (2k - n = 1), not points, so
+overlay adds new edges, not just new vertices.</li>
+<li>The neighbourhood of a vertex is a sphere, not a circle. Ordering
+the faces around a vertex is a surface-embedding problem of its
+own.</li>
+<li>A sweep plane meets the geometry in a planar arrangement, not an
+ordered list.</li>
+<li>Size bounds are no longer linear. By the Upper Bound Theorem, a
+Delaunay triangulation of n points in d dimensions can have on the order
+of n^ceil(d/2) cells. In xyz that is already n^2 tetrahedra in the worst
+case.</li>
+<li>Triangulating a polyhedron can need extra (Steiner) vertices. The
+Schoenhardt polyhedron has no tetrahedralization using only its own
+vertices, and deciding whether one exists is NP-complete. Constrained
+Delaunay tetrahedralizations exist only under extra conditions on the
+input.</li>
+</ul>
+<p>The general rule is: <strong>a region is its codimension-1 boundary
+plus a fill rule.</strong> Lines are that boundary only when the region
+is a piece of the plane, or of a surface such as the sphere.</p>
+<h3 id="graphs-in-xyz">Graphs in xyz</h3>
+<p>A related question shows the same count from the other side: when can
+a graph be drawn without crossings? In the plane that is planarity, a
+real constraint with forbidden graphs (K5 and K3,3). In xyz every graph
+has a crossing-free drawing: put the vertices on the curve (t, t^2, t^3)
+and join them with straight segments. The question that survives is
+about <em>linking</em>. Two disjoint cycles of edges in xyz can be
+linked, and graphs that can be drawn with no two cycles linked have
+their own short list of forbidden graphs (the seven graphs of the
+Petersen family). The stable version of crossing comes back one level
+up: 2-dimensional complexes in 4 dimensions, where the 2-skeleton of the
+6-simplex has no embedding (the van Kampen-Flores theorem). Crossing as
+a stable, countable event lives at 2k = n, and segments in the plane are
+the case k = 1.</p>
+<h3 id="the-sphere">The sphere</h3>
+<p>A closed curve on the sphere separates it into two regions, but
+neither one is the outside. Lines still determine the region only once
+something picks which side is which: the orientation of the segments
+(interior on the left, as in s2) or a stated convention. Even-odd fill,
+which needs no orientation, gives two answers on the sphere, and a data
+model has to choose between them. See <a href="../../curves/">Curves:
+bigcurve and s2</a> for what an edge is on the sphere in the first
+place.</p>
+<h2 id="what-follows-for-data-models">What follows for data models</h2>
+<ul>
+<li><strong>Store the vertices and segments; derive the rings.</strong>
+Rings, ring order and shell/hole membership can be rebuilt from the
+segments in the plane, so a format that requires them stores a choice,
+not information.</li>
+<li><strong>Say the fill rule and the orientation.</strong> These are
+the only extra facts a set of segments needs to determine a region, and
+they are where the readers of one dataset really differ: parity against
+winding, and on the sphere, which side.</li>
+<li><strong>Keep shared edges shared.</strong> A segment with a left and
+a right owner is stored once, which is what coverage simplification and
+level of detail need to keep neighbours consistent.</li>
+<li><strong>Do not build the plane into the schema.</strong> A model
+whose primitive is "the boundary of dimension n - 1" carries over to
+triangles bounding volumes. A model whose primitive is "the ring" does
+not. In the plane the two models give the same thing, so a format built
+only for the plane cannot tell which one it is using.</li>
+</ul>
+<p>The claim "polygons are just lines" is therefore not a general
+principle. It is the 2-dimensional case of one, and the plane happens to
+be the case where everything is cheap.</p>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>
