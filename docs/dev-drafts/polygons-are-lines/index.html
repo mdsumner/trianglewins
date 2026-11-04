@@ -120,29 +120,33 @@ information.</p>
 <p>The working code on this site and around it already treats polygons
 this way.</p>
 <ul>
-<li><strong>Rasterizing.</strong> A scanline rasterizer needs, for each
-row, where the segments cross it and with what sign. Ring membership
-never comes into it. Exact coverage fractions go through the same
-segment-by-cell walk. A line's length in a cell and a polygon's area in
-a cell are the same geometry-intersect-cell measure, taken at dimension
-1 and at dimension 2. See <a
-href="https://github.com/hypertidy/controlledburn">hypertidy/controlledburn</a>.</li>
-<li><strong>Triangulating.</strong> A constrained triangulation of all
-the segments, valid or not, gives each triangle a depth: the number of
-constraint edges crossed from outside. Odd depth is the even-odd
+<li><p><strong>Rasterizing.</strong> A scanline rasterizer needs, for
+each row, where the segments cross it and with what sign. Ring
+membership never comes into it. Exact coverage fractions go through the
+same segment-by-cell walk. A line's length in a cell and a polygon's
+area in a cell are the same geometry-intersect-cell measure, taken at
+dimension 1 and at dimension 2. See <a
+href="https://github.com/hypertidy/controlledburn">hypertidy/controlledburn</a>.</p></li>
+<li><p><strong>Triangulating.</strong> A constrained triangulation of
+all the segments, valid or not, gives each triangle a depth: the number
+of constraint edges crossed from outside. Odd depth is the even-odd
 reading. The mesh is never asked for valid rings, only segments. See <a
 href="../../validity/#triangles-read-parity">Triangles read
-parity</a>.</li>
-<li><strong>Sharing boundaries.</strong> A boundary is a segment with
+parity</a>.</p></li>
+<li><p><strong>Sharing boundaries.</strong> A boundary is a segment with
 owners: the region on its left and the region on its right. County,
 state and country lines come from one table of edges, each drawn once.
 Nesting becomes a lookup, not a geometry operation. See <a
-href="../../boundaries/">Drawing each boundary once</a>.</li>
-<li><strong>Repairing.</strong> Choosing a repair for an invalid polygon
-is choosing a fill rule for its segments: parity, winding, or union of
-the rings. The segments are the same in every reading. See <a
+href="../../boundaries/">Drawing each boundary once</a>.</p></li>
+<li><p><strong>Repairing.</strong> Choosing a repair for an invalid
+polygon is choosing a fill rule for its segments: parity, winding, or
+union of the rings. The segments are the same in every reading. See <a
 href="../../validity/#fixing-is-choosing-a-reading">Fixing is choosing a
-reading</a>.</li>
+reading</a>.</p></li>
+<li><p><strong>Gridding.</strong> A raster is the case where even the
+segments need not be stored: <code>ncol</code>, <code>nrow</code> and a
+bbox imply the vertex pool, the segment pairs and the cells. See <a
+href="../../grids/">Grids as meshes</a>.</p></li>
 </ul>
 <p>In each case the segments are the data and the rings are, at most, an
 output format.</p>

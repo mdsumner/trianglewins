@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Grids as meshes: Delaunay in what?</title>
-<meta name="description" content="Every logically rectangular grid is a mesh; triangulating its points gives a different mesh in every frame, measured on one polar grid block.">
+<title>Grids as meshes: a raster is a mesh</title>
+<meta name="description" content="A raster is a mesh: ncol, nrow and a bbox imply its vertex pool, segment pairs and triangle triplets. Triangulating its points instead gives a different mesh in every frame, measured on one polar grid block.">
 <style>
 :root {
   color-scheme: light;
@@ -68,37 +68,206 @@ td small { color: var(--text-muted); font-size: 12px; }
 td:first-child a { text-decoration: none; }
 td:first-child a:hover { text-decoration: underline; }
 td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
 </style>
 </head>
 <body>
 <main>
 <p class="muted"><a href="../">trianglewins</a> / grids</p>
-<h1 id="grids-as-meshes-delaunay-in-what">Grids as meshes: Delaunay in
-what?</h1>
-<p>A gridded dataset is a mesh that never had to say so. This page is
-about where grids and triangulations meet, and about one question they
-share. The companion book <a
+<h1 id="grids-as-meshes-a-raster-is-a-mesh-and-delaunay-in-what">Grids
+as meshes: a raster is a mesh, and Delaunay in what?</h1>
+<p>A gridded dataset is a mesh that never had to say so. A raster
+defined by <code>ncol</code>, <code>nrow</code> and a bbox (or an affine
+geotransform) already holds every table a triangle mesh is made of: a
+vertex pool, segments as vertex pairs, triangles as vertex triplets.
+None of them is stored, because all of them are arithmetic on the cell
+index. The first half of this page builds that up from one rectangle.
+The second half asks what happens when a grid is triangulated as loose
+points instead, and the index is thrown away. The companion book <a
 href="https://hypertidy.github.io/regular-in-what/">Regular in what?</a>
 argues that a grid is regular, rectilinear or curvilinear only <em>in a
 frame</em>. A triangulation is Delaunay, has straight edges and
 interpolates linearly only in a frame too. "Delaunay in what?" is the
 same question.</p>
-<h2 id="every-logically-rectangular-grid-is-already-a-mesh">Every
-logically rectangular grid is already a mesh</h2>
-<p>A regular, rectilinear or curvilinear grid has an (i, j) index, and
-the index gives the topology for free: each cell is a quad, its corners
-are the vertices, and neighbours are i + 1 and j + 1. Turning that into
-triangles needs no Delaunay at all. Split each quad into two triangles,
-and the only choice is the diagonal.</p>
-<p>The diagonal matters. Bilinear interpolation in a cell is not linear
-on either pair of triangles, and the two splits give different values at
-the cell centre (see <a href="../notes/#interpolation">notes</a>). A
-split is a choice to record, not a detail to leave to the mesher.</p>
-<p>Where the values sit changes which mesh you have. Values at cell
-corners (PixelIsPoint, a DEM read as heights) are a field on the mesh's
-nodes. Values as cell averages (PixelIsArea) are a field on its faces.
-The grid words "centre" and "corner" are the mesh words "face" and
-"node".</p>
+<h2 id="one-rectangle-is-two-triangles">One rectangle is two
+triangles</h2>
+<p>Split a rectangle along a diagonal and you have two triangles.
+Counted as a mesh:</p>
+<ul>
+<li><strong>4 vertices</strong>, the corners;</li>
+<li><strong>5 segments</strong>, the four sides and the diagonal, each a
+pair of vertex ids;</li>
+<li><strong>2 triangles</strong>, each a triplet of vertex ids.</li>
+</ul>
+<p>The two ends of the diagonal belong to both triangles, and they are
+stored once. Each triangle refers to them by id, so there is no
+duplicated coordinate to drift, and the diagonal is visibly one shared
+edge, not two coincident ones. That is the whole idea of an indexed
+mesh: coordinates live in one vertex pool, and everything else is a
+table of indices into it.</p>
+<h2 id="a-raster-is-all-three-tables-already">A raster is all three
+tables already</h2>
+<p>Put rectangles side by side in rows and columns and the tables grow,
+but they never need to be written down. Number the cell corners row by
+row from the top left, with <code>i</code> the column and <code>j</code>
+the row, as in a GDAL geotransform. The corner <code>(i, j)</code> has
+id</p>
+<pre><code>v(i, j) = j * (ncol + 1) + i + 1</code></pre>
+<p>and cell <code>(i, j)</code> has corners <code>a = v(i, j)</code>,
+<code>b = v(i + 1, j)</code>, <code>c = v(i + 1, j + 1)</code> and
+<code>d = v(i, j + 1)</code>. Its two triangles are
+<code>(a, b, c)</code> and <code>(a, c, d)</code>, sharing the diagonal
+<code>(a, c)</code>. Every vertex, segment and triangle of the grid
+comes from that one formula.</p>
+<p><img src="grid-mesh-tables.png"
+alt="A 3 x 2 grid as a mesh: the vertex pool of 12 corners numbered row by row, 23 segments with the six diagonals in red, and 12 triangles in two triplets per cell sharing the diagonal" /></p>
+<p>For the 3 x 2 grid in the figure, bbox <code>0 0 3 2</code>:</p>
+<table>
+<thead>
+<tr class="header">
+<th>table</th>
+<th>rows</th>
+<th>from ncol and nrow</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>vertex pool</td>
+<td>12</td>
+<td>(ncol + 1)(nrow + 1)</td>
+</tr>
+<tr class="even">
+<td>segments</td>
+<td>23</td>
+<td>ncol(nrow + 1) across, (ncol + 1)nrow down, ncol nrow diagonals</td>
+</tr>
+<tr class="odd">
+<td>quads</td>
+<td>6</td>
+<td>ncol nrow</td>
+</tr>
+<tr class="even">
+<td>triangles</td>
+<td>12</td>
+<td>2 ncol nrow</td>
+</tr>
+</tbody>
+</table>
+<p>The vertex coordinates come from the bbox:
+<code>x = xmin + i (xmax - xmin) / ncol</code> and
+<code>y = ymax - j (ymax - ymin) / nrow</code>. The counts also satisfy
+Euler's formula for a disc, V - E + F = 1 (12 - 23 + 12), the planar
+bookkeeping that <a href="../dev-drafts/polygons-are-lines/">Polygons
+are just lines</a> leans on.</p>
+<p><a
+href="https://github.com/mdsumner/trianglewins/blob/main/survey/grids/grid-mesh.R">survey/grids/grid-mesh.R</a>
+builds all four tables in base R from <code>ncol</code>,
+<code>nrow</code> and a bbox, and checks the counts, that no segment
+repeats, that every triangle edge is a segment, and Euler. The core is a
+few lines:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>vid <span class="ot">&lt;-</span> <span class="cf">function</span>(i, j) j <span class="sc">*</span> (ncol <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">+</span> i <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>a <span class="ot">&lt;-</span> <span class="fu">vid</span>(ci, cj); b <span class="ot">&lt;-</span> <span class="fu">vid</span>(ci <span class="sc">+</span> <span class="dv">1</span>, cj)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>c <span class="ot">&lt;-</span> <span class="fu">vid</span>(ci <span class="sc">+</span> <span class="dv">1</span>, cj <span class="sc">+</span> <span class="dv">1</span>); d <span class="ot">&lt;-</span> <span class="fu">vid</span>(ci, cj <span class="sc">+</span> <span class="dv">1</span>)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>quad     <span class="ot">&lt;-</span> <span class="fu">cbind</span>(a, b, c, d)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>triangle <span class="ot">&lt;-</span> <span class="fu">rbind</span>(<span class="fu">cbind</span>(a, b, c), <span class="fu">cbind</span>(a, c, d))</span></code></pre></div>
+<p>So a raster is a mesh. Six numbers (<code>ncol</code>,
+<code>nrow</code> and the bbox), plus a CRS, are a complete, compressed
+description of its vertex pool and its topology.</p>
+<h2 id="rings-store-it-the-long-way">Rings store it the long way</h2>
+<p>Polygonizing a raster, cell by cell, throws that structure away. Each
+cell becomes a closed ring with its own corners, so every interior
+corner is written up to four times, and every interior edge twice, once
+by each cell that owns it.</p>
+<p><img src="grid-rings-vs-pool.png"
+alt="The same 3 x 2 grid as six separate polygon rings, each with its own four corners, against the mesh, where the cells index one pool of 12 corners and each edge appears once" /></p>
+<table>
+<thead>
+<tr class="header">
+<th>form</th>
+<th>coordinates stored</th>
+<th>interior edges</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>polygon rings, closed</td>
+<td>5 ncol nrow (30 here)</td>
+<td>each twice (7 here)</td>
+</tr>
+<tr class="even">
+<td>indexed mesh</td>
+<td>(ncol + 1)(nrow + 1) (12 here)</td>
+<td>each once</td>
+</tr>
+<tr class="odd">
+<td>raster</td>
+<td>none: six numbers</td>
+<td>implied by the index</td>
+</tr>
+</tbody>
+</table>
+<p>Getting the shared edges back from the rings is real work: matching
+coordinates that are equal only up to rounding. That is the problem <a
+href="../boundaries/">Drawing each boundary once</a> deals with for
+polygon layers in general. The grid never had it.</p>
+<h2 id="topology-from-the-index-geometry-from-the-transform">Topology
+from the index, geometry from the transform</h2>
+<p>The tables above never used a coordinate. The vertex pool, the
+segment pairs and the triangle triplets are fixed by <code>ncol</code>
+and <code>nrow</code>. Only the <em>position</em> of each vertex depends
+on how the grid sits in space, and that is the one thing that changes
+between kinds of grid.</p>
+<p><img src="grid-same-topology.png"
+alt="One 6 x 4 index mesh with the same vertex pool, segments and triangles drawn four ways: regular from a bbox, rotated by a geotransform, curvilinear from coordinate arrays, and in texture space" /></p>
+<ul>
+<li><strong>Regular</strong>: positions from a bbox, or a geotransform
+without rotation.</li>
+<li><strong>Rotated or sheared</strong>: positions from a full six-term
+geotransform. Still affine, still six numbers.</li>
+<li><strong>Curvilinear</strong>: positions from two arrays, x and y per
+corner. The geometry is now data, but the topology is still the
+index.</li>
+<li><strong>Texture</strong>: <code>u = i / ncol</code>,
+<code>v = j / nrow</code>. These are the texture coordinates of the
+vertices, and they are the same index again.</li>
+</ul>
+<p>The texture case is how a GPU draws a raster. It draws a triangle
+mesh, the image is sampled as a texture through each vertex's
+<code>(u, v)</code>, and those texture coordinates come from the cell
+index. Reprojecting a raster this way moves the vertex positions into
+the target frame and leaves the texture coordinates and the triangles
+alone: the mesh is warped, the pixels are not touched. A coarse mesh
+carries a fine image. How coarse it can be depends on how straight the
+cell edges stay in the target frame (see <a
+href="../curves/">curves</a>). WebGL raster viewers use this, for
+example <a
+href="https://github.com/mdsumner/ortho-cog-viewer">mdsumner/ortho-cog-viewer</a>,
+which reprojects COG tiles by moving mesh vertices and keeping their
+UVs.</p>
+<h2 id="corners-or-centres">Corners or centres</h2>
+<p>Where the values sit decides which mesh you have.</p>
+<ul>
+<li><strong>Values as cell averages</strong> (PixelIsArea, most imagery
+and gridded model output) are a field on the mesh's <em>faces</em>. The
+vertex pool is the cell corners: a 256 x 256 raster has 257 x 257
+vertices.</li>
+<li><strong>Values at sample points</strong> (PixelIsPoint, a DEM read
+as heights) are a field on the mesh's <em>nodes</em>. The vertex pool is
+the cell centres: a 256 x 256 raster has 256 x 256 vertices and 255 x
+255 quads between them.</li>
+</ul>
+<p>The two meshes are half a cell apart and differ in size by one in
+each direction. Mixing them up is the usual source of half-pixel offsets
+between a raster and a mesh made from it. The grid words "centre" and
+"corner" are the mesh words "face" and "node".</p>
+<h2 id="the-diagonal-is-a-choice">The diagonal is a choice</h2>
+<p>Bilinear interpolation in a cell is not linear on either pair of
+triangles, and the two splits give different values at the cell centre
+(see <a href="../notes/#interpolation">notes</a>). The split
+<code>(a, b, c)</code>, <code>(a, c, d)</code> used above is one
+convention; <code>(a, b, d)</code>, <code>(b, c, d)</code> is the other.
+A split is a choice to record, not a detail to leave to the mesher. The
+next section shows a mesher making it anyway.</p>
 <h2 id="delaunay-in-what">Delaunay in what?</h2>
 <p>Triangulate the points of a grid instead of splitting its cells, and
 the index is thrown away. What comes back depends on the frame the
@@ -189,8 +358,9 @@ wrong.</strong> The four corners of a square are on one circle, so both
 diagonals are equally Delaunay. Stereographic projection maps circles on
 the sphere to circles on the plane, so the tie survives on the sphere as
 well. Which diagonal each run picked is decided by rounding, which is
-why "same as xyz" is about half. This is the diagonal choice from the
-previous section, arriving uninvited.</li>
+why "same as xyz" is about half. This is the diagonal choice from <a
+href="#the-diagonal-is-a-choice">The diagonal is a choice</a>, arriving
+uninvited.</li>
 </ol>
 <p>A regular grid can be recovered by finding the frame it is regular
 in. A triangulation built in the wrong frame cannot: it is simply a
@@ -274,6 +444,18 @@ the grid never needed: its identity was computed from the index.</p>
 <code>grid_diagonal</code> put this page's 60S block (and a unit grid)
 in the harness, and <code>tw_in_cell()</code> judges each backend's
 triangles in the grid's index, as the figure does.</p>
+<h2 id="tools-for-the-index-side">Tools for the index side</h2>
+<ul>
+<li><a href="https://github.com/hypertidy/vaster">hypertidy/vaster</a>:
+the index arithmetic with no data at all. Cells, rows, columns and
+coordinates from an extent and a dimension, which is everything above
+except the tables themselves.</li>
+<li><a
+href="https://github.com/hypertidy/quadmesh">hypertidy/quadmesh</a>:
+builds the indexed quad mesh (and its triangle split) from a raster,
+with the shared vertex pool, so a raster can be plotted as a surface,
+textured, or reprojected by its vertices.</li>
+</ul>
 </main>
 <script>
 document.querySelectorAll("table").forEach(function (t) {

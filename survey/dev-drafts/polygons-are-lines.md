@@ -65,6 +65,10 @@ way.
   segments are the same in every reading. See
   [Fixing is choosing a reading](../../validity/#fixing-is-choosing-a-reading).
 
+- **Gridding.** A raster is the case where even the segments need not be
+  stored: `ncol`, `nrow` and a bbox imply the vertex pool, the segment
+  pairs and the cells. See [Grids as meshes](../../grids/).
+
 In each case the segments are the data and the rings are, at most, an
 output format.
 
