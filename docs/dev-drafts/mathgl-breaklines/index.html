@@ -75,10 +75,11 @@ img { max-width: 100%; height: auto; }
 <main>
 <p class="muted"><a href="../../">trianglewins</a> / dev draft</p>
 <h1 id="breaklines-in-terrain-meshes">Breaklines in terrain meshes</h1>
-<p><em>Development draft, 31 October 2026. Study 1 of <a
-href="../mathgl-terrain/">math.gl terrain, read from the mesh side</a>.
-Interactive version: <a href="viewer/">the deck.gl viewer</a>. Code and
-results: <code>survey/dev-drafts/mathgl-terrain/</code> in this
+<p><em>Development draft, 31 October 2026; math.gl's own fixtures added
+11 November 2026. Study 1 of <a href="../mathgl-terrain/">math.gl
+terrain, read from the mesh side</a>. Interactive version: <a
+href="viewer/">the deck.gl viewer</a>. Code and results:
+<code>survey/dev-drafts/mathgl-terrain/</code> in this
 repository.</em></p>
 <p>Delatin, the adaptive mesher in math.gl's terrain module, keeps every
 <em>grid sample</em> within a vertical tolerance. It cannot follow a
@@ -100,6 +101,12 @@ samples.</li>
 the bilinear surface at its worst point, even at a 5 m sample tolerance.
 Breaklines do not change that. A sample tolerance is not a surface
 bound, just as the math.gl roadmap says.</li>
+<li><strong>On math.gl's own fixtures</strong> the same holds. On
+<code>pacific-streaming</code>, Delatin's shoreline is up to 176 m off
+sea level, while the constrained mesh holds the coast exactly with a
+similar triangle count. On <code>sierra-nodata</code>, which math.gl's
+adaptive adapters refuse, the constrained mesh covers exactly the
+regular mesh's domain with 35 to 68% as many triangles.</li>
 </ul>
 <h2 id="the-meshers">The meshers</h2>
 <table>
@@ -250,11 +257,11 @@ every 4 cells) dominate the count, and a sparser breakline would do.</p>
 href="https://registry.opendata.aws/terrain-tiles/">AWS open terrain
 tiles</a>, about 56 m on the ground. Land is height above 0. The
 coastline is the boundary of the land, with islets under 25 cells
-dropped, simplified to within one cell. It enters the mesh twice over:
-as a breakline at height 0, and as the mesh boundary, so sea samples are
-treated as nodata. Error is measured on land only. "Surface max"
-compares each mesh with the bilinear surface through the samples, on a 4
-times finer lattice.</p>
+dropped, enclosed water filled, and the line simplified to within one
+cell. It enters the mesh twice over: as a breakline at height 0, and as
+the mesh boundary, so sea samples are treated as nodata. Error is
+measured on land only. "Surface max" compares each mesh with the
+bilinear surface through the samples, on a 4 times finer lattice.</p>
 <p><img src="coast.png"
 alt="Where each mesh puts the sea (blue, mesh height at or below 0) along part of the western shore of the Derwent, at a 10 m tolerance. Delatin&#39;s shoreline wanders either side of the coastline (red); the constrained mesh stops at it. The one blue sliver on the right is a triangle with all three corners on the coastline, so it is flat at 0 m." /></p>
 <table>
@@ -378,13 +385,154 @@ spots the two agree closely: the 99th percentile is about 8 m at a 10 m
 tolerance. Breaklines do not address this. A per-triangle check against
 the interpolant would, which is the roadmap's "full-surface error
 certificates".</p>
+<h2 id="examples-3-and-4-mathgls-own-fixtures">Examples 3 and 4:
+math.gl's own fixtures</h2>
+<p>math.gl's terrain module now has its own regional fixtures. These are
+257 by 257 nearest-neighbour samples, cell-registered in Web Mercator,
+from pinned AWS terrain tiles. We used two of them unchanged, fetched
+from math.gl at commit <code>7c31b41</code>.</p>
+<p><strong>Pacific coast</strong> (<code>pacific-streaming</code>, tile
+8/40/98, Point Reyes, about 609 m cells, with bathymetry). The coastline
+is built as for Hobart. 103 land samples lie exactly on the simplified
+coastline. They are not inserted, because the coastline is the authority
+there.</p>
+<p><img src="pacific.png"
+alt="Where each mesh puts the sea along Point Reyes and Drakes Bay at a 20 m tolerance. Delatin&#39;s shoreline (where blue meets green) wanders across the coastline (red) and floods Tomales Bay; the constrained mesh stops at the coast. Tomales Bay is land in the constrained mesh because enclosed water is filled before simplifying." /></p>
+<table>
+<thead>
+<tr class="header">
+<th>tolerance</th>
+<th>mesh</th>
+<th style="text-align: right;">triangles</th>
+<th style="text-align: right;">land max</th>
+<th style="text-align: right;">land RMSE</th>
+<th style="text-align: right;">coast max</th>
+<th style="text-align: right;">land/sea triangles</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>10 m</td>
+<td>Delatin</td>
+<td style="text-align: right;">49,453</td>
+<td style="text-align: right;">10.0</td>
+<td style="text-align: right;">2.62</td>
+<td style="text-align: right;">170.5</td>
+<td style="text-align: right;">1,677</td>
+</tr>
+<tr class="even">
+<td>10 m</td>
+<td>greedy + coastline</td>
+<td style="text-align: right;">46,550</td>
+<td style="text-align: right;">10.0</td>
+<td style="text-align: right;">2.21</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td style="text-align: right;"><strong>0</strong></td>
+</tr>
+<tr class="odd">
+<td>20 m</td>
+<td>Delatin</td>
+<td style="text-align: right;">36,155</td>
+<td style="text-align: right;">20.0</td>
+<td style="text-align: right;">6.50</td>
+<td style="text-align: right;">175.8</td>
+<td style="text-align: right;">1,186</td>
+</tr>
+<tr class="even">
+<td>20 m</td>
+<td>greedy + coastline</td>
+<td style="text-align: right;">36,690</td>
+<td style="text-align: right;">20.0</td>
+<td style="text-align: right;">5.80</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td style="text-align: right;"><strong>0</strong></td>
+</tr>
+<tr class="odd">
+<td>40 m</td>
+<td>Delatin</td>
+<td style="text-align: right;">21,922</td>
+<td style="text-align: right;">40.0</td>
+<td style="text-align: right;">14.57</td>
+<td style="text-align: right;">175.8</td>
+<td style="text-align: right;">760</td>
+</tr>
+<tr class="even">
+<td>40 m</td>
+<td>greedy + coastline</td>
+<td style="text-align: right;">23,652</td>
+<td style="text-align: right;">40.0</td>
+<td style="text-align: right;">13.60</td>
+<td style="text-align: right;"><strong>0</strong></td>
+<td style="text-align: right;"><strong>0</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Sierra Nevada with nodata</strong>
+(<code>sierra-nodata-streaming</code>, tile 8/43/98). Its mask is
+manufactured: a 65 by 65 nodata block, plus single missing samples on
+every 16th row and 8th column. math.gl's Delatin and MARTINI adapters
+refuse it. Its regular mesh keeps every cell whose four corners are
+valid, two triangles each. We gave the adaptive mesher exactly that
+domain. The outline of the kept cells, 422 rings, goes in as
+constraints. Every outline vertex is a valid sample, so no height is
+invented. The adaptive mesh's area equals the regular mesh's area,
+59,312 cells.</p>
+<p><img src="sierra-nodata.png"
+alt="math.gl&#39;s regular mesh against the adaptive mesh on the same domain, around the corner of the nodata block. Crosses are missing samples. On the right, the domain outline (red) is a constraint, and each isolated missing sample becomes a two-by-two-cell hole." /></p>
+<table>
+<thead>
+<tr class="header">
+<th>tolerance</th>
+<th>mesh</th>
+<th style="text-align: right;">triangles</th>
+<th style="text-align: right;">sample max</th>
+<th style="text-align: right;">RMSE</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>every sample</td>
+<td>math.gl regular mesh</td>
+<td style="text-align: right;">118,624</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td>10 m</td>
+<td>greedy + nodata outline</td>
+<td style="text-align: right;">80,310</td>
+<td style="text-align: right;">10.0</td>
+<td style="text-align: right;">2.48</td>
+</tr>
+<tr class="odd">
+<td>20 m</td>
+<td>greedy + nodata outline</td>
+<td style="text-align: right;">63,025</td>
+<td style="text-align: right;">20.0</td>
+<td style="text-align: right;">5.84</td>
+</tr>
+<tr class="even">
+<td>40 m</td>
+<td>greedy + nodata outline</td>
+<td style="text-align: right;">41,311</td>
+<td style="text-align: right;">40.0</td>
+<td style="text-align: right;">13.20</td>
+</tr>
+</tbody>
+</table>
+<p>The saving is modest because of the holes. Each isolated missing
+sample brings an eight-vertex ring that the mesh must honour, and there
+are about 420 of them. A policy that interpolates across single missing
+samples would mesh far fewer triangles. math.gl's rule is that missing
+terrain is never silently filled, though, and this keeps to it.</p>
 <h2 id="what-this-suggests">What this suggests</h2>
 <ol type="1">
 <li>For T7, a breakline's main value is <em>fidelity</em>, not triangle
 count. The cliff shows it on an analytic surface, and the coast on a
 real one.</li>
 <li>A boundary given as a constraint is also a nodata strategy for
-adaptive meshes. math.gl's adaptive adapters do not have one today.</li>
+adaptive meshes. math.gl's adaptive adapters do not have one today, and
+<code>sierra-nodata</code> shows it working on their own fixture.</li>
 <li>Sample error and surface error differ on real DEMs as well as on
 analytic ones. This applies to every mesher here, including ours.</li>
 <li>A constrained mesher would want to keep provenance: which edges are
@@ -402,12 +550,16 @@ GDAL:</p>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> survey/dev-drafts/mathgl-terrain/step.R</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> survey/dev-drafts/mathgl-terrain/coast.R      <span class="co"># about 10 minutes</span></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> survey/dev-drafts/mathgl-terrain/figures.R</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> survey/dev-drafts/mathgl-terrain/export-viewer.R</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> survey/dev-drafts/mathgl-terrain/build-viewer.py</span></code></pre></div>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">sh</span> survey/dev-drafts/mathgl-terrain/fetch-fixtures.sh</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> survey/dev-drafts/mathgl-terrain/fixtures.R   <span class="co"># about 10 minutes</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> survey/dev-drafts/mathgl-terrain/figures-fixtures.R</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> survey/dev-drafts/mathgl-terrain/export-viewer.R</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> survey/dev-drafts/mathgl-terrain/build-viewer.py</span></code></pre></div>
 <p>Results land in
 <code>survey/dev-drafts/mathgl-terrain/results/</code>
-(<code>step.csv</code>, <code>coast.csv</code>). Large intermediates go
-to <code>cache/</code>, which git ignores.</p>
+(<code>step.csv</code>, <code>coast.csv</code>,
+<code>fixtures.csv</code>). Large intermediates go to
+<code>cache/</code>, which git ignores.</p>
 </main>
 <script>
 document.querySelectorAll("table").forEach(function (t) {

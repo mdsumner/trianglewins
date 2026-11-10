@@ -45,7 +45,33 @@ hobart <- list(
   meshes = lapply(e2$meshes, pack_mesh, W = W2, H = H2, cell = cell2),
   lines = merge_runs(lines2))
 
-stats <- list(step = read.csv("survey/dev-drafts/mathgl-terrain/results/step.csv"), hobart = read.csv("survey/dev-drafts/mathgl-terrain/results/coast.csv"))
-writeLines(toJSON(list(fixtures = list(step = step, hobart = hobart), stats = stats),
+## study 2: math.gl's own fixtures (meshes keyed by viewer slot)
+fx <- readRDS("survey/dev-drafts/mathgl-terrain/cache/fixtures.rds")
+zp <- fx$pacific$z; Wp <- ncol(zp); Hp <- nrow(zp); cellp <- fx$pacific$cell * cos(38 * pi / 180)
+cop <- as.data.frame(fx$pacific$coast); names(cop) <- c("x", "y", "z", "coast")
+sgp <- as.data.frame(fx$pacific$segs); names(sgp) <- c("s0", "s1")
+csp <- which(cop$coast[sgp$s0] == 1 & cop$coast[sgp$s1] == 1)
+pacific <- list(
+  title = "Pacific coast (math.gl fixture)", tol = 20, cell = cellp, units = "m",
+  slots = list(delatin = "delatin", lines = "greedy + coastline"),
+  meshes = list(delatin = pack_mesh(fx$meshes[["pacific delatin"]], Wp, Hp, cellp),
+                lines = pack_mesh(fx$meshes[["pacific greedy + coastline"]], Wp, Hp, cellp)),
+  lines = merge_runs(lapply(csp, function(i) pack_line(rbind(c(cop$x[sgp$s0[i]], cop$y[sgp$s0[i]]), c(cop$x[sgp$s1[i]], cop$y[sgp$s1[i]])), c(0, 0), Wp, Hp, cellp))))
+s <- fx$sierra; zs <- s$z; Ws <- ncol(zs); Hs <- nrow(zs); cells <- s$cell * cos(37 * pi / 180)
+sg <- s$segs
+sierra <- list(
+  title = "Sierra Nevada, nodata (math.gl fixture)", tol = 20, cell = cells, units = "m",
+  slots = list(lines = "greedy + nodata boundary"),
+  meshes = list(lines = pack_mesh(fx$meshes[["sierra greedy + nodata boundary"]], Ws, Hs, cells)),
+  lines = merge_runs(lapply(seq_len(nrow(sg)), function(i) {
+    xy <- rbind(c(s$ring_x[sg[i, 1]], s$ring_y[sg[i, 1]]), c(s$ring_x[sg[i, 2]], s$ring_y[sg[i, 2]]))
+    pack_line(xy, zs[cbind(round(xy[, 2]) + 1, round(xy[, 1]) + 1)], Ws, Hs, cells)
+  })))
+fxs <- read.csv("survey/dev-drafts/mathgl-terrain/results/fixtures.csv")
+
+stats <- list(step = read.csv("survey/dev-drafts/mathgl-terrain/results/step.csv"),
+              hobart = read.csv("survey/dev-drafts/mathgl-terrain/results/coast.csv"),
+              pacific = fxs[fxs$fixture == "pacific", ], sierra = fxs[fxs$fixture == "sierra-nodata", ])
+writeLines(toJSON(list(fixtures = list(step = step, hobart = hobart, pacific = pacific, sierra = sierra), stats = stats),
                   auto_unbox = TRUE, digits = 6), "survey/dev-drafts/mathgl-terrain/cache/viewer-data.json")
 cat(file.size("survey/dev-drafts/mathgl-terrain/cache/viewer-data.json") / 1e6, "MB\n")

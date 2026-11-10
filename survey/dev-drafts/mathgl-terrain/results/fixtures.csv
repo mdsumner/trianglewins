@@ -1,0 +1,11 @@
+"fixture","tol","method","triangles","max_err","rmse","coast_max_abs_z","straddle_tris","seconds"
+"pacific",10,"delatin",49453,10,2.62445563220541,170.5,1677,0.167360893
+"pacific",10,"greedy + coastline",46550,10,2.20939274879062,0,0,81.724
+"pacific",20,"delatin",36155,20.0000000000001,6.49745775253077,175.75,1186,0.145598632
+"pacific",20,"greedy + coastline",36690,20,5.79610989551791,0,0,39.234
+"pacific",40,"delatin",21922,40,14.5661500369962,175.75,760,0.091484345
+"pacific",40,"greedy + coastline",23652,40,13.604396945083,0,0,13.831
+"sierra-nodata",10,"greedy + nodata boundary",80310,10,2.48045055500314,NA,NA,198.548
+"sierra-nodata",20,"greedy + nodata boundary",63025,20,5.84130885220634,NA,NA,102.653
+"sierra-nodata",40,"greedy + nodata boundary",41311,40,13.1982568890423,NA,NA,41.679
+"sierra-nodata",0,"math.gl regular mesh",118624,0,0,NA,NA,NA

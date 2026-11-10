@@ -1,6 +1,7 @@
 # Breaklines in terrain meshes
 
-*Development draft, 31 October 2026. Study 1 of
+*Development draft, 31 October 2026; math.gl's own fixtures added 11 November
+2026. Study 1 of
 [math.gl terrain, read from the mesh side](../mathgl-terrain/). Interactive
 version: [the deck.gl viewer](viewer/). Code and results:
 `survey/dev-drafts/mathgl-terrain/` in this repository.*
@@ -23,6 +24,11 @@ The short answer has three parts:
   at its worst point, even at a 5 m sample tolerance. Breaklines do not change
   that. A sample tolerance is not a surface bound, just as the math.gl roadmap
   says.
+- **On math.gl's own fixtures** the same holds. On `pacific-streaming`,
+  Delatin's shoreline is up to 176 m off sea level, while the constrained mesh
+  holds the coast exactly with a similar triangle count. On `sierra-nodata`,
+  which math.gl's adaptive adapters refuse, the constrained mesh covers exactly
+  the regular mesh's domain with 35 to 68% as many triangles.
 
 ## The meshers
 
@@ -74,7 +80,8 @@ The grid covers kunanyi/Mt Wellington and the Derwent estuary: 513 by 513
 samples from four z10 tiles of the
 [AWS open terrain tiles](https://registry.opendata.aws/terrain-tiles/), about
 56 m on the ground. Land is height above 0. The coastline is the boundary of
-the land, with islets under 25 cells dropped, simplified to within one cell.
+the land, with islets under 25 cells dropped, enclosed water filled, and the
+line simplified to within one cell.
 It enters the mesh twice over: as a breakline at height 0, and as the mesh
 boundary, so sea samples are treated as nodata. Error is measured on land only.
 "Surface max" compares each mesh with the bilinear surface through the samples,
@@ -110,12 +117,60 @@ bilinear patch disagree. Away from those spots the two agree closely: the
 this. A per-triangle check against the interpolant would, which is the
 roadmap's "full-surface error certificates".
 
+## Examples 3 and 4: math.gl's own fixtures
+
+math.gl's terrain module now has its own regional fixtures. These are
+257 by 257 nearest-neighbour samples, cell-registered in Web Mercator, from
+pinned AWS terrain tiles. We used two of them unchanged, fetched from math.gl at
+commit `7c31b41`.
+
+**Pacific coast** (`pacific-streaming`, tile 8/40/98, Point Reyes, about
+609 m cells, with bathymetry). The coastline is built as for Hobart. 103 land
+samples lie exactly on the simplified coastline. They are not inserted, because
+the coastline is the authority there.
+
+![Where each mesh puts the sea along Point Reyes and Drakes Bay at a 20 m tolerance. Delatin's shoreline (where blue meets green) wanders across the coastline (red) and floods Tomales Bay; the constrained mesh stops at the coast. Tomales Bay is land in the constrained mesh because enclosed water is filled before simplifying.](pacific.png)
+
+| tolerance | mesh | triangles | land max | land RMSE | coast max | land/sea triangles |
+|---|---|---:|---:|---:|---:|---:|
+| 10 m | Delatin | 49,453 | 10.0 | 2.62 | 170.5 | 1,677 |
+| 10 m | greedy + coastline | 46,550 | 10.0 | 2.21 | **0** | **0** |
+| 20 m | Delatin | 36,155 | 20.0 | 6.50 | 175.8 | 1,186 |
+| 20 m | greedy + coastline | 36,690 | 20.0 | 5.80 | **0** | **0** |
+| 40 m | Delatin | 21,922 | 40.0 | 14.57 | 175.8 | 760 |
+| 40 m | greedy + coastline | 23,652 | 40.0 | 13.60 | **0** | **0** |
+
+**Sierra Nevada with nodata** (`sierra-nodata-streaming`, tile 8/43/98). Its
+mask is manufactured: a 65 by 65 nodata block, plus single missing samples on
+every 16th row and 8th column. math.gl's Delatin and MARTINI adapters refuse it.
+Its regular mesh keeps every cell whose four corners are valid, two triangles
+each. We gave the adaptive mesher exactly that domain. The outline of the kept
+cells, 422 rings, goes in as constraints. Every outline vertex is a valid
+sample, so no height is invented. The adaptive mesh's area equals the regular
+mesh's area, 59,312 cells.
+
+![math.gl's regular mesh against the adaptive mesh on the same domain, around the corner of the nodata block. Crosses are missing samples. On the right, the domain outline (red) is a constraint, and each isolated missing sample becomes a two-by-two-cell hole.](sierra-nodata.png)
+
+| tolerance | mesh | triangles | sample max | RMSE |
+|---|---|---:|---:|---:|
+| every sample | math.gl regular mesh | 118,624 | 0 | 0 |
+| 10 m | greedy + nodata outline | 80,310 | 10.0 | 2.48 |
+| 20 m | greedy + nodata outline | 63,025 | 20.0 | 5.84 |
+| 40 m | greedy + nodata outline | 41,311 | 40.0 | 13.20 |
+
+The saving is modest because of the holes. Each isolated missing sample brings
+an eight-vertex ring that the mesh must honour, and there are about 420 of
+them. A policy that interpolates across single missing samples would mesh far
+fewer triangles. math.gl's rule is that missing terrain is never silently
+filled, though, and this keeps to it.
+
 ## What this suggests
 
 1. For T7, a breakline's main value is *fidelity*, not triangle count. The
    cliff shows it on an analytic surface, and the coast on a real one.
 2. A boundary given as a constraint is also a nodata strategy for adaptive
-   meshes. math.gl's adaptive adapters do not have one today.
+   meshes. math.gl's adaptive adapters do not have one today, and
+   `sierra-nodata` shows it working on their own fixture.
 3. Sample error and surface error differ on real DEMs as well as on analytic
    ones. This applies to every mesher here, including ours.
 4. A constrained mesher would want to keep provenance: which edges are
@@ -134,9 +189,12 @@ npm install --prefix survey/dev-drafts/mathgl-terrain
 Rscript survey/dev-drafts/mathgl-terrain/step.R
 Rscript survey/dev-drafts/mathgl-terrain/coast.R      # about 10 minutes
 Rscript survey/dev-drafts/mathgl-terrain/figures.R
+sh survey/dev-drafts/mathgl-terrain/fetch-fixtures.sh
+Rscript survey/dev-drafts/mathgl-terrain/fixtures.R   # about 10 minutes
+Rscript survey/dev-drafts/mathgl-terrain/figures-fixtures.R
 Rscript survey/dev-drafts/mathgl-terrain/export-viewer.R
 python3 survey/dev-drafts/mathgl-terrain/build-viewer.py
 ```
 
 Results land in `survey/dev-drafts/mathgl-terrain/results/` (`step.csv`,
-`coast.csv`). Large intermediates go to `cache/`, which git ignores.
+`coast.csv`, `fixtures.csv`). Large intermediates go to `cache/`, which git ignores.
