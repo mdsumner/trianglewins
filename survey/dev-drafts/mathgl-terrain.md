@@ -63,8 +63,11 @@ Each question gets a study page, with code under
    and on the Hobart coast, it covers sample error, true-surface error,
    coastline height and triangle count.
 2. **How far is sample error from surface error on real DEMs?** Partly done in
-   study 1, against the bilinear surface for Hobart. Next: MARTINI, and their
-   own N43 DTED fixture.
+   study 1, against the bilinear surface for Hobart. Study 1 now also runs on
+   math.gl's own `pacific` and `sierra-nodata` fixtures (11 November). Next:
+   MARTINI, and a polar case. The REMA ice-sheet margin
+   ([rema-ovr](https://github.com/mdsumner/rema-ovr)) is a natural breakline
+   in EPSG:3031.
 3. **Can the greedy mesher match Delatin's triangle count with constraints?**
    The R prototype inserts points in batches and needs about 35% more
    triangles. A one-at-a-time version would settle whether constraints cost
