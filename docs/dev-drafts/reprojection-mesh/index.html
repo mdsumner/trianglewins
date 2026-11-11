@@ -108,8 +108,9 @@ avoid that.</li>
 Upstream sets the error unit for each tile separately. When neighbouring
 tiles come from different overview levels, that triples the polar mesh
 and leaves T-junctions along the tile seams. With one shared unit, both
-problems go away, because the mesher's own midpoint rule is already the
-bigcurve edge rule.</li>
+problems go away, because the mesher's own midpoint test already works
+like bigcurve's edge rule (it does not use bigcurve; it reached the same
+idea on its own).</li>
 <li><strong>Constrained seeds are the real gain.</strong> The mesher
 accepts any starting triangulation. If it starts from a tile clipped to
 the projection's valid area, triangulated with constraints, it handles
@@ -263,8 +264,8 @@ view (the sandbox adds a <code>_pixelSize</code> option, see
 longer depends on the overview level. The cost is that the mesh then
 depends on the view, so a cache would key on tile and zoom (a quantised
 zoom is enough), not on tile alone.</p>
-<h2 id="the-mesher-already-uses-the-bigcurve-rule">The mesher already
-uses the bigcurve rule</h2>
+<h2 id="the-mesher-already-follows-a-bigcurve-style-rule">The mesher
+already follows a bigcurve-style rule</h2>
 <p>The sandbox's first attempt at "conforming" tiles copied bigcurve. It
 densified every tile edge first, by bisecting until the projected
 midpoint is within tolerance of the chord. That rule looks only at the
@@ -275,10 +276,19 @@ were then fixed as the seed's boundary.</p>
 long thin triangles refines less efficiently. The reason it made no
 difference: the greedy mesher only ever splits a boundary edge at its
 midpoint, and only when that midpoint's error is over the tolerance.
-That is the bigcurve rule, applied lazily. Bisection at midpoints also
-nests across levels, since a finer tile's half-edge splits exactly where
-the coarse edge would. So the shared error unit is all the seams
-need.</p>
+That is the same idea as bigcurve, applied lazily during refinement.
+deck.gl-raster does not use bigcurve: the rule falls out of Delatin's
+sample points, which include each edge's midpoint (<a
+href="https://github.com/developmentseed/deck.gl-raster/blob/5b55894f3306867f2ae77166f6b71d2d8f6535f9/packages/raster-reproject/src/delatin.ts#L23-L28">delatin.ts
+L23-28</a>), and its collinear split when the worst sample lies on an
+edge (<a
+href="https://github.com/developmentseed/deck.gl-raster/blob/5b55894f3306867f2ae77166f6b71d2d8f6535f9/packages/raster-reproject/src/delatin.ts#L506-L520">L506-520</a>).
+The test differs a little. It uses the full distance from the projected
+midpoint to the chord's midpoint, so sliding along the chord counts as
+well as bulging off it, while bigcurve, following d3-geo, measures the
+distance off the chord. Bisection at midpoints also nests across levels,
+since a finer tile's half-edge splits exactly where the coarse edge
+would. So the shared error unit is all the seams need.</p>
 <p>This suggests how the edge logic should relate to meshes in general.
 It is an <strong>edge oracle</strong>: given an edge and a tolerance, it
 decides the vertices by looking at that edge alone. A mesher can call it

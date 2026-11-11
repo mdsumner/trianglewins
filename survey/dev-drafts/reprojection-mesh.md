@@ -32,8 +32,9 @@ The short version:
   error unit for each tile separately. When neighbouring tiles come from
   different overview levels, that triples the polar mesh and leaves
   T-junctions along the tile seams. With one shared unit, both problems go
-  away, because the mesher's own midpoint rule is already the bigcurve
-  edge rule.
+  away, because the mesher's own midpoint test already works like
+  bigcurve's edge rule (it does not use bigcurve; it reached the same idea
+  on its own).
 - **Constrained seeds are the real gain.** The mesher accepts any starting
   triangulation. If it starts from a tile clipped to the projection's
   valid area, triangulated with constraints, it handles domains that are
@@ -148,7 +149,7 @@ level. The cost is that the mesh then depends on the view, so a cache
 would key on tile and zoom (a quantised zoom is enough), not on tile
 alone.
 
-## The mesher already uses the bigcurve rule
+## The mesher already follows a bigcurve-style rule
 
 The sandbox's first attempt at "conforming" tiles copied bigcurve. It
 densified every tile edge first, by bisecting until the projected
@@ -161,7 +162,16 @@ It made no difference to the seams, and it cost 26% more triangles
 long thin triangles refines less efficiently. The reason it made no
 difference: the greedy mesher only ever splits a boundary edge at its
 midpoint, and only when that midpoint's error is over the tolerance.
-That is the bigcurve rule, applied lazily. Bisection at midpoints also
+That is the same idea as bigcurve, applied lazily during refinement.
+deck.gl-raster does not use bigcurve: the rule falls out of Delatin's
+sample points, which include each edge's midpoint
+([delatin.ts L23-28](https://github.com/developmentseed/deck.gl-raster/blob/5b55894f3306867f2ae77166f6b71d2d8f6535f9/packages/raster-reproject/src/delatin.ts#L23-L28)),
+and its collinear split when the worst sample lies on an edge
+([L506-520](https://github.com/developmentseed/deck.gl-raster/blob/5b55894f3306867f2ae77166f6b71d2d8f6535f9/packages/raster-reproject/src/delatin.ts#L506-L520)).
+The test differs a little. It uses the full distance from the projected
+midpoint to the chord's midpoint, so sliding along the chord counts as
+well as bulging off it, while bigcurve, following d3-geo, measures the
+distance off the chord. Bisection at midpoints also
 nests across levels, since a finer tile's half-edge splits exactly where
 the coarse edge would. So the shared error unit is all the seams need.
 
