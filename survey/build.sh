@@ -66,6 +66,10 @@ render dev-drafts/polygons-are-lines.md dev-drafts/polygons-are-lines \
   "Polygons are just lines (draft)" "dev draft" \
   "Development draft: a polygon is segments plus a fill rule, why that holds because the plane is special, and where it stops holding for volumes, graphs in xyz and the sphere." \
   ../../
+render dev-drafts/reprojection-mesh.md dev-drafts/reprojection-mesh \
+  "Reprojection meshes (draft)" "dev draft" \
+  "Development draft: why deck.gl-raster's reprojection mesh looks the way it does, measured headless, and what a shared tolerance and constrained seeds change." \
+  ../../
 redirect choose ../start/#which-package
 redirect dimension ../notes/#dimension
 redirect interpolation ../notes/#interpolation
