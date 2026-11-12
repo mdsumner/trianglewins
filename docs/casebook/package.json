@@ -1,0 +1,6 @@
+{
+  "name": "warp-casebook",
+  "private": true,
+  "type": "commonjs",
+  "scripts": { "test": "node tests/grid.js && node tests/tiles.js && node tests/goode.js" }
+}

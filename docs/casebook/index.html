@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Warp Mesh Casebook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: instrument bench. Case strip on top, canvas left, case notes + controls right, verdict table below. */
+:root {
+  --bg: #f3f5f7; --panel: #ffffff; --ink: #18212b; --muted: #5a6673; --line: #d5dbe1;
+  --accent: #0f6f86; --accent-ink: #ffffff; --chip: #e6eef1;
+  --good: #2f7d4f; --warn: #a86a00; --bad: #b3261e;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f151b; --panel: #172029; --ink: #e3e9ee; --muted: #94a2af; --line: #2a3642;
+  --accent: #4fb8cf; --accent-ink: #0b1217; --chip: #1e2b35;
+  --good: #6cc48e; --warn: #e2a63b; --bad: #f07a70; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f151b; --panel: #172029; --ink: #e3e9ee; --muted: #94a2af; --line: #2a3642;
+  --accent: #4fb8cf; --accent-ink: #0b1217; --chip: #1e2b35;
+  --good: #6cc48e; --warn: #e2a63b; --bad: #f07a70; color-scheme: dark }
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 22px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em }
+h1 { font-size: 2rem; line-height: 1.15 }
+h2 { font-size: 1.25rem }
+h3 { font-size: 1.02rem }
+p { margin: 0 }
+.lede { max-width: 68ch; color: var(--muted); display: grid; gap: 8px }
+.lede h1 { color: var(--ink) }
+.lede strong { color: var(--ink); font-weight: 600 }
+.eyebrow { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent) }
+.casegroups { display: grid; gap: 10px }
+.casegroup { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 10px; align-items: center }
+@media (max-width: 560px) { .casegroup { grid-template-columns: minmax(0, 1fr) } }
+.grouplabel { font: 500 0.74rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted) }
+.cases { display: flex; flex-wrap: wrap; gap: 8px }
+.cases button { font: 500 0.9rem var(--body); padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink); cursor: pointer }
+.cases button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.bench { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 22px; align-items: start }
+@media (max-width: 860px) { .bench { grid-template-columns: minmax(0, 1fr) } }
+.stage { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; touch-action: none }
+.stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; max-width: 100%; cursor: grab }
+.stage canvas.fixed { cursor: default }
+.probe { position: absolute; left: 10px; bottom: 10px; font: 0.75rem/1.4 var(--mono); background: color-mix(in srgb, var(--panel) 88%, transparent);
+  color: var(--ink); padding: 6px 8px; border-radius: 4px; border: 1px solid var(--line); pointer-events: none; white-space: pre; max-width: calc(100% - 20px); overflow: hidden }
+.side { display: grid; gap: 16px; min-width: 0 }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: grid; gap: 10px; min-width: 0 }
+.note p + p { margin-top: 2px }
+.note .try { font-size: 0.9rem; color: var(--muted) }
+.note .try b { color: var(--ink); font-weight: 600 }
+.verdict { display: inline-flex; gap: 6px; align-items: center; font: 500 0.8rem var(--body); padding: 2px 8px; border-radius: 999px; background: var(--chip); justify-self: start }
+.verdict.right { color: var(--good) } .verdict.open { color: var(--warn) } .verdict.note { color: var(--accent) }
+.controls { display: grid; gap: 10px }
+.row { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr) 3.4rem; gap: 10px; align-items: center; font-size: 0.88rem }
+.row output { font: 0.82rem var(--mono); text-align: right; font-variant-numeric: tabular-nums }
+.row select, .row input[type=range] { width: 100% }
+.toggles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; font-size: 0.88rem }
+.toggles label { display: flex; gap: 7px; align-items: center; cursor: pointer }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px }
+.stat { display: grid; gap: 1px }
+.stat span { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase }
+.stat b { font: 500 1.05rem var(--mono); font-variant-numeric: tabular-nums }
+.legend { display: grid; gap: 4px; font-size: 0.78rem; color: var(--muted) }
+.legend .bar { height: 10px; border-radius: 2px; background: linear-gradient(90deg, #ffe65a, #ff9a2e 33%, #e5372a 66%, #c2189b); border: 1px solid var(--line) }
+.legend .ticks { position: relative; height: 1.2em; }
+.legend .ticks span { position: absolute; transform: translateX(-50%) }
+.legend .ticks span:first-child { transform: none }
+.legend .ticks span:last-child { transform: translateX(-100%) }
+.legend .ticks { font-family: var(--mono); font-variant-numeric: tabular-nums }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem }
+.tablewrap { overflow-x: auto }
+th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-top: 1px solid var(--line) }
+th { font: 600 0.78rem var(--body); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted) }
+td:first-child { font-weight: 600; white-space: nowrap }
+td .tag { font: 500 0.75rem var(--mono); }
+.tag.right { color: var(--good) } .tag.open { color: var(--warn) } .tag.wrong { color: var(--bad) }
+.foot { color: var(--muted); font-size: 0.85rem; max-width: 80ch }
+a { color: var(--accent) }
+code { font-family: var(--mono); font-size: 0.86em }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto } }
+</style>
+<style>body { margin: 0 } img { max-width: 100% }</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="lede">
+    <div class="eyebrow"><a href="../">trianglewins</a> / ortho-cog-viewer and deck.gl-raster, case by case</div>
+    <h1>Warp Mesh Casebook</h1>
+    <p>A live copy of the warp that <a href="https://github.com/mdsumner/ortho-cog-viewer">ortho-cog-viewer</a> draws: a constant grid in <strong>screen</strong> space, each vertex inverse-projected to lon/lat, and the GPU interpolating texture coordinates linearly inside each triangle. The heat layer shows how far the interpolated texture lands from where it belongs, in screen pixels, measured at each triangle's centroid and edge midpoints.</p>
+    <p>A companion to <a href="../dev-drafts/reprojection-mesh/">Reprojection meshes for raster tiles</a>, which measures the same questions headless. Away from singularities that error is small and even, as the constant-mesh model says. It grows where the inverse is not smooth: the pole, the horizon, the antimeridian. The second row of cases meshes the other way, as deck.gl-raster does: level-of-detail tiles in source lon/lat, each refined on its own until its error is under a fraction of a source pixel. Same texture, same error measure, so the two can be compared directly. Pick a case, then flip the switches.</p>
+  </header>
+
+  <nav class="casegroups" aria-label="Cases">
+    <div class="casegroup"><span class="grouplabel">Screen grid</span><div class="cases" id="casesG"></div></div>
+    <div class="casegroup"><span class="grouplabel">Source tiles</span><div class="cases" id="casesT"></div></div>
+  </nav>
+
+  <section class="bench">
+    <div class="stage" id="stage">
+      <canvas id="gl" width="720" height="720" aria-label="Reprojected lon/lat raster drawn through the warp mesh"></canvas>
+      <div class="probe" id="probe">hover or touch the map</div>
+    </div>
+    <div class="side">
+      <article class="card note" id="note"></article>
+      <div class="card">
+        <div class="stats" id="stats"></div>
+        <div class="legend">
+          <div class="bar"></div>
+          <div class="ticks"><span style="left:0">0.125</span><span style="left:28.6%">0.5</span><span style="left:57.1%">2</span><span style="left:85.7%">8</span><span style="left:100%">16</span></div>
+          <div>Error in screen px. Untinted: under 0.125 px, the gdalwarp default.</div>
+        </div>
+      </div>
+      <div class="card controls">
+        <div class="row"><label for="proj">Display</label>
+          <select id="proj">
+            <option value="ortho">Orthographic globe</option>
+            <option value="stere">South polar stereographic</option>
+            <option value="eqearth">Equal Earth world</option>
+            <option value="goode">Goode Homolosine, interrupted</option>
+          </select><span></span></div>
+        <div class="row"><label for="mesh">Mesh</label>
+          <select id="mesh">
+            <option value="grid">Screen grid (ortho-cog-viewer)</option>
+            <option value="tiles">Source tiles (deck.gl-raster style)</option>
+          </select><span></span></div>
+        <div class="row" data-mode="grid"><label for="grid">Grid cells</label><input id="grid" type="range" min="8" max="160" step="4"><output id="gridOut"></output></div>
+        <div class="row"><label for="zoom">Zoom</label><input id="zoom" type="range" min="0" max="5" step="0.05"><output id="zoomOut"></output></div>
+        <div class="row" data-mode="grid"><label for="tol">Refine to</label><input id="tol" type="range" min="-3" max="1" step="0.25"><output id="tolOut"></output></div>
+        <div class="row" data-mode="tiles"><label for="maxErr">maxError</label><input id="maxErr" type="range" min="-5" max="0" step="0.5"><output id="maxErrOut"></output></div>
+        <div class="row" data-mode="tiles"><label for="unit">Unit</label>
+          <select id="unit">
+            <option value="tile">Source pixel at tile centre</option>
+            <option value="screen">One screen pixel, every tile</option>
+          </select><span></span></div>
+        <div class="toggles">
+          <label data-mode="grid"><input type="checkbox" id="unwrap"> Unwrap u per triangle</label>
+          <label data-mode="grid"><input type="checkbox" id="poleFan"> Split pole triangle</label>
+          <label data-mode="grid"><input type="checkbox" id="rimClip"> Clip at the rim</label>
+          <label data-mode="grid"><input type="checkbox" id="refine"> Refine where error is high</label>
+          <label data-mode="tiles"><input type="checkbox" id="poleGuard"> Pole guard (0.5 deg)</label>
+          <label data-mode="tiles"><input type="checkbox" id="cut"> Split at map edges / lobes</label>
+          <label data-mode="tiles"><input type="checkbox" id="conform"> Conform tile edges</label>
+          <label data-mode="tiles"><input type="checkbox" id="tileEdges"> Tile outlines</label>
+          <label data-mode="tiles"><input type="checkbox" id="tj"> T-junction markers</label>
+          <label><input type="checkbox" id="heat"> Error heat</label>
+          <label><input type="checkbox" id="wire"> Triangles</label>
+        </div>
+        <p class="foot">Drag to move the centre. The texture is a synthetic lon/lat raster: 10 degree graticule, 1 degree lines poleward of 75, the antimeridian in teal.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>What ortho-cog-viewer gets right, and what is open</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Choice</th><th>Verdict</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Mesh in screen space</td><td><span class="tag right">right</span></td><td>Every vertex sits exactly where it is drawn, so neighbouring triangles always meet: no cracks, no T-junction gaps, no tiles to stitch. Error is in screen pixels by construction, which is the unit a viewer cares about.</td></tr>
+        <tr><td>UV by exact inverse</td><td><span class="tag right">right</span></td><td>Picking and texture both come from the same inverse, so the only approximation is linear interpolation inside a triangle.</td></tr>
+        <tr><td>Per-triangle unwrap + REPEAT</td><td><span class="tag right">right</span></td><td>Fixes antimeridian smears for any display projection with no special case. Try the Antimeridian case with unwrap off.</td></tr>
+        <tr><td>Pole split into three</td><td><span class="tag right">right</span></td><td>Exact at the pole itself, since u is arbitrary there. It only repairs the one triangle that holds the pole.</td></tr>
+        <tr><td>Round-trip validity + bisected rim</td><td><span class="tag right">right</span></td><td>Projection-agnostic and smooth at any grid size. Try the Horizon case with clipping off.</td></tr>
+        <tr><td>Fixed grid size (64)</td><td><span class="tag open">open</span></td><td>Not error-driven. At 900 px a 64 grid is about 1 px off across the disc, 4 to 6 px within the outer tenth of the limb and 8 to 11 px in the ring of triangles around the pole (the fan fixes only the centre one). Error falls with the square of cell size, so the flat middle is cheap to fix; the singular parts need local refinement.</td></tr>
+        <tr><td>Refinement</td><td><span class="tag open">missing</span></td><td>Bisecting screen triangles until the error test passes keeps the mesh in screen space, so new T-junctions cost nothing. For 0.25 px it took about 26,000 triangles on the polar globe and 10,500 on polar stereographic, against 8,192 for the grid.</td></tr>
+        <tr><td>Docs vs code</td><td><span class="tag wrong">stale</span></td><td>The <code>buildLayerGeometry</code> comment in <code>uv.ts</code> still says pole triangles are dropped and leave a hole, and Next Steps still lists closing the pole hole. The README and <code>fanAroundPole</code> say the hole is gone.</td></tr>
+        <tr><td>Interrupted projections</td><td><span class="tag open">open</span></td><td>The round-trip mask handles the open part of each gap, but near the equator a gap narrows to a point and a triangle with all corners valid can straddle it. In Goode at 900 by 450 px that leaves about 16 px of error at the tips, and refining to 0.25 px (55,000 triangles) still leaves 16 px.</td></tr>
+        <tr><td>Fetch across the antimeridian</td><td><span class="tag open">open</span></td><td>The full source width is fetched when a view straddles 180 (Next Steps says so). Two windows would do.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="card">
+    <h2>Source tiles, the deck.gl-raster way</h2>
+    <p class="foot">The tile mode follows deck.gl-raster's design as documented in its source and dev-docs, without using its code. Tiles are chosen so a source pixel is at most one screen pixel at the tile centre. Each tile starts from two triangles, and the error at the centroid and edge midpoints is measured forward in screen pixels against maxError (default 0.125) times one source pixel's size on screen. A bintree split stands in for Delatin's Delaunay insertion. Triangle shapes differ, but the picture does not, because only the error test decides what gets drawn.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Choice</th><th>Effect</th><th>What the cases show</th></tr></thead>
+      <tbody>
+        <tr><td>Mesh in source lon/lat</td><td><span class="tag right">strength</span></td><td>Texture coordinates are exact at every vertex and never wrap inside a tile, so the pole and the antimeridian need no special triangles. A map-space quadtree over the same polar tile is about 3 px off.</td></tr>
+        <tr><td>Greedy error-driven refinement</td><td><span class="tag right">strength</span></td><td>Every triangle meets its tolerance. The density near the pole is what that accuracy costs in a lon/lat source.</td></tr>
+        <tr><td>Unit set per tile</td><td><span class="tag open">trade-off</span></td><td>The tolerance follows the source pixel at each tile's centre, so it differs from tile to tile and across one tile. Polar tiles: 29,700 triangles against 26,500 with one screen pixel everywhere, at 900 px.</td></tr>
+        <tr><td>One mesh per tile</td><td><span class="tag open">trade-off</span></td><td>Neighbouring tiles disagree along shared edges: 256 T-junctions in the polar view. The cracks are under 0.06 px there, so they show as sparkle, not gaps. Forcing neighbours to split the same edges removes them for under 1% more triangles.</td></tr>
+        <tr><td>Pole guard</td><td><span class="tag open">trade-off</span></td><td>A 0.5 degree hole at each pole, kept from input-pixel error. With forward error it can go.</td></tr>
+        <tr><td>Interrupted projections</td><td><span class="tag right">strength</span></td><td>Lobe edges are meridians in source space, so splitting each tile at them and projecting each part into its own lobe is exact: Goode at 900 by 450 px meets 0.125 of a source pixel everywhere, including the gap tips. Projected whole, the same tiles smear across the gaps by up to about 200 px.</td></tr>
+        <tr><td>Box-shaped seeds</td><td><span class="tag open">limit</span></td><td>Fine for lon/lat bands and projection boxes. They cannot follow a curved domain such as the orthographic horizon.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="foot">Numbers in both tables come from this page's own code at a 900 px square view, with error measured at the centroid and three edge midpoints of each triangle, as deck.gl-raster does. The page reimplements both meshes from their sources (ortho-cog-viewer c35b303, deck.gl-raster 5b55894) and uses neither's code. Mesh area / map is the summed triangle area over the map's valid area: under 100% means holes, over 100% means overlapping smears.</p>
+  </section>
+</div>
+<script src="js/core.js"></script>
+<script src="js/tiles.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
