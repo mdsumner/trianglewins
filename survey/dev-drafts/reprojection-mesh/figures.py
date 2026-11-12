@@ -155,3 +155,64 @@ fig.tight_layout(rect=(0, 0.04, 1, 0.97))
 fig.savefig(OUT / "ortho.png", dpi=200)
 plt.close(fig)
 print("wrote", sorted(p.name for p in OUT.glob("*.png")))
+
+# 5. overview: the whole polar disc, source-pixel vs screen-pixel tolerance --
+fig, axs = plt.subplots(1, 2, figsize=(8, 4.8))
+SUM = {(r["scenario"], r["variant"]): r for r in __import__("csv").DictReader(open(RES / "summary.csv"))}
+for ax, var, title in ((axs[0], "B0", "Tolerance in source pixels (upstream)"),
+                       (axs[1], "S", "Tolerance in screen pixels, 1000 px view")):
+    for t in M["scenarios"]["ring"][var]:
+        draw(ax, t["xy"], t["tri"], color=INK, lw=0.12, scale=1e-3)
+    ax.autoscale(); bare(ax)
+    ax.set_title(f"{title}\n{int(SUM[('ring', var)]['triangles_total']):,} triangles", fontsize=9)
+fig.text(0.5, 0.01, "32 lon/lat tiles from 45 S to the pole in polar stereographic, one overview level, both at 0.125 of their pixel.",
+         ha="center", color=MUTED, fontsize=8)
+fig.tight_layout(rect=(0, 0.04, 1, 0.97))
+fig.savefig(OUT / "overview.png", dpi=200)
+plt.close(fig)
+
+# 6. three strategies on the same polar tile ----------------------------------
+S3 = json.loads((RES / "strategies.json").read_text())
+import csv  # noqa: E402
+
+stats = {(r["tile"], r["strategy"]): r for r in csv.DictReader(open(RES / "strategies.csv"))}
+fig, axs = plt.subplots(1, 3, figsize=(9, 3.9))
+labels = {"grid": "Fixed grid in the source\n(MapLibre globe style)",
+          "target": "Quadtree on the map\n(OpenLayers style)",
+          "greedy": "Greedy in the source\n(deck.gl-raster)"}
+for ax, k in zip(axs, ("grid", "target", "greedy")):
+    m = S3["tiles"]["polar"][k]
+    draw(ax, m["xy"], m["tri"], color=INK if k != "target" else ACCENT, lw=0.25, scale=1e-3)
+    s = stats[("polar", k)]
+    ax.autoscale(); bare(ax)
+    ax.set_title(f"{labels[k]}\n{int(s['triangles']):,} triangles, worst error {float(s['true_max_error_P']):.2f} px", fontsize=8.5)
+    if k == "target":
+        lim = 1.05 * np.abs(np.asarray(S3["tiles"]["polar"]["greedy"]["xy"], float)).max() / 1e3
+        ax.set_xlim(-0.05 * lim, lim); ax.set_ylim(-0.05 * lim, lim)
+fig.text(0.5, 0.01, "One 22.5 degree lon/lat tile from 67.5 S to the pole, polar stereographic, target 0.125 px. "
+         "The quadtree also covers map area outside the tile.", ha="center", color=MUTED, fontsize=8)
+fig.tight_layout(rect=(0, 0.05, 1, 1))
+fig.savefig(OUT / "strategies.png", dpi=200)
+plt.close(fig)
+
+# 7. a polar-native raster in Equal Earth --------------------------------------
+A = json.loads((RES / "antimeridian-meshes.json").read_text())
+half = A["worldHalf"] / 1e3
+fig, axs = plt.subplots(2, 1, figsize=(8, 6.6))
+for ax, var, title in ((axs[0], "one-mesh", "One mesh per tile (upstream)"),
+                       (axs[1], "cut", "Tiles clipped to the hemisphere and cut at the antimeridian")):
+    for i, t in enumerate(A["variants"][var]):
+        xy = np.asarray(t["xy"], float).reshape(-1, 2) / 1e3
+        tri = np.asarray(t["tri"]).reshape(-1, 3)
+        fc = "#bfdbfe" if (t["crosses"] and var == "cut") else ("#fecaca" if not t["converged"] else "#e5e7eb")
+        ax.add_collection(PolyCollection(xy[tri], facecolors=fc, edgecolors=INK, linewidths=0.05, alpha=0.55))
+    ax.plot([-half, half, half, -half, -half], [0, 0, -half * 0.49, -half * 0.49, 0], color=MUTED, lw=0)
+    ax.set_xlim(-half * 1.03, half * 1.03); ax.set_ylim(-half * 0.53, half * 0.08); bare(ax)
+    ax.axhline(0, color=MUTED, lw=0.5)
+    ax.set_title(title)
+fig.text(0.5, 0.01, "Southern hemisphere of a south polar stereographic raster (5 x 5 tiles) drawn in Equal Earth. "
+         "Red: did not converge. Blue: tiles cut in two.", ha="center", color=MUTED, fontsize=8)
+fig.tight_layout(rect=(0, 0.03, 1, 1))
+fig.savefig(OUT / "antimeridian.png", dpi=200)
+plt.close(fig)
+print("wrote", sorted(p.name for p in OUT.glob("*.png")))

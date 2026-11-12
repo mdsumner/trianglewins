@@ -1,0 +1,7 @@
+tile,strategy,triangles,true_max_error_P,note
+outer,grid,2048,0.0986,32x32 cells
+outer,target,1540,0.2015,quadtree up to 10 levels
+outer,greedy,1124,0.1242,deck.gl-raster with a shared unit
+polar,grid,2048,0.0871,32x32 cells
+polar,target,1074,3.1751,quadtree up to 10 levels
+polar,greedy,1193,0.1196,deck.gl-raster with a shared unit
