@@ -199,7 +199,7 @@ plt.close(fig)
 A = json.loads((RES / "antimeridian-meshes.json").read_text())
 half = A["worldHalf"] / 1e3
 fig, axs = plt.subplots(2, 1, figsize=(8, 6.6))
-for ax, var, title in ((axs[0], "one-mesh", "One mesh per tile (upstream)"),
+for ax, var, title in ((axs[0], "one-mesh", "Naive one mesh per tile (no unwrap)"),
                        (axs[1], "cut", "Tiles clipped to the hemisphere and cut at the antimeridian")):
     for i, t in enumerate(A["variants"][var]):
         xy = np.asarray(t["xy"], float).reshape(-1, 2) / 1e3

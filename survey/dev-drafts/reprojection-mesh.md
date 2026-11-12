@@ -32,17 +32,22 @@ The short version:
   disc in a polar view comes from. The mesher is close to optimal for the
   tolerance it is given.
 - **The tolerance is the lever, and it is a heuristic.** deck.gl-raster
-  uses gdalwarp's 1/8 pixel, measured in source pixels at each tile's
-  centre. Measured in screen pixels for the view instead, the same polar
-  disc needs 10,192 triangles instead of 39,000, and tiles from different
-  overview levels meet without T-junctions.
+  uses gdalwarp's 1/8 pixel, measured as one source pixel's size at each
+  tile's centre. Tile selection keeps a source pixel at or under one
+  device pixel, so that is roughly a screen tolerance at the centre of
+  each tile. It does not follow pixel size across a tile, and tiles from
+  different overview levels then meet with T-junctions. One unit for the
+  whole view fixes the seams. At one fixed overview level, a screen-pixel
+  unit thins the polar disc from 39,000 to 10,192 triangles, an upper
+  bound on the saving.
 - **Constrained seeds widen what can be drawn.** The mesher accepts any
-  starting triangulation. Seeds clipped to the projection's domain, and
-  cut at the antimeridian, draw an orthographic hemisphere and a polar
-  stereographic raster in Equal Earth. Both are listed as unsupported in
-  the deck.gl-raster example today.
+  starting triangulation. Seeds clipped to the projection's domain draw an
+  orthographic hemisphere. Seeds cut along the antimeridian also handle
+  the tile that holds the pole, which lets a polar stereographic raster
+  be drawn in Equal Earth. Both cases are listed as unsupported in the
+  deck.gl-raster custom-projection example today.
 
-![32 longitude/latitude tiles from 45 S to the pole in polar stereographic. Left: the tolerance deck.gl-raster uses, in source pixels. Right: the same mesher with the tolerance in screen pixels for a 1000 pixel view.](overview.png)
+![32 longitude/latitude tiles from 45 S to the pole in polar stereographic, all from one overview level. Left: the tolerance deck.gl-raster uses, in source pixels. Right: the same mesher with the tolerance in screen pixels for a 1000 pixel view. At that view the tile selector would pick a coarser level, so the right panel is an upper bound on the saving.](overview.png)
 
 ## The landscape
 
@@ -142,10 +147,17 @@ the same tiles at the same overview level need far fewer triangles:
 | one source-pixel tolerance for all tiles | 37,152 | 0.12 P |
 | screen-pixel tolerance, 1000 px view | 10,192 | 0.125 screen px |
 
-At such a view the tile selector would usually pick a coarser overview,
-which narrows the first gap. What remains is the spread of pixel sizes
-within and between tiles, which a per-tile source-pixel unit cannot
-follow.
+This comparison holds the overview level fixed, so it is an upper bound.
+deck.gl-raster picks each tile's level so that a source pixel is at most
+one device pixel ([lod-and-pixel-matching](https://github.com/developmentseed/deck.gl-raster/blob/5b55894f3306867f2ae77166f6b71d2d8f6535f9/dev-docs/lod-and-pixel-matching.md)).
+At this view it would choose a coarser level, which brings the per-tile
+unit close to a screen pixel at each tile's centre. What a per-tile unit
+cannot follow is the spread of pixel size inside a tile (in the polar
+row it shrinks with the cosine of latitude) and between neighbouring
+tiles. Their own design note for output-pixel error makes the same point
+about a fixed source-pixel tolerance, and lists per-tile pixel size in
+tile selection as later work
+([output-pixel error design](https://github.com/developmentseed/deck.gl-raster/blob/5b55894f3306867f2ae77166f6b71d2d8f6535f9/dev-docs/specs/2026-10-13-output-pixel-error-design.md)).
 
 A per-tile unit also breaks seams. When neighbouring tiles come from
 different overview levels, the finer tile's unit is half the size, so it
@@ -193,13 +205,21 @@ Hobart), traced at even spacing on the sphere.
 | share of the visible disc covered | 92.3% | 100% |
 | worst error | 0.127 P | 0.129 P |
 
-**A polar-native raster in a world projection.** A south polar
-stereographic raster of the southern hemisphere, in 5 x 5 tiles of 512
-pixels, drawn in Equal Earth. One tile holds the pole, and the column
-below it straddles the antimeridian (the ray from the pole along
-longitude 180). With one mesh per tile, any triangle that crosses the
-antimeridian spans the width of the world, and the pole, a point in the
-source, should become a line on the map. So each tile is:
+**A polar-native raster in a world projection.** deck.gl-raster already
+draws tiles that cross the antimeridian: it makes the forward projection
+continuous by moving each point to the nearest copy of the world, meshes
+the tile once, and clips the mesh at the world's edge
+([antimeridian unwrap design](https://github.com/developmentseed/deck.gl-raster/blob/5b55894f3306867f2ae77166f6b71d2d8f6535f9/dev-docs/specs/2026-10-14-antimeridian-unwrap-design.md)).
+That cannot help a tile that holds a pole, because the pole is one point
+in the source and a whole line on the map. So the example offers
+polar-native rasters only in their own projection.
+
+The test case is a south polar stereographic raster of the southern
+hemisphere, in 5 x 5 tiles of 512 pixels, drawn in Equal Earth. One tile
+holds the pole, and the column below it straddles the antimeridian (the
+ray from the pole along longitude 180). The baseline below is the naive
+one mesh per tile, without the unwrap, so it shows the problem rather
+than deck.gl-raster's behaviour. With seeds, each tile is:
 
 1. clipped to the hemisphere, minus a cap of radius 0.05 degrees at the
    pole (5.6 km, under one pixel);
@@ -208,9 +228,9 @@ source, should become a line on the map. So each tile is:
 3. meshed one part at a time, each with its own longitude branch, so the
    vertices on the cut go to -180 on one side and +180 on the other.
 
-![The polar stereographic hemisphere in Equal Earth. One mesh per tile (top): three tiles do not converge (red) and triangles smear across the world. Clipped and cut seeds (bottom) give the hemisphere, with the cut tiles in blue.](antimeridian.png)
+![The polar stereographic hemisphere in Equal Earth. Naive one mesh per tile (top): three tiles do not converge (red) and triangles smear across the world. Clipped and cut seeds (bottom) give the hemisphere, with the cut tiles in blue.](antimeridian.png)
 
-| polar stereographic raster in Equal Earth | one mesh per tile (upstream) | clipped and cut |
+| polar stereographic raster in Equal Earth | naive one mesh per tile | clipped and cut |
 |---|---|---|
 | tile meshes (converged) | 25 (22) | 28 (28) |
 | triangles | 94,698 | 79,059 |
@@ -218,8 +238,9 @@ source, should become a line on the map. So each tile is:
 | worst error | 3,353 P | 0.125 P |
 | map area drawn, share of the hemisphere | 198% | 100% |
 
-The cut needs two meshes for one tile, each with its own projection
-function. That is the one change to the mesher's interface this needs.
+For the tiles below the pole, the unwrap would do the same job as the
+cut. The cut matters for the pole tile, and it needs two meshes for one
+tile, each with its own projection function.
 The tiny cap at the pole stays undrawn: on the map it is a band 5.6 km
 tall along the bottom edge. Closing it exactly needs vertices that share
 a texture coordinate but not a map position, which the mesher's data
@@ -266,10 +287,10 @@ Tested here, in the sandbox:
 
 | change | effect measured | size of change |
 |---|---|---|
-| tolerance in screen pixels for the view (zoom-keyed cache) | polar disc 39,000 to 10,192 triangles; no T-junctions across levels | one option (the sandbox's `_pixelSize`, see `pixel-size.patch`) plus the view's pixel size |
+| one error unit for the view, in device pixels (zoom-keyed cache) | no T-junctions across levels (256 before); polar disc 39,000 to 10,192 triangles at one fixed level (an upper bound) | one option (the sandbox's `_pixelSize`, see `pixel-size.patch`) plus the view's pixel size |
 | close the half-degree pole guard | 5% fewer polar triangles, no 110 km hole | remove a clamp |
 | seeds clipped to the projection's domain | orthographic hemisphere 92.3% to 100% covered | a seed builder; the mesher is unchanged |
-| antimeridian cut with a longitude branch per part | polar-native raster in Equal Earth converges, 0.125 P, nothing smeared | up to two meshes per tile, each with its own projection function |
+| pole tile cut along the antimeridian, a longitude branch per part | polar-native raster in Equal Earth converges, 0.125 P, nothing smeared | up to two meshes for the pole tile, each with its own projection function |
 
 Not tested yet:
 
