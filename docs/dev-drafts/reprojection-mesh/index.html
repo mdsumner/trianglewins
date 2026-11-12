@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reprojection meshes (draft)</title>
+<meta name="description" content="Development draft: why deck.gl-raster's reprojection mesh looks the way it does, measured headless, and what a shared tolerance and constrained seeds change.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 code, h2 code, h3 code, h4 code { font-size: 0.9em; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+  border-bottom: 1px solid var(--grid); line-height: 1.45; }
+th:first-child, td:first-child { min-width: 12em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; background: var(--surface-0);
+  border-bottom: 1px solid var(--border); }
+td code { font-size: 12px; color: var(--text-secondary); }
+td small { color: var(--text-muted); font-size: 12px; }
+td:first-child a { text-decoration: none; }
+td:first-child a:hover { text-decoration: underline; }
+td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../../">trianglewins</a> / dev draft</p>
+<h1 id="reprojection-meshes-why-they-look-the-way-they-do">Reprojection
+meshes: why they look the way they do</h1>
+<p><em>Development draft, 12 November 2026.</em></p>
+<p>deck.gl-raster's <a
+href="https://developmentseed.org/deck.gl-raster/examples/custom-projection/">custom
+projection example</a> draws Cloud-Optimized GeoTIFFs in any planar map
+projection. Each tile is textured onto a triangle mesh. Turn on the
+debug view over Antarctica with a longitude/latitude source (GEBCO,
+EPSG:4326) and the mesh looks bad. It fans into the pole, it goes almost
+black in a disc around the pole, and pink tile outlines run through it.
+This page explains why it is built that way, and what our side
+(bigcurve, the sizing-field work, cdtr and laridae, and the mesh spec)
+would change.</p>
+<p>Everything here runs headless against deck.gl-raster's own mesher,
+<code>RasterReprojector</code> in
+<code>packages/raster-reproject</code>, fetched at a pinned commit. The
+scripts and results are in <a
+href="https://github.com/mdsumner/trianglewins/tree/main/survey/dev-drafts/reprojection-mesh">survey/dev-drafts/reprojection-mesh/</a>.
+Nothing has been sent upstream.</p>
+<p>The short version:</p>
+<ul>
+<li><strong>The mesh only exists to warp a texture.</strong> The GPU
+interpolates texture coordinates linearly in each triangle, so the only
+thing that matters is how far a drawn point lands from where it belongs.
+Triangle shape on the map does not matter at all.</li>
+<li><strong>The dense disc is not a bug.</strong> It comes from linear
+interpolation of a longitude/latitude grid near a pole. The mesh is
+about evenly dense per square degree, and the map squeezes square
+degrees together near the pole. A smarter mesh in source space would not
+avoid that.</li>
+<li><strong>The tolerance belongs to the view, not the tile.</strong>
+Upstream sets the error unit for each tile separately. When neighbouring
+tiles come from different overview levels, that triples the polar mesh
+and leaves T-junctions along the tile seams. With one shared unit, both
+problems go away, because the mesher's own midpoint test already works
+like bigcurve's edge rule (it does not use bigcurve; it reached the same
+idea on its own).</li>
+<li><strong>Constrained seeds are the real gain.</strong> The mesher
+accepts any starting triangulation. If it starts from a tile clipped to
+the projection's valid area, triangulated with constraints, it handles
+domains that are not longitude/latitude boxes. An orthographic
+hemisphere goes from 92% coverage to all of it.</li>
+</ul>
+<h2 id="how-the-mesh-is-built">How the mesh is built</h2>
+<p><code>RasterReprojector</code> is a fork of mapbox's Delatin, a
+greedy Delaunay refiner for terrain. Here it refines a warp instead of a
+height:</p>
+<ol type="1">
+<li>Start each tile from two triangles over its pixel rectangle, in
+<strong>source</strong> texture coordinates (uv).</li>
+<li>For each triangle, project its corners exactly into the map CRS.
+Test four sample points (the centroid and three edge midpoints): where
+the GPU would draw the point (linear in the triangle) against where it
+belongs (the exact projection).</li>
+<li>Insert a vertex at the worst sample point, legalise the Delaunay
+triangulation in uv, and repeat until the worst error is below
+<code>maxError</code>.</li>
+</ol>
+<p>In "output" mode, which the raster layer uses, the error is measured
+on the map. The unit is one source pixel's size on the map, measured at
+the centre of the tile, and the default <code>maxError</code> is 0.125
+of that unit.</p>
+<p>Building the mesh in source space is the robust choice. The texture
+coordinate has to be linear within each triangle. Going the other way,
+meshing in map space and interpolating longitude and latitude, fails at
+the pole and the antimeridian, where longitude jumps.</p>
+<p><img src="same-mesh.png"
+alt="Four tiles from the upstream mesher, in source longitude/latitude (left) and on the polar stereographic map (right). In source space the mesh is ordinary; the fan only appears on the map." /></p>
+<p>The sandbox uses the example's layout: 22.5 degree tiles of 512
+pixels, in two rows from 45 S to the pole, drawn in south polar
+stereographic (spherical, standard parallel 71 S). P is one source pixel
+on the map at 71 S, 2.79 km. All errors below are in units of P.</p>
+<h2 id="why-the-disc-is-dense">Why the disc is dense</h2>
+<p>The image of a straight source-space triangle edge on the polar map
+is a curve. An edge along a parallel becomes an arc, and an edge along a
+meridian stays straight. An edge that changes both longitude and
+latitude becomes a piece of a spiral. The spiral's bulge is about
+<code>rho' * dlon * dlat / 4</code>, where <code>rho'</code> is how fast
+the distance from the pole grows with latitude. Near the pole,
+<code>rho'</code> is nearly constant. So the largest triangle allowed is
+about the same size <strong>in square degrees</strong> everywhere near
+the pole. For a tolerance of 0.125 P that is about 0.37 square degrees,
+or roughly 2.7 triangles per square degree.</p>
+<p>The mesher finds that limit without being told:</p>
+<p><img src="density.png"
+alt="Triangles per square degree (black) are flat from 45 S to the pole; triangles per 1000 square km on the map (blue) climb steeply toward the pole." /></p>
+<table>
+<thead>
+<tr class="header">
+<th>latitude band</th>
+<th>triangles per square degree</th>
+<th>triangles per 1000 km^2</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>90 to 85 S</td>
+<td>2.73</td>
+<td>5.30</td>
+</tr>
+<tr class="even">
+<td>80 to 75 S</td>
+<td>2.31</td>
+<td>0.89</td>
+</tr>
+<tr class="odd">
+<td>70 to 65 S</td>
+<td>2.38</td>
+<td>0.49</td>
+</tr>
+<tr class="even">
+<td>50 to 45 S</td>
+<td>2.54</td>
+<td>0.24</td>
+</tr>
+</tbody>
+</table>
+<p>The count is flat in source space and goes up more than 20 times per
+unit of map area. The disc in the screenshot is that factor, drawn with
+one-pixel lines. The polar row holds about as many triangles as the
+outer row (19,088 against 18,016) in a third of the map area. No mesh
+that interpolates longitude and latitude linearly can do much better,
+because the limit comes from the warp, not from how the vertices are
+placed. The only way out is not to interpolate at all: compute the
+texture coordinate per pixel in the shader, by inverse projection. For
+analytic projections like this one, that is cheap.</p>
+<p>Two smaller findings:</p>
+<ul>
+<li><strong>The pole hole can close.</strong> Upstream stops geographic
+tiles half a degree short of each pole, a hole about 110 km across. In
+output mode the mesh converges all the way to the pole, and the polar
+row gets <em>smaller</em>: 20,400 triangles against 21,440 with the
+hole. The sliver triangles along the cut edge are the cost.</li>
+<li><strong>The four-point sampler holds up.</strong> Checked by dense
+sampling of every triangle (28 points each), the true worst error is
+within 1% of <code>maxError</code> with a fixed unit and within 3% on
+the orthographic seeds below.</li>
+</ul>
+<h2 id="seams-and-the-error-unit">Seams and the error unit</h2>
+<p>Upstream measures each tile's error unit at the tile's centre. In
+this symmetric layout that is harmless: neighbours in a row have the
+same unit, and the edge between the rows happens to split the same way
+from both sides. It breaks when neighbours come from different overview
+levels, which the tileset does whenever it picks a finer level for part
+of the view. A tile one level finer has pixels half the size, so its
+tolerance on the map is halved.</p>
+<table>
+<thead>
+<tr class="header">
+<th>two rows, polar cap one level finer</th>
+<th>upstream: unit per tile</th>
+<th>one unit for the view</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>triangles in the polar cap</td>
+<td>69,440</td>
+<td>19,104</td>
+</tr>
+<tr class="even">
+<td>T-junctions on tile seams</td>
+<td>256</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<td>widest seam gap</td>
+<td>0.067 P</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>true worst error</td>
+<td>0.168 P</td>
+<td>0.125 P</td>
+</tr>
+</tbody>
+</table>
+<p><img src="seam.png"
+alt="A coarse tile (black) above two finer tiles (blue). Upstream (left) splits the shared parallel more finely from the fine side, leaving vertices on one side only (red). With one unit (right) the vertices match." /></p>
+<p>A T-junction is a vertex on one side of an edge but not the other.
+The gap it leaves is below a tenth of a pixel here, so in practice it
+shows up as the occasional dropped pixel along a seam, not a visible
+crack. The mesh size is the bigger effect: tying the tolerance to source
+pixels makes the polar cap 3.6 times larger for no visible gain.</p>
+<p>The fix is one number. With a single error unit for all tiles in a
+view (the sandbox adds a <code>_pixelSize</code> option, see
+<code>pixel-size.patch</code>), the seams match exactly and the mesh no
+longer depends on the overview level. The cost is that the mesh then
+depends on the view, so a cache would key on tile and zoom (a quantised
+zoom is enough), not on tile alone.</p>
+<h2 id="the-mesher-already-follows-a-bigcurve-style-rule">The mesher
+already follows a bigcurve-style rule</h2>
+<p>The sandbox's first attempt at "conforming" tiles copied bigcurve. It
+densified every tile edge first, by bisecting until the projected
+midpoint is within tolerance of the chord. That rule looks only at the
+edge, so both tiles sharing an edge get the same vertices. The edges
+were then fixed as the seed's boundary.</p>
+<p>It made no difference to the seams, and it cost 26% more triangles
+(46,732 against 37,152), because a seed with many boundary points and
+long thin triangles refines less efficiently. The reason it made no
+difference: the greedy mesher only ever splits a boundary edge at its
+midpoint, and only when that midpoint's error is over the tolerance.
+That is the same idea as bigcurve, applied lazily during refinement.
+deck.gl-raster does not use bigcurve: the rule falls out of Delatin's
+sample points, which include each edge's midpoint (<a
+href="https://github.com/developmentseed/deck.gl-raster/blob/5b55894f3306867f2ae77166f6b71d2d8f6535f9/packages/raster-reproject/src/delatin.ts#L23-L28">delatin.ts
+L23-28</a>), and its collinear split when the worst sample lies on an
+edge (<a
+href="https://github.com/developmentseed/deck.gl-raster/blob/5b55894f3306867f2ae77166f6b71d2d8f6535f9/packages/raster-reproject/src/delatin.ts#L506-L520">L506-520</a>).
+The test differs a little. It uses the full distance from the projected
+midpoint to the chord's midpoint, so sliding along the chord counts as
+well as bulging off it, while bigcurve, following d3-geo, measures the
+distance off the chord. Bisection at midpoints also nests across levels,
+since a finer tile's half-edge splits exactly where the coarse edge
+would. So the shared error unit is all the seams need.</p>
+<p>This suggests how the edge logic should relate to meshes in general.
+It is an <strong>edge oracle</strong>: given an edge and a tolerance, it
+decides the vertices by looking at that edge alone. A mesher can call it
+for its boundary and constraint edges, either up front (bigcurve, then
+cdtr or laridae) or lazily (this mesher). The mesh records the result
+through the mesh spec's vertex origin (<code>densify</code>) and
+<code>edge_sources</code>, which link each new piece of an edge back to
+the input edge it came from. That is a linked capability, not one built
+into every mesher.</p>
+<h2 id="constrained-seeds-domains-that-are-not-boxes">Constrained seeds:
+domains that are not boxes</h2>
+<p>The README for the example lists projections whose valid area is not
+a longitude/latitude box, such as an orthographic hemisphere, as
+unsupported. The mesher already accepts any valid starting triangulation
+(<code>initialTriangulation</code>, in delaunator's halfedge shape). So,
+for each tile, the sandbox:</p>
+<ol type="1">
+<li>clips the tile box to the visible cap, traced as a small circle 89.5
+degrees from the view centre, at even spacing on the sphere;</li>
+<li>triangulates the clipped polygon with constraints (Shewchuk's
+Triangle with the <code>p</code> switch, no refinement), and</li>
+<li>hands that to the unchanged mesher, with the shared error unit.</li>
+</ol>
+<p><img src="ortho.png"
+alt="Orthographic view centred on Hobart. Box seeds (left) can only draw whole tiles, which leaves the yellow part of the visible disc empty. Constrained seeds (right) draw tiles cut at the horizon (blue) and cover the disc." /></p>
+<table>
+<thead>
+<tr class="header">
+<th>orthographic, centred on Hobart</th>
+<th>box seeds (whole tiles only)</th>
+<th>constrained seeds</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>tiles drawn</td>
+<td>51</td>
+<td>77</td>
+</tr>
+<tr class="even">
+<td>triangles</td>
+<td>44,886</td>
+<td>63,911</td>
+</tr>
+<tr class="odd">
+<td>share of the visible disc covered</td>
+<td>92.3%</td>
+<td>100%</td>
+</tr>
+<tr class="even">
+<td>true worst error</td>
+<td>0.127 P</td>
+<td>0.129 P</td>
+</tr>
+</tbody>
+</table>
+<p>Three things had to be right. The seed triangles must be wound the
+same way as delaunator's output, or the mesher stalls. The cap stops
+half a degree short of the horizon, so the chords the mesher splits stay
+where the projection is defined. And the horizon is traced at even
+spacing on the sphere. A first version traced it at even steps of
+longitude, and the mesher never converged on two tiles near the horizon.
+Even spacing fixed that. The likely cause is chords that cut outside the
+hemisphere where the traced points were far apart, but that has not been
+checked.</p>
+<p>The same approach should handle the README's other limitation:
+polar-native rasters in world projections, where one tile spans the
+antimeridian and the pole. That needs a seed in two parts, cut along the
+antimeridian with the cut as a constraint, and is the next thing to
+try.</p>
+<h2 id="what-our-side-adds">What our side adds</h2>
+<ul>
+<li><strong>Sizing.</strong> The density limit above is a sizing field
+for this warp, and here it is anisotropic. As the sizing page says, a
+projection cannot stand in for that, and a greedy refiner finds it by
+sampling. For analytic warps it could be computed up front, but the
+greedy result is already close to the limit, so speed is the only
+gain.</li>
+<li><strong>Constraints.</strong> Clipped domains, the antimeridian, the
+pole and projection edges are constraint edges. They are cdtr and
+laridae territory, densified by the edge oracle.</li>
+<li><strong>The mesh spec.</strong> A tile mesh is a mesh with
+<code>uv</code> as the input coordinates and map xy as derived
+positions. Densified vertices carry <code>origin = densify</code>, and
+seams can be checked from <code>edge_sources</code> without looking at
+geometry.</li>
+<li><strong>Not triangle shape.</strong> Constrained refinement with a
+minimum angle would make the debug view prettier, and it would cost
+triangles for no gain in the picture.</li>
+</ul>
+<h2 id="running-it">Running it</h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> survey/dev-drafts/reprojection-mesh</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sh</span> fetch-upstream.sh <span class="kw">&amp;&amp;</span> <span class="ex">npm</span> install</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">node</span> <span class="at">--experimental-strip-types</span> run.mjs</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> ortho_seeds.py</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">node</span> <span class="at">--experimental-strip-types</span> ortho.mjs</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> figures.py</span></code></pre></div>
+<p><code>fetch-upstream.sh</code> gets the mesher at the pinned commit
+and applies the patch; npm adds delaunator. The Python steps need numpy,
+shapely, triangle and matplotlib. Node 22 runs the TypeScript mesher
+directly. <code>results/summary.csv</code>,
+<code>results/tiles.csv</code> and
+<code>results/ortho-summary.csv</code> hold the numbers quoted here.</p>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>

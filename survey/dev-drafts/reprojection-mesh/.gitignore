@@ -1,0 +1,8 @@
+delatin.upstream.ts
+delatin.ours.ts
+node_modules/
+package-lock.json
+results/meshes.json
+results/ortho-meshes.json
+results/ortho-seeds.json
+results/figures/

@@ -1,0 +1,25 @@
+--- a/delatin.ts
++++ b/delatin.ts
+@@ -229,6 +229,12 @@
+        * This option is experimental and may change or be removed.
+        */
+       _errorSpace?: "input" | "output";
++      /**
++       * SANDBOX ADDITION: a fixed size (map units) for one error unit, in
++       * place of the per-mesh pixel size measured at the mesh centre. Lets
++       * every tile share one tolerance so shared edges densify identically.
++       */
++      _pixelSize?: number;
+     } = {},
+   ) {
+     this.reprojectors = reprojectors;
+@@ -253,7 +259,8 @@
+     const seed = options.initialTriangulation ?? UNIT_SQUARE_TRIANGULATION;
+     this._errorSpace = options._errorSpace ?? "input";
+     this._pixelSize =
+-      this._errorSpace === "output" ? this._measurePixelSize(seed) : 1;
++      options._pixelSize ??
++      (this._errorSpace === "output" ? this._measurePixelSize(seed) : 1);
+     this._seed(seed);
+     this._flush();
+   }
