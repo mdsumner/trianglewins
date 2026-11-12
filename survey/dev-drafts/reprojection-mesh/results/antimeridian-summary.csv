@@ -1,0 +1,3 @@
+variant,tile_meshes,converged,triangles,triangles_spanning_half_the_world,true_max_error_P,area_share_of_hemisphere
+one-mesh,25,22,94698,58836,3353.056,1.9771
+cut,28,28,79059,0,0.125,1.0000

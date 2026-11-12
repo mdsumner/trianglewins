@@ -6,3 +6,6 @@ results/meshes.json
 results/ortho-meshes.json
 results/ortho-seeds.json
 results/figures/
+results/am-seeds.json
+results/antimeridian-meshes.json
+results/strategies.json

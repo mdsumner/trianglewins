@@ -52,6 +52,9 @@ const ROWS = [0, 1];
 // error unit for B1 and A; a stand-in for "one screen pixel" at the zoom
 // where the view's LOD would pick this source level.
 const P = R * Math.sqrt(Math.cos(71 * D2R)) * RES * D2R;
+// SCREEN: one screen pixel when the disc from 45 S to the pole fills a
+// 1000-pixel-wide view (a phone, say). Variant S meshes to that unit.
+const SCREEN = (2 * 2 * R * K0 * Math.tan((Math.PI / 2 - 45 * D2R) / 2)) / 1000;
 
 // level 0 = 22.5 degree tiles; level 1 = 11.25 degree tiles (one LOD finer)
 function tileGeo(col, row, level = 0) {
@@ -132,6 +135,11 @@ function build(variant, t) {
   } else if (variant === "B1") {
     r = new ours.RasterReprojector(fns, W, W, {
       _errorSpace: "output", _pixelSize: P,
+      initialTriangulation: ours.triangulateRectangle(0, 0, 1, vMaxFor(t)),
+    });
+  } else if (variant === "S") {
+    r = new ours.RasterReprojector(fns, W, W, {
+      _errorSpace: "output", _pixelSize: SCREEN,
       initialTriangulation: ours.triangulateRectangle(0, 0, 1, vMaxFor(t)),
     });
   } else {
@@ -275,7 +283,7 @@ const meshes = { P, MAX_ERROR, scenarios: {} };
 
 for (const [scen, tiles] of Object.entries(SCENARIOS)) {
   meshes.scenarios[scen] = {};
-  for (const variant of ["B0", "B1", "A"]) {
+  for (const variant of ["B0", "B1", "A", "S"]) {
     const built = new Map();
     let outer = 0, cap = 0, ms = 0, emax = 0;
     const angles = [];
@@ -306,5 +314,5 @@ for (const [scen, tiles] of Object.entries(SCENARIOS)) {
 writeFileSync(join(OUT, "tiles.csv"), tileRows.join("\n") + "\n");
 writeFileSync(join(OUT, "summary.csv"), summary.join("\n") + "\n");
 writeFileSync(join(OUT, "meshes.json"), JSON.stringify(meshes));
-console.log(`P = ${P.toFixed(1)} m`);
+console.log(`P = ${P.toFixed(1)} m, SCREEN = ${SCREEN.toFixed(1)} m`);
 console.log(summary.join("\n"));

@@ -67,8 +67,8 @@ render dev-drafts/polygons-are-lines.md dev-drafts/polygons-are-lines \
   "Development draft: a polygon is segments plus a fill rule, why that holds because the plane is special, and where it stops holding for volumes, graphs in xyz and the sphere." \
   ../../
 render dev-drafts/reprojection-mesh.md dev-drafts/reprojection-mesh \
-  "Reprojection meshes (draft)" "dev draft" \
-  "Development draft: why deck.gl-raster's reprojection mesh looks the way it does, measured headless, and what a shared tolerance and constrained seeds change." \
+  "Reprojection meshes for raster tiles (draft)" "dev draft" \
+  "Development draft: how GDAL, d3, OpenLayers, MapLibre and deck.gl-raster mesh the warp for raster tiles, measured on polar, hemispheric and antimeridian cases, and where bigcurve, cdtr, laridae and the mesh spec fit." \
   ../../
 redirect choose ../start/#which-package
 redirect dimension ../notes/#dimension
