@@ -39,13 +39,16 @@ p { margin: 0 }
 .lede h1 { color: var(--ink) }
 .lede strong { color: var(--ink); font-weight: 600 }
 .eyebrow { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent) }
-.casegroups { display: grid; gap: 10px }
-.casegroup { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 10px; align-items: center }
-@media (max-width: 560px) { .casegroup { grid-template-columns: minmax(0, 1fr) } }
+.casegroups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px }
+@media (max-width: 860px) { .casegroups { grid-template-columns: minmax(0, 1fr) } }
+.casegroup { display: grid; gap: 12px; align-content: start; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px }
+.grouphead { display: grid; gap: 3px }
+.grouphead h2 { font-size: 1.05rem }
+.grouphead p { font-size: 0.88rem; color: var(--muted) }
 .grouplabel { font: 500 0.74rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted) }
 .cases { display: flex; flex-wrap: wrap; gap: 8px }
-.cases button { font: 500 0.9rem var(--body); padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line);
-  background: var(--panel); color: var(--ink); cursor: pointer }
+.cases button { font: 500 0.88rem var(--body); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); cursor: pointer }
 .cases button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
 .bench { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 22px; align-items: start }
@@ -99,12 +102,20 @@ code { font-family: var(--mono); font-size: 0.86em }
     <div class="eyebrow"><a href="../">trianglewins</a> / ortho-cog-viewer and deck.gl-raster, case by case</div>
     <h1>Warp Mesh Casebook</h1>
     <p>A live copy of the warp that <a href="https://github.com/mdsumner/ortho-cog-viewer">ortho-cog-viewer</a> draws: a constant grid in <strong>screen</strong> space, each vertex inverse-projected to lon/lat, and the GPU interpolating texture coordinates linearly inside each triangle. The heat layer shows how far the interpolated texture lands from where it belongs, in screen pixels, measured at each triangle's centroid and edge midpoints.</p>
-    <p>A companion to <a href="../dev-drafts/reprojection-mesh/">Reprojection meshes for raster tiles</a>, which measures the same questions headless. Away from singularities that error is small and even, as the constant-mesh model says. It grows where the inverse is not smooth: the pole, the horizon, the antimeridian. The second row of cases meshes the other way, as deck.gl-raster does: level-of-detail tiles in source lon/lat, each refined on its own until its error is under a fraction of a source pixel. Same texture, same error measure, so the two can be compared directly. Pick a case, then flip the switches.</p>
+    <p>A companion to <a href="../dev-drafts/reprojection-mesh/">Reprojection meshes for raster tiles</a>, which measures the same questions headless. Away from singularities that error is small and even, as the constant-mesh model says. It grows where the inverse is not smooth: the pole, the horizon, the antimeridian. The cases come in two separate sets, one per mesher: the screen grid above, and source tiles as <a href="https://github.com/developmentseed/deck.gl-raster">deck.gl-raster</a> builds them, with level-of-detail tiles in lon/lat, each refined on its own until its error is under a fraction of a source pixel. Both use the same texture and the same error measure, so they can be compared directly. For deck.gl-raster's own account of its mesh, see its <a href="https://developmentseed.org/deck.gl-raster/examples/reprojection-explainer/">reprojection explainer</a>. Pick a case, then flip the switches.</p>
   </header>
 
   <nav class="casegroups" aria-label="Cases">
-    <div class="casegroup"><span class="grouplabel">Screen grid</span><div class="cases" id="casesG"></div></div>
-    <div class="casegroup"><span class="grouplabel">Source tiles</span><div class="cases" id="casesT"></div></div>
+    <div class="casegroup">
+      <div class="grouphead"><span class="grouplabel">Mesher 1</span><h2>Screen grid, as in ortho-cog-viewer</h2>
+        <p>A constant grid over the screen, each vertex inverse-projected. <a href="https://github.com/mdsumner/ortho-cog-viewer">ortho-cog-viewer</a></p></div>
+      <div class="cases" id="casesG"></div>
+    </div>
+    <div class="casegroup">
+      <div class="grouphead"><span class="grouplabel">Mesher 2</span><h2>Source tiles, as in deck.gl-raster</h2>
+        <p>Level-of-detail tiles in lon/lat, each refined on its own. <a href="https://github.com/developmentseed/deck.gl-raster">deck.gl-raster</a> &middot; <a href="https://developmentseed.org/deck.gl-raster/examples/reprojection-explainer/">its reprojection explainer</a></p></div>
+      <div class="cases" id="casesT"></div>
+    </div>
   </nav>
 
   <section class="bench">
@@ -183,7 +194,7 @@ code { font-family: var(--mono); font-size: 0.86em }
 
   <section class="card">
     <h2>Source tiles, the deck.gl-raster way</h2>
-    <p class="foot">The tile mode follows deck.gl-raster's design as documented in its source and dev-docs, without using its code. Tiles are chosen so a source pixel is at most one screen pixel at the tile centre. Each tile starts from two triangles, and the error at the centroid and edge midpoints is measured forward in screen pixels against maxError (default 0.125) times one source pixel's size on screen. A bintree split stands in for Delatin's Delaunay insertion. Triangle shapes differ, but the picture does not, because only the error test decides what gets drawn.</p>
+    <p class="foot">The tile mode follows deck.gl-raster's design as documented in its source, dev-docs and <a href="https://developmentseed.org/deck.gl-raster/examples/reprojection-explainer/">reprojection explainer</a>, without using its code. Tiles are chosen so a source pixel is at most one screen pixel at the tile centre. Each tile starts from two triangles, and the error at the centroid and edge midpoints is measured forward in screen pixels against maxError (default 0.125) times one source pixel's size on screen. A bintree split stands in for Delatin's Delaunay insertion. Triangle shapes differ, but the picture does not, because only the error test decides what gets drawn.</p>
     <div class="tablewrap"><table>
       <thead><tr><th>Choice</th><th>Effect</th><th>What the cases show</th></tr></thead>
       <tbody>
