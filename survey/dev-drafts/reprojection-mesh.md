@@ -10,7 +10,10 @@ the warp, and how it is built decides accuracy, triangle count, seams
 between tiles, and which projections and domains can be drawn at all.
 
 This page surveys how current tools build that mesh. It then takes the
-most adaptive of them, deck.gl-raster's `RasterReprojector`, measures it
+most adaptive of them, deck.gl-raster's `RasterReprojector` (its authors
+explain it in a
+[reprojection explainer](https://developmentseed.org/deck.gl-raster/examples/reprojection-explainer/)),
+measures it
 headless against cases that are hard for it (polar, hemispheric,
 antimeridian), and sets out where our tools (bigcurve, cdtr and laridae,
 the mesh spec, and the sizing-field work) fit. The scripts and results

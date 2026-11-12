@@ -1,6 +1,6 @@
 const CASES = [
   { id: "flat", group: "grid", label: "Constant mesh", set: { proj: "ortho", lon0: 147, lat0: -42, zoom: 0, grid: 64, unwrap: 1, poleFan: 1, rimClip: 1, refine: 0, heat: 1, wire: 0 },
-    verdict: ["right", "Michael's model holds where the inverse is smooth"],
+    verdict: ["right", "the constant-mesh model holds where the inverse is smooth"],
     what: "A 64 cell screen grid over a globe centred on Hobart, the ortho-cog-viewer default. Across most of the disc the error is a fraction of a pixel to about one pixel and it is even, as the constant-mesh model says. It rises at the limb and around the pole.",
     tryit: "Move <b>Grid cells</b>: error falls with the square of the cell size in the flat middle, but the limb and pole rings stay hot much longer." },
   { id: "pole", group: "grid", label: "Pole in view", set: { proj: "ortho", lon0: 25, lat0: -78, zoom: 1.2, grid: 64, unwrap: 1, poleFan: 1, rimClip: 1, refine: 0, heat: 1, wire: 1 },
