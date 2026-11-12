@@ -16,7 +16,8 @@ antimeridian), and sets out where our tools (bigcurve, cdtr and laridae,
 the mesh spec, and the sizing-field work) fit. The scripts and results
 are in
 [survey/dev-drafts/reprojection-mesh/](https://github.com/mdsumner/trianglewins/tree/main/survey/dev-drafts/reprojection-mesh).
-Nothing here has been proposed upstream.
+Nothing here has been proposed upstream. To try the cases
+interactively, see the [Warp Mesh Casebook](../../casebook/).
 
 The short version:
 
