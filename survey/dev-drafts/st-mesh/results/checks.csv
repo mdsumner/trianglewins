@@ -1,0 +1,31 @@
+"layer","op","check_r","check_cpp"
+"nc","ST_Area",1.33851916399712e-14,NA
+"nc","ST_Centroid",1.01018236117904e-15,NA
+"nc","ST_PointOnSurface",0,NA
+"nc","ST_Envelope",0,0
+"nc","ST_Touches",0,0
+"nc","ST_Relate F***1****",0,NA
+"nc","ST_Intersects(point, polygon)",0,0
+"nc","ST_Union_Agg (grouped)",0,0
+"nc","ST_CoverageUnion (grouped)",0,0
+"nc","ST_Transform",1.28697734741692e-13,NA
+"voronoi","ST_Area",1.54183241082603e-13,NA
+"voronoi","ST_Centroid",7.27661810527695e-16,NA
+"voronoi","ST_PointOnSurface",0,NA
+"voronoi","ST_Envelope",0,0
+"voronoi","ST_Touches",0,0
+"voronoi","ST_Relate F***1****",0,NA
+"voronoi","ST_Intersects(point, polygon)",0,0
+"voronoi","ST_Union_Agg (grouped)",0,0
+"voronoi","ST_CoverageUnion (grouped)",0,0
+"voronoi","ST_Transform",1.36728916119491e-11,NA
+"inlandwaters","ST_Area",5.88585824728948e-14,NA
+"inlandwaters","ST_Centroid",5.83394824038987e-16,NA
+"inlandwaters","ST_PointOnSurface",0,NA
+"inlandwaters","ST_Envelope",0,0
+"inlandwaters","ST_Touches",0,0
+"inlandwaters","ST_Relate F***1****",0,NA
+"inlandwaters","ST_Intersects(point, polygon)",0,0
+"inlandwaters","ST_Union_Agg (grouped)",0,0
+"inlandwaters","ST_CoverageUnion (grouped)",0,0
+"inlandwaters","ST_Transform",7.52150352513915e-13,NA

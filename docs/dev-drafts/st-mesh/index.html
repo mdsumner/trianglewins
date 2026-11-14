@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ST_* functions on a triangle mesh (draft)</title>
+<meta name="description" content="Development draft: which ST_* functions run natively on a triangle mesh, which need only its indices, which need one more index and which fall back to polygons, with a prototype checked against sf.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 code, h2 code, h3 code, h4 code { font-size: 0.9em; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+  border-bottom: 1px solid var(--grid); line-height: 1.45; }
+th:first-child, td:first-child { min-width: 12em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; background: var(--surface-0);
+  border-bottom: 1px solid var(--border); }
+td code { font-size: 12px; color: var(--text-secondary); }
+td small { color: var(--text-muted); font-size: 12px; }
+td:first-child a { text-decoration: none; }
+td:first-child a:hover { text-decoration: underline; }
+td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../../">trianglewins</a> / dev draft</p>
+<h1 id="st_-functions-on-a-triangle-mesh">ST_* functions on a triangle
+mesh</h1>
+<p><em>Development draft, 14 November 2026.</em></p>
+<p>The <a href="../geoarrow-triangles-proposal/">geoarrow.triangles
+proposal</a> stores a mesh as one Arrow array: triangles that index a
+shared dictionary of vertices. Asked about it, the GeoArrow side's
+answer was that adoption is easier if the usual <code>ST_*</code>
+functions are defined for it, so that users never have to think about
+how the geometry is stored. This page takes that seriously. It goes
+through the <code>ST_*</code> functions that SQL engines (PostGIS,
+DuckDB spatial, SedonaDB) and sf share, and sorts each one by how it
+runs on a mesh: natively, from the indices alone, with one extra index,
+or by falling back to polygons and GEOS.</p>
+<p>The idea behind the sorting is that a mesh is pre-prepared geometry.
+The work that GEOS does on every call, or once per prepared geometry,
+has already been done by the triangulation: the polygon is split into
+convex pieces, shared boundaries share their vertices, crossings are
+nodes, and what is inside is settled. Many functions become a sum or a
+min over triangles, and many predicates become questions about shared
+indices. The functions that need real geometry construction fall back to
+union to polygons, which is no worse than today.</p>
+<p>A small R prototype runs ten of these functions on three layers and
+checks every answer against sf. The code is in <a
+href="https://github.com/mdsumner/trianglewins/tree/main/survey/dev-drafts/st-mesh">survey/dev-drafts/st-mesh/</a>.
+Nothing here has been proposed upstream.</p>
+<p>The short version:</p>
+<ul>
+<li><strong>Most of the everyday functions are native.</strong> Area,
+centroid, point on surface, extent, the transforms and per-triangle
+validity are closed forms over triangles. Point on surface is better
+than native: the centroid of any triangle of the feature is inside it by
+construction.</li>
+<li><strong>Relations between features of one mesh need no
+coordinates.</strong> Touches, edge adjacency, overlaps, the full DE-9IM
+between two features, boundary, dissolve and hole counts all follow from
+shared vertex and edge indices, once the mesh is noded. In the
+prototype, touches is 15 to 20 times faster than sf and a grouped union
+11 to 38 times.</li>
+<li><strong>Point in polygon is a lookup.</strong> A grid of triangle
+buckets and three orientation tests beat GEOS's prepared geometry by 29
+to 60 times for 100,000 points, index build included. cdtr already has
+this locator inside <code>cdt_interpolate()</code>.</li>
+<li><strong>Overlay between layers is near-native.</strong> Insert both
+layers' edges in one constrained triangulation and label the triangles
+(mesh spec v0.2, Annex A). That is what polymer does, and after it
+intersection, union and difference are set algebra on triangle
+labels.</li>
+<li><strong>Buffer, simplify, offset curves and distances to other
+geometry fall back.</strong> They construct new geometry, and the mesh
+gives them nothing more than clean, once-only boundaries as input.</li>
+<li><strong>Feature-level functions need one more column.</strong> To
+answer <code>ST_Area(feature)</code> a consumer must know which
+triangles make up a feature. The proposal keeps that outside the type;
+this page argues it should be a recommended column
+(<code>feature</code>, or <code>set_id</code> with
+<code>set_features</code> for overlapping inputs).</li>
+</ul>
+<p><img src="nc-mesh.png"
+alt="The North Carolina counties as one mesh (2,205 triangles on 1,255 shared vertices). Blue points are ST_PointOnSurface, each the centroid of its county&#39;s largest triangle (shaded). Dark lines are a grouped ST_Union_Agg into eight bands, walked from the triangle indices with no overlay." /></p>
+<h2 id="what-an-argument-is">What an argument is</h2>
+<p>With polygons, a geometry is a row. With
+<code>geoarrow.triangles</code>, a row is a triangle and the array is
+the mesh, so an <code>ST_*</code> function can mean three things:</p>
+<ol type="1">
+<li><strong>Per triangle.</strong> <code>ST_Area(tri)</code> on each
+row. This is what a SQL engine would do with the type as written, and it
+is always native, but no user wants it on its own.</li>
+<li><strong>Per feature.</strong> The geometry the user thinks of: the
+triangles that came from one input polygon, or one overlay piece.
+<code>ST_Area(feature)</code> must return what it would for that
+polygon. This is the level that has to work for users not to care about
+storage.</li>
+<li><strong>Per mesh.</strong> Aggregates over the whole array:
+<code>ST_Extent_Agg</code>, <code>ST_Union_Agg</code>.</li>
+</ol>
+<p>Level 2 needs a grouping. In SQL it is a
+<code>GROUP BY feature</code> over rows with
+<code>SUM(ST_Area(tri))</code>, which already works with a plain feature
+column. A better engine binding hides the grouping: a mesh column whose
+per-feature view is a lazy geometry, materialised as a polygon only when
+a function falls back. Either way the mesh must say which feature each
+triangle belongs to. For a coverage (no overlaps) that is one
+<code>feature</code> integer per triangle. For overlapping inputs it is
+the v0.2 labelling: <code>set_id</code> per triangle and a long
+<code>set_features</code> table, because one triangle can belong to
+several features.</p>
+<h2 id="tiers">Tiers</h2>
+<table>
+<thead>
+<tr class="header">
+<th>tier</th>
+<th>meaning</th>
+<th>reads</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>native</strong></td>
+<td>a closed form per triangle, then a sum, min, max or pick per
+feature</td>
+<td>vertices, triangles, feature</td>
+</tr>
+<tr class="even">
+<td><strong>combinatorial</strong></td>
+<td>answered from indices: shared vertices, shared edges, triangle sets.
+Exact whenever the noding was</td>
+<td>triangles, feature; edges derived from triangles</td>
+</tr>
+<tr class="odd">
+<td><strong>near-native</strong></td>
+<td>one extra structure: a point locator, the other geometry inserted as
+constraints, or a clip of crossing triangles</td>
+<td>as above, plus an index or a rebuild</td>
+</tr>
+<tr class="even">
+<td><strong>fallback</strong></td>
+<td>dissolve to polygons (combinatorial, cheap) and hand them to GEOS or
+s2</td>
+<td>as for dissolve</td>
+</tr>
+</tbody>
+</table>
+<p>Combinatorial answers rest on the noding. Two features touch in the
+mesh when they share a vertex id, so a vertex of one lying on the edge
+of the other must have been inserted as a vertex of both. A constrained
+triangulation that resolves crossings does that
+(<code>vertex_identity</code> <code>"noded"</code> or
+<code>"exact"</code> in the proposal). A mesh pooled only by exact float
+matching (<code>"exact_float"</code>) answers relations correctly only
+for inputs that were already noded, as a clean coverage is.</p>
+<h2 id="the-coverage-table">The coverage table</h2>
+<p>Tables, in mesh spec terms: <strong>V</strong> vertices,
+<strong>T</strong> triangles, <strong>F</strong> <code>feature</code> or
+<code>set_id</code> + <code>set_features</code>, <strong>E</strong>
+edges (derived from T in one sort), <strong>C</strong>
+<code>constraints</code>, <strong>S</strong> <code>edge_sources</code>,
+<strong>D</strong> <code>depth</code>. "Exists" lists implementations
+that do the mesh-side work today or nearly do, in our packages and
+elsewhere.</p>
+<h3 id="measures-and-accessors">Measures and accessors</h3>
+<table>
+<thead>
+<tr class="header">
+<th>function</th>
+<th>tier</th>
+<th>on the mesh</th>
+<th>tables</th>
+<th>exists</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ST_Area</code></td>
+<td>native</td>
+<td>sum of triangle areas (spherical excess when <code>edges</code> is
+spherical)</td>
+<td>V T F</td>
+<td>prototype; every mesh library</td>
+</tr>
+<tr class="even">
+<td><code>ST_Centroid</code></td>
+<td>native</td>
+<td>area-weighted mean of triangle centroids</td>
+<td>V T F</td>
+<td>prototype</td>
+</tr>
+<tr class="odd">
+<td><code>ST_PointOnSurface</code></td>
+<td>native</td>
+<td>centroid of the feature's largest triangle, inside by
+construction</td>
+<td>V T F</td>
+<td>prototype</td>
+</tr>
+<tr class="even">
+<td><code>ST_Envelope</code>, <code>ST_Extent</code>,
+<code>ST_XMin</code> ...</td>
+<td>native</td>
+<td>min and max over triangle corners; per mesh, over the
+dictionary</td>
+<td>V T F</td>
+<td>prototype; <code>wk_envelope</code></td>
+</tr>
+<tr class="odd">
+<td><code>ST_Perimeter</code>,
+<code>ST_Length(ST_Boundary(...))</code></td>
+<td>combinatorial</td>
+<td>sum of lengths of edges whose twin is in another feature or
+absent</td>
+<td>V T F E</td>
+<td>prototype boundary pass</td>
+</tr>
+<tr class="even">
+<td><code>ST_NumGeometries</code>, <code>ST_NumInteriorRings</code></td>
+<td>combinatorial</td>
+<td>edge-connected components; holes from the boundary walk or V - E + T
+per component</td>
+<td>T F E</td>
+<td>prototype dissolve; wkpool <code>pool_holes()</code></td>
+</tr>
+<tr class="odd">
+<td><code>ST_NPoints</code></td>
+<td>combinatorial</td>
+<td>boundary vertex count, not a triangle count</td>
+<td>T F E</td>
+<td>(semantic trap: count the boundary)</td>
+</tr>
+<tr class="even">
+<td><code>ST_IsValid</code></td>
+<td>native</td>
+<td>per triangle: non-degenerate and counter-clockwise (one orientation
+test); per feature: valid by construction, with the v0.2
+<code>inconsistent_edges</code> self-check as the reason when not</td>
+<td>V T, S</td>
+<td>cdtr tests; polymer warning</td>
+</tr>
+<tr class="odd">
+<td><code>ST_IsEmpty</code>, <code>ST_GeometryType</code>,
+<code>ST_Dimension</code></td>
+<td>native</td>
+<td>no triangles; polygonal; 2</td>
+<td>T F</td>
+<td>trivial</td>
+</tr>
+<tr class="even">
+<td><code>ST_Distance(point, feature)</code></td>
+<td>near-native</td>
+<td>0 if the point locates in the feature, else nearest boundary edge
+(index the boundary edges)</td>
+<td>V T F E</td>
+<td>point locators below; GEOS for the edge part</td>
+</tr>
+<tr class="odd">
+<td><code>ST_MaximumInscribedCircle</code></td>
+<td>fallback</td>
+<td>triangle incircles give a lower bound and a start</td>
+<td>V T F</td>
+<td>GEOS</td>
+</tr>
+<tr class="even">
+<td><code>ST_HausdorffDistance</code>,
+<code>ST_FrechetDistance</code></td>
+<td>fallback</td>
+<td></td>
+<td></td>
+<td>GEOS</td>
+</tr>
+</tbody>
+</table>
+<h3 id="predicates">Predicates</h3>
+<table>
+<thead>
+<tr class="header">
+<th>function</th>
+<th>tier</th>
+<th>on the mesh</th>
+<th>tables</th>
+<th>exists</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ST_Intersects</code>, <code>ST_Contains</code>,
+<code>ST_Within</code> (point, feature)</td>
+<td>near-native</td>
+<td>locate the point (grid buckets, a walk, or a tree), then the
+triangle's feature</td>
+<td>V T F</td>
+<td>prototype; cdtr <code>cdt_interpolate()</code> has the grid locator
+inside; matplotlib <code>TriFinder</code>; scipy
+<code>find_simplex</code>; d3-delaunay <code>find</code>; spade
+<code>locate</code>; xugrid celltree; CGAL <code>locate</code></td>
+</tr>
+<tr class="even">
+<td><code>ST_Intersects</code> (geometry, feature)</td>
+<td>near-native</td>
+<td>candidate triangles from the locator's grid, then convex triangle
+tests (separating axis, segment against triangle)</td>
+<td>V T F</td>
+<td>GEOS prepared geometry does the polygon-side equivalent</td>
+</tr>
+<tr class="odd">
+<td><code>ST_Touches</code> between features of one mesh</td>
+<td>combinatorial</td>
+<td>features sharing a vertex id, no shared triangle</td>
+<td>T F</td>
+<td>prototype; wkpool <code>find_neighbours(type = "vertex")</code></td>
+</tr>
+<tr class="even">
+<td><code>ST_Relate</code> <code>F***1****</code> (share an edge)</td>
+<td>combinatorial</td>
+<td>features on the two sides of a mesh edge</td>
+<td>T F E</td>
+<td>prototype; wkpool <code>find_shared_edges()</code>; the <a
+href="../../boundaries/">boundaries page</a> owner table</td>
+</tr>
+<tr class="odd">
+<td><code>ST_Overlaps</code>, <code>ST_Covers</code>,
+<code>ST_Equals</code> within one mesh</td>
+<td>combinatorial</td>
+<td>set relations on triangle sets via <code>set_features</code></td>
+<td>T F</td>
+<td>polymer <code>index</code></td>
+</tr>
+<tr class="even">
+<td><code>ST_Relate</code> (full DE-9IM) within one mesh</td>
+<td>combinatorial</td>
+<td>interiors meet if a triangle is shared; boundaries meet at shared
+boundary vertices (0) or edges (1); a boundary edge of A in B's interior
+if both its triangles are in B</td>
+<td>T F E</td>
+<td>none yet; worth writing as one function</td>
+</tr>
+<tr class="odd">
+<td>any predicate against a geometry from outside the mesh</td>
+<td>near-native or fallback</td>
+<td>insert it as constraints (overlay), or locate its vertices and test
+crossing triangles</td>
+<td></td>
+<td>polymer; GEOS</td>
+</tr>
+<tr class="even">
+<td><code>ST_DWithin</code></td>
+<td>near-native</td>
+<td>as <code>ST_Distance</code></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="set-operations-and-overlay">Set operations and overlay</h3>
+<table>
+<thead>
+<tr class="header">
+<th>function</th>
+<th>tier</th>
+<th>on the mesh</th>
+<th>tables</th>
+<th>exists</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ST_Union_Agg</code>, grouped dissolve</td>
+<td>combinatorial</td>
+<td>keep edges whose twin is in another group, walk them into rings by
+rotating around each vertex, give each ring the component of its
+triangles (so holes need no point-in-polygon test)</td>
+<td>V T F</td>
+<td>prototype <code>mesh_dissolve_c</code>; wkpool
+<code>tri_dissolve()</code>; polymer <code>fuse()</code>; GEOS
+<code>CoverageUnion</code> is the polygon-side analogue</td>
+</tr>
+<tr class="even">
+<td><code>ST_Union</code>, <code>ST_Intersection</code>,
+<code>ST_Difference</code>, <code>ST_SymDifference</code> within one
+mesh</td>
+<td>combinatorial</td>
+<td>set algebra on <code>set_features</code>, then dissolve</td>
+<td>T F</td>
+<td>polymer <code>fuse()</code>, <code>layer_n()</code></td>
+</tr>
+<tr class="odd">
+<td>the same between two layers</td>
+<td>near-native</td>
+<td>one constrained triangulation of both layers' edges, labelled by
+winding (v0.2 Annex A), then as above</td>
+<td>V T C S</td>
+<td>polymer on cdtr; laridae exact path in progress</td>
+</tr>
+<tr class="even">
+<td><code>ST_ClipByBox2D</code>, intersection with a convex polygon</td>
+<td>near-native</td>
+<td>keep triangles inside, drop those outside, clip crossing triangles
+(convex against convex) and fan the pieces back into triangles; the
+result is still a mesh</td>
+<td>V T F</td>
+<td>not written; polyclip or a Sutherland-Hodgman loop per crossing
+triangle</td>
+</tr>
+<tr class="odd">
+<td><code>ST_Split</code> (feature, line)</td>
+<td>near-native</td>
+<td>insert the line as constraints, relabel the two sides</td>
+<td>V T C S</td>
+<td>cdtr + polymer labelling</td>
+</tr>
+<tr class="even">
+<td><code>ST_Node</code>, <code>ST_Polygonize</code></td>
+<td>native to the producer</td>
+<td>a constrained triangulation resolves crossings
+(<code>intersect = "resolve"</code>), and depth or labelling gives the
+faces</td>
+<td>V T C D</td>
+<td>cdtr, laridae, wkpool <code>find_faces()</code></td>
+</tr>
+<tr class="odd">
+<td><code>ST_MakeValid</code></td>
+<td>native to the producer</td>
+<td>the labelled mesh is the repaired polygon under its fill rule
+(even-odd or non-zero, see <a href="../../validity/">validity</a>)</td>
+<td>V T D or F</td>
+<td>polymer <code>rule =</code>; cdtr depth</td>
+</tr>
+</tbody>
+</table>
+<h3 id="processing-and-construction">Processing and construction</h3>
+<table>
+<thead>
+<tr class="header">
+<th>function</th>
+<th>tier</th>
+<th>on the mesh</th>
+<th>tables</th>
+<th>exists</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ST_Boundary</code></td>
+<td>combinatorial</td>
+<td>boundary edges as lines, each drawn once</td>
+<td>V T F E</td>
+<td>prototype <code>mesh_boundary_c</code>; wkpool arcs</td>
+</tr>
+<tr class="even">
+<td><code>ST_ConvexHull</code></td>
+<td>near-native</td>
+<td>hull of the feature's vertices; for an unerased Delaunay mesh, its
+outer boundary</td>
+<td>V T F</td>
+<td>any hull</td>
+</tr>
+<tr class="odd">
+<td><code>ST_DelaunayTriangles</code>,
+<code>ST_ConstrainedDelaunayTriangles</code>,
+<code>ST_TriangulatePolygon</code></td>
+<td>native</td>
+<td>the identity: the triangles are the answer, without the
+GEOMETRYCOLLECTION</td>
+<td>V T</td>
+<td>cdtr, laridae, GEOS 3.10+ produces the polygon form</td>
+</tr>
+<tr class="even">
+<td><code>ST_VoronoiPolygons</code></td>
+<td>near-native</td>
+<td>dual of a Delaunay mesh from circumcentres; a constrained mesh is
+not Delaunay across constraints</td>
+<td>V T E</td>
+<td>d3-delaunay <code>voronoi</code>; GEOS</td>
+</tr>
+<tr class="odd">
+<td><code>ST_Subdivide</code></td>
+<td>native</td>
+<td>the mesh is already subdivided into convex pieces; group triangles
+into chunks along a space-filling curve if bigger pieces are wanted</td>
+<td>V T F</td>
+<td></td>
+</tr>
+<tr class="even">
+<td><code>ST_Segmentize</code></td>
+<td>near-native, different rule</td>
+<td>split boundary edges at a length (constraint edge splits) or refine
+by area</td>
+<td>V T C</td>
+<td>cdtr <code>max_area</code>, laridae refinement</td>
+</tr>
+<tr class="odd">
+<td><code>ST_SnapToGrid</code>, <code>ST_ReducePrecision</code></td>
+<td>near-native</td>
+<td>edit the dictionary, then re-check every triangle's orientation and
+repair flips locally</td>
+<td>V T</td>
+<td>the vertex identity ladder</td>
+</tr>
+<tr class="even">
+<td><code>ST_Simplify</code>, <code>ST_SimplifyPreserveTopology</code>,
+<code>ST_CoverageSimplify</code></td>
+<td>fallback</td>
+<td>the mesh supplies each shared boundary once as an arc, which is the
+input a coverage simplifier wants</td>
+<td>V T F E</td>
+<td>GEOS <code>CoverageSimplifyVW</code>; wkpool
+<code>find_arcs()</code></td>
+</tr>
+<tr class="odd">
+<td><code>ST_Buffer</code>, <code>ST_OffsetCurve</code>,
+<code>ST_ConcaveHull</code>,
+<code>ST_MinimumRotatedRectangle</code></td>
+<td>fallback</td>
+<td></td>
+<td></td>
+<td>GEOS</td>
+</tr>
+</tbody>
+</table>
+<h3 id="transforms-and-io">Transforms and I/O</h3>
+<table>
+<thead>
+<tr class="header">
+<th>function</th>
+<th>tier</th>
+<th>on the mesh</th>
+<th>tables</th>
+<th>exists</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ST_Transform</code>, <code>ST_Affine</code>,
+<code>ST_Translate</code>, <code>ST_Scale</code>,
+<code>ST_FlipCoordinates</code></td>
+<td>native</td>
+<td>transform the dictionary only; then a cheap check that no triangle
+changed orientation (a reflection flips all; a fold or a cut shows as a
+mix)</td>
+<td>V, T for the check</td>
+<td>prototype; bigcurve when edges are geodesic</td>
+</tr>
+<tr class="even">
+<td><code>ST_SetSRID</code>, <code>ST_Force2D</code>,
+<code>ST_Force3D</code></td>
+<td>native</td>
+<td>metadata, or a z column on the vertex table</td>
+<td>V</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><code>ST_AsBinary</code>, <code>ST_AsText</code> per triangle</td>
+<td>native</td>
+<td>WKB <code>TRIANGLE</code>, or the mesh as <code>TIN</code></td>
+<td>V T</td>
+<td>wk reads TIN as MULTIPOLYGON on the <code>read-surface-types</code>
+branch (wk#236)</td>
+</tr>
+<tr class="even">
+<td><code>ST_AsBinary</code>, <code>ST_AsGeoJSON</code> per feature</td>
+<td>combinatorial</td>
+<td>dissolve, then write the polygon</td>
+<td>V T F</td>
+<td>as dissolve</td>
+</tr>
+<tr class="odd">
+<td><code>ST_GeomFromWKB</code> of <code>TIN</code>, polygons to a
+mesh</td>
+<td>producer</td>
+<td>repool vertices by exact match and triangulate</td>
+<td></td>
+<td>wkpool <code>merge_coincident()</code>; cdtr; laridae</td>
+</tr>
+</tbody>
+</table>
+<h3 id="beyond-the-sql-list">Beyond the SQL list</h3>
+<p>A mesh also answers questions that have no <code>ST_*</code> name,
+and these are often the reason to have a mesh at all: linear
+interpolation of a vertex value at points (cdtr
+<code>cdt_interpolate()</code>, matplotlib
+<code>LinearTriInterpolator</code>), exact rasterisation (each triangle
+burns a convex footprint; controlledburn does the polygon-edge version),
+area weighted regridding between two meshes (xugrid, and the overlay
+above), and drawing (every renderer triangulates polygons anyway;
+deck.gl runs earcut on each one).</p>
+<h2 id="prototype">Prototype</h2>
+<p><code>st_mesh.R</code> implements ten functions on a mesh built by
+polymer (which triangulates with cdtr and labels with Annex A). All ten
+are written in vectorised base R, and the four grouped loops (extent,
+touches, point location, dissolve) are also written in about 250 lines
+of C++ (<code>st_mesh.cpp</code>, loaded with
+<code>cpp11::cpp_source()</code>), so that the comparison with sf, which
+calls GEOS in C++, is of algorithms rather than of R against C++.
+<code>bench.R</code> runs both against sf on three layers and checks
+every answer:</p>
+<table>
+<thead>
+<tr class="header">
+<th>layer</th>
+<th>features</th>
+<th>polygon coordinates</th>
+<th>mesh vertices</th>
+<th>triangles</th>
+<th>build (s)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>nc counties</td>
+<td>100</td>
+<td>2,529</td>
+<td>1,255</td>
+<td>2,205</td>
+<td>0.04</td>
+</tr>
+<tr class="even">
+<td>Voronoi coverage</td>
+<td>19,493</td>
+<td>136,260</td>
+<td>39,478</td>
+<td>77,781</td>
+<td>0.64</td>
+</tr>
+<tr class="odd">
+<td>inlandwaters (holes)</td>
+<td>6</td>
+<td>33,644</td>
+<td>30,835</td>
+<td>33,205</td>
+<td>0.19</td>
+</tr>
+</tbody>
+</table>
+<p>The Voronoi layer is whole Voronoi cells of 20,000 random points, so
+its shared edges are exact. Every check passed: areas agree with sf to
+1.5e-13 (relative), centroids to 1e-15, every point on surface lies in
+its own feature, extents are identical, the touches and edge-neighbour
+lists are identical to <code>st_touches()</code> and
+<code>st_relate(pattern = "F***1****")</code>, all 100,000 points land
+in the same feature as <code>st_intersects()</code>, and the dissolved
+polygons have zero symmetric difference with <code>st_union()</code> and
+are valid.</p>
+<p><img src="speedup.png"
+alt="Times faster than sf for each function on each layer, using the faster of the R and C++ versions. Above 1 the mesh is faster." /></p>
+<p>Median times in milliseconds (R, C++ where written, sf):</p>
+<table>
+<thead>
+<tr class="header">
+<th>function</th>
+<th>nc</th>
+<th>Voronoi</th>
+<th>inlandwaters</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ST_Area</code></td>
+<td>0.2, -, 5.6</td>
+<td>9.6, -, 69</td>
+<td>1.4, -, 25</td>
+</tr>
+<tr class="even">
+<td><code>ST_Centroid</code></td>
+<td>0.2, -, 2.6</td>
+<td>35, -, 148</td>
+<td>3.2, -, 16</td>
+</tr>
+<tr class="odd">
+<td><code>ST_PointOnSurface</code></td>
+<td>0.1, -, 2.5</td>
+<td>10, -, 114</td>
+<td>3.8, -, 13</td>
+</tr>
+<tr class="even">
+<td><code>ST_Envelope</code></td>
+<td>1.0, 0.05, 0.1</td>
+<td>159, 3.1, 18</td>
+<td>25, 0.3, 0.4</td>
+</tr>
+<tr class="odd">
+<td><code>ST_Touches</code></td>
+<td>12, 0.5, 9.6</td>
+<td>1,738, 40, 799</td>
+<td>185, 5.0, 76</td>
+</tr>
+<tr class="even">
+<td><code>ST_Relate F***1****</code></td>
+<td>4.9, -, 10</td>
+<td>728, -, 713</td>
+<td>28, -, 67</td>
+</tr>
+<tr class="odd">
+<td><code>ST_Intersects(point, polygon)</code>, 100,000 points</td>
+<td>334, 6.1, 306</td>
+<td>383, 21, 597</td>
+<td>365, 6.6, 397</td>
+</tr>
+<tr class="even">
+<td><code>ST_Union_Agg</code>, grouped</td>
+<td>9.0, 1.1, 39</td>
+<td>1,067, 21, 778</td>
+<td>705, 12, 137</td>
+</tr>
+<tr class="odd">
+<td><code>ST_CoverageUnion</code>, grouped</td>
+<td>7.2, 0.8, 23</td>
+<td>1,129, 21, 159</td>
+<td>504, 11, 28</td>
+</tr>
+<tr class="even">
+<td><code>ST_Transform</code> to EPSG:4326</td>
+<td>15, -, 3.1</td>
+<td>35, -, 222</td>
+<td>12, -, 17</td>
+</tr>
+</tbody>
+</table>
+<p>What the numbers say:</p>
+<ul>
+<li><strong>The algorithms are linear and short.</strong> Each native or
+combinatorial function is one pass over the triangles, or one sort of
+their edges. The C++ for touches is about 30 lines, point location about
+50 and the dissolve walk about 80.</li>
+<li><strong>The sf column includes converting to GEOS on every
+call.</strong> That is a real cost for an sf user, and it is exactly the
+cost a mesh column avoids, but it means part of the gap is not GEOS's
+algorithm.</li>
+<li><strong>GEOS's coverage union already does what the mesh
+does.</strong> It matches shared edges instead of overlaying, which is
+why it is 5 times faster than ordinary union on the Voronoi and
+inlandwaters layers, and why the mesh's lead over it shrinks to 2.6 to
+28 times. It is the clearest case of a polygon-side method that is
+mesh-shaped already.</li>
+<li><strong>Transform depends on vertex sharing.</strong> On the Voronoi
+coverage every vertex is shared by about three cells, so the mesh
+projects 39,478 points instead of 136,260, and is 6 times faster. On nc
+the fixed cost of building the PROJ pipeline dominates and the mesh
+path, through <code>sf_project()</code>, is slower; inlandwaters has
+almost no shared vertices.</li>
+<li><strong>Build cost is the price of preparation.</strong> Building
+the mesh took 0.04 to 0.64 s, about one or two calls of the slower sf
+functions. It is paid once, by the producer, and travels with the data;
+a file of <code>geoarrow.triangles</code> arrives prepared.</li>
+<li><strong>Pure R is not enough for the grouped loops.</strong>
+Touches, extent and dissolve in vectorised R are slower than sf on the
+larger layers. Any real binding would sit in C, C++ or Rust, next to the
+storage.</li>
+</ul>
+<p>Not measured: overlay between two layers (polymer's own benchmarks
+cover that), clip by box, and the spherical case.</p>
+<h2 id="what-this-suggests-for-the-proposal">What this suggests for the
+proposal</h2>
+<ol type="1">
+<li><strong>Recommend a feature column.</strong> Feature-level functions
+are the ones users call, and they need to know which triangles form a
+feature. Add <code>feature: int32</code> per triangle (coverage) and the
+v0.2 <code>set_id</code> plus <code>set_features</code> (overlapping
+inputs) to "Conventions outside the type".</li>
+<li><strong>Say what <code>vertex_identity</code> buys.</strong> The
+combinatorial tier is exact only at <code>"noded"</code> or
+<code>"exact"</code>. That is a concrete reason for the key, which open
+question 2 of the proposal asks for.</li>
+<li><strong>Counter-clockwise should be a must, or flagged.</strong>
+Point location, validity and the dissolve walk all assume it; a consumer
+that cannot trust it must test every triangle first (cheap, but a
+pass).</li>
+<li><strong>An <code>ST_*</code> binding is mostly a dissolve plus
+sums.</strong> A first implementation in any engine needs: per-triangle
+closed forms, a group reduction, a point locator and the dissolve walk.
+Everything else can fall back through the dissolve.</li>
+</ol>
+<h2 id="possible-next-steps">Possible next steps</h2>
+<p>All on our side first:</p>
+<ul>
+<li>Expose cdtr's grid locator as <code>cdt_locate()</code> returning
+triangle ids (about ten lines over the code already in
+<code>cdt_interpolate()</code>).</li>
+<li>Move the dissolve walk into wkpool's <code>tri_dissolve()</code> as
+compiled code; the prototype's pinch handling and hole assignment by
+component carry over.</li>
+<li>Write a full DE-9IM for two features of one mesh, checked against
+<code>st_relate()</code> on the conformance corpus.</li>
+<li>Try clip by box as a mesh-to-mesh function, and the spherical tier
+with s2's predicates.</li>
+<li>Sketch what a SedonaDB or DuckDB function over a
+<code>geoarrow.triangles</code> column plus a feature column would look
+like, without proposing it.</li>
+</ul>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>
