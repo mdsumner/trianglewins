@@ -70,6 +70,10 @@ render dev-drafts/reprojection-mesh.md dev-drafts/reprojection-mesh \
   "Reprojection meshes for raster tiles (draft)" "dev draft" \
   "Development draft: how GDAL, d3, OpenLayers, MapLibre and deck.gl-raster mesh the warp for raster tiles, measured on polar, hemispheric and antimeridian cases, and where bigcurve, cdtr, laridae and the mesh spec fit." \
   ../../
+render dev-drafts/st-mesh.md dev-drafts/st-mesh \
+  "ST_* functions on a triangle mesh (draft)" "dev draft" \
+  "Development draft: which ST_* functions run natively on a triangle mesh, which need only its indices, which need one more index and which fall back to polygons, with a prototype checked against sf." \
+  ../../
 redirect choose ../start/#which-package
 redirect dimension ../notes/#dimension
 redirect interpolation ../notes/#interpolation
