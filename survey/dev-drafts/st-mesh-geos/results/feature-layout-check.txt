@@ -1,0 +1,9 @@
+rows (features): 2
+triangles in row 2: 2
+slice keeps the shared dictionary: True
+vertex ids shared by rows 1 and 2: [1, 2]
+IPC batches read: 2
+batch 2 dictionary size (delta added one vertex): 7
+batch 2 triangle refers to shared vertex ids: [4, 6, 5]
+Parquet, nested dictionary: refused: ArrowNotImplementedError
+list offsets (feature -> triangle ranges): [0, 2, 4]

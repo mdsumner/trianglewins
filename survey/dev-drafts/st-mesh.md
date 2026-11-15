@@ -275,6 +275,9 @@ cover that), clip by box, and the spherical case.
 
 ## Possible next steps
 
+Followed up in [ST_* on a mesh with wkpool and geos](../st-mesh-geos/)
+(the first two steps are done there) and
+[What geoarrow.triangles needs for ST_*](../geoarrow-triangles-st/).
 All on our side first:
 
 - Expose cdtr's grid locator as `cdt_locate()` returning triangle ids
