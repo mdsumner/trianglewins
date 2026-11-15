@@ -183,6 +183,16 @@ cases, with what a screen-pixel tolerance and constrained seeds change.</p>
 <p>Which ST_* functions run natively on a mesh, which need only its indices, which need one more
 index and which fall back to polygons, with a prototype checked and timed against sf.</p>
 </a>
+<a class="card" href="dev-drafts/st-mesh-geos/">
+<h2>ST_* on a mesh with wkpool and geos</h2>
+<p>24 ST_* functions on a mesh with no sf in the path, checked and timed against the geos package,
+including the full DE-9IM matrix computed from triangle indices alone.</p>
+</a>
+<a class="card" href="dev-drafts/geoarrow-triangles-st/">
+<h2>What geoarrow.triangles needs for ST_*</h2>
+<p>A plan: a row as a feature, what the metadata must promise, what a binding caches, seven kernels,
+joins across two meshes, and the steps to take on our side first.</p>
+</a>
 <a class="card" href="casebook/">
 <h2>Warp Mesh Casebook</h2>
 <p>Interactive: a screen grid (ortho-cog-viewer) against source tiles (deck.gl-raster style) at the

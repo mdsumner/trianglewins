@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What geoarrow.triangles needs for ST_* (draft)</title>
+<meta name="description" content="Development draft: a plan for geoarrow.triangles with ST_* support: a row as a feature, metadata promises, cached tables, kernels, joins across meshes and steps on our side first.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 code, h2 code, h3 code, h4 code { font-size: 0.9em; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+  border-bottom: 1px solid var(--grid); line-height: 1.45; }
+th:first-child, td:first-child { min-width: 12em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; background: var(--surface-0);
+  border-bottom: 1px solid var(--border); }
+td code { font-size: 12px; color: var(--text-secondary); }
+td small { color: var(--text-muted); font-size: 12px; }
+td:first-child a { text-decoration: none; }
+td:first-child a:hover { text-decoration: underline; }
+td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../../">trianglewins</a> / dev draft</p>
+<h1 id="what-geoarrowtriangles-needs-for-st_">What geoarrow.triangles
+needs for ST_*</h1>
+<p><em>Development draft, 15 November 2026. A plan, not a proposal. It
+reads the <a href="../geoarrow-triangles-proposal/">geoarrow.triangles
+proposal</a> against what the <a href="../st-mesh-geos/">ST_* suite on
+wkpool and geos</a> needed in practice, and lists what would have to
+exist, in the format and in code, for an engine to offer the usual
+<code>ST_*</code> functions on a mesh column so that users need not care
+how it is stored. Nothing here goes upstream until Michael says
+so.</em></p>
+<h2 id="the-goal-restated">The goal, restated</h2>
+<p>Asked about the proposal, the GeoArrow side's answer was that
+adoption is easier if the <code>ST_*</code> functions are defined for
+it. Taken literally, that means: a user who calls
+<code>ST_Area(geom)</code>, <code>ST_Intersects(a.geom, b.geom)</code>
+or <code>ST_Union_Agg(geom)</code> on a column of
+<code>geoarrow.triangles</code> gets the answer they would get for the
+polygons, and never writes a <code>GROUP BY</code> over triangles. The
+two drafts so far show the computation is there: 24 functions agree with
+GEOS, and the relations tier is several times faster. What is missing is
+mostly not computation. It is the unit a function is applied to.</p>
+<h2 id="requirement-1-a-row-must-be-a-feature">Requirement 1: a row must
+be a feature</h2>
+<p>In the proposal one row is one triangle. That is the natural storage,
+and per-triangle <code>ST_*</code> is trivially native, but nobody wants
+the area of a triangle. An engine evaluates <code>ST_*</code> per row,
+so with one triangle per row the user has to group, and has to know
+which column to group by. That is exactly caring about storage.</p>
+<p>The fix costs one list level. Wrap the triangles of each feature in a
+list, and keep one dictionary for the whole array:</p>
+<pre><code>List&lt;FixedSizeList&lt;Dictionary&lt;int32, Coordinate&gt;&gt;[3]&gt;</code></pre>
+<p>Each row is one polygonal feature, the way a
+<code>geoarrow.multipolygon</code> row is, but its value is the
+feature's triangles, and every triangle indexes the same vertex
+dictionary as every other row. Arrow already does all of this (checked
+with pyarrow 26, <a
+href="https://github.com/mdsumner/trianglewins/blob/main/survey/dev-drafts/st-mesh-geos/feature-layout-check.py"><code>feature-layout-check.py</code></a>):</p>
+<table>
+<thead>
+<tr class="header">
+<th>check</th>
+<th>result</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>two features sharing an edge</td>
+<td>both rows hold vertex ids 1 and 2</td>
+</tr>
+<tr class="even">
+<td>slice one row</td>
+<td>keeps the shared dictionary</td>
+</tr>
+<tr class="odd">
+<td>IPC stream, second batch adds a feature with a new vertex</td>
+<td>dictionary delta to 7 vertices; the new triangle refers to ids 4, 6,
+5</td>
+</tr>
+<tr class="even">
+<td>Parquet</td>
+<td>refused (nested dictionary), as for the flat layout</td>
+</tr>
+<tr class="odd">
+<td>list offsets</td>
+<td>are the feature-to-triangle ranges: the <code>feature</code> column,
+for free</td>
+</tr>
+</tbody>
+</table>
+<p>This one change settles three things the earlier drafts left
+open:</p>
+<ul>
+<li><strong>The feature column.</strong> For a coverage sorted by
+feature, the list offsets are the feature column, so the recommendation
+"add <code>feature: int32</code>" disappears into the type.</li>
+<li><strong>Overlapping features.</strong> A triangle covered by two
+features appears in both rows (three more indices, no new vertices).
+That is the v0.2 <code>set_id</code> plus <code>set_features</code>
+labelling, flattened, and it is what the DE-9IM kernel already reads
+(membership as offsets and ids).</li>
+<li><strong>The per-feature mesh.</strong> The proposal ruled out one
+mesh per row, because rows get large and vertices repeat. Here rows are
+features of one mesh and nothing repeats.</li>
+</ul>
+<p>The flat row-per-triangle layout stays useful as the storage of the
+mesh itself (renderers, <code>TIN</code>, a whole-mesh column). The two
+are the same buffers with or without the outer offsets.</p>
+<p><strong>Decision for Michael:</strong> propose the list layout as the
+primary <code>geoarrow.triangles</code> (a row is a feature), the flat
+layout as primary with the list as a second extension name, or keep the
+flat layout and leave features to a column convention. The ST_* goal
+argues for the first.</p>
+<h2 id="requirement-2-what-the-metadata-must-promise">Requirement 2:
+what the metadata must promise</h2>
+<table>
+<thead>
+<tr class="header">
+<th>promise</th>
+<th>why ST_* needs it</th>
+<th>proposal today</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>counter-clockwise triangles</td>
+<td>point location, validity, the dissolve walk and DE-9IM's boundary
+classes all assume it; otherwise every consumer tests every triangle
+first</td>
+<td>"should" (open question 3)</td>
+</tr>
+<tr class="even">
+<td><code>vertex_identity</code></td>
+<td>relations from indices are exact only when the mesh is noded: at
+<code>"noded"</code> or <code>"exact"</code> a shared boundary is a
+shared vertex id; at <code>"exact_float"</code> it is only if the input
+was already a clean coverage</td>
+<td>optional key (open question 2)</td>
+</tr>
+<tr class="odd">
+<td><code>edges</code></td>
+<td>planar or spherical; every closed form changes on the sphere</td>
+<td>inherited from GeoArrow</td>
+</tr>
+<tr class="even">
+<td>no duplicate dictionary entries</td>
+<td>two entries with equal coordinates break "shared boundary = shared
+id"</td>
+<td>"should"</td>
+</tr>
+<tr class="odd">
+<td>triangles form a triangulation (no overlaps, edge to edge)</td>
+<td>edge adjacency and the edge table assume it; a triangle soup would
+need re-pooling first</td>
+<td>implied, not stated</td>
+</tr>
+</tbody>
+</table>
+<p>The suggestion is to make orientation a must,
+<code>vertex_identity</code> a recommended key with a stated meaning for
+each value, and the triangulation property a must whenever
+<code>vertex_identity</code> is set.</p>
+<h2
+id="requirement-3-what-the-binding-computes-once-and-caches">Requirement
+3: what the binding computes once and caches</h2>
+<p>Two derived tables made the difference between slow and fast in the
+suite. Neither needs to be stored; both should be computed once per
+array (per dictionary) and cached by whatever binds the type:</p>
+<ul>
+<li><strong>The edge table</strong>: the triangle across each edge, from
+one sort or hash of the triangles (34 ms for 78,000 triangles in the
+prototype). It feeds perimeter, boundary, DE-9IM and the dissolve.</li>
+<li><strong>The point locator</strong>: a grid of triangle buckets
+(cdtr's <code>cdt_locate()</code>), built in a few milliseconds.</li>
+</ul>
+<p>A third is worth storing or caching because the suite showed it is
+the mesh's weak spot:</p>
+<ul>
+<li><strong>Rings.</strong> Number of parts, number of holes,
+<code>ST_Boundary</code> as lines and every fallback go through the
+dissolve. Cached, they become reads. A file could carry them as an
+optional column (ring count per feature, or the boundary edges), but
+caching in the binding is enough to start.</li>
+</ul>
+<h2 id="requirement-4-the-kernels">Requirement 4: the kernels</h2>
+<p>An engine (or a library it calls) needs seven kernels. Sizes are the
+C++ in this repository's prototypes and in cdtr and wkpool:</p>
+<table>
+<thead>
+<tr class="header">
+<th>kernel</th>
+<th>serves</th>
+<th>size</th>
+<th>where it lives now</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>per-triangle closed forms with a group reduction</td>
+<td><code>ST_Area</code>, <code>ST_Centroid</code>,
+<code>ST_PointOnSurface</code>, <code>ST_Envelope</code>,
+<code>ST_IsValid</code>, <code>ST_Affine</code> and
+<code>ST_Transform</code> on the dictionary</td>
+<td>~40 lines</td>
+<td><code>st_mesh.cpp</code></td>
+</tr>
+<tr class="even">
+<td>edge table</td>
+<td>everything combinatorial</td>
+<td>~20 lines</td>
+<td><code>st_mesh.cpp</code></td>
+</tr>
+<tr class="odd">
+<td>DE-9IM from indices</td>
+<td><code>ST_Relate</code> and every named predicate between features of
+one array</td>
+<td>~60 lines</td>
+<td><code>st_mesh.cpp</code></td>
+</tr>
+<tr class="even">
+<td>point locator, exact</td>
+<td><code>ST_Intersects</code>, <code>ST_Contains</code> with points,
+<code>ST_Distance</code> inside</td>
+<td>~130 lines</td>
+<td>cdtr <code>cdt_locate()</code> (cdtr#9)</td>
+</tr>
+<tr class="odd">
+<td>dissolve walk</td>
+<td><code>ST_Union_Agg</code>, polygons out, structure accessors, every
+fallback</td>
+<td>~300 lines</td>
+<td>wkpool <code>tri_dissolve()</code> (wkpool#15)</td>
+</tr>
+<tr class="even">
+<td>clip by convex shape</td>
+<td><code>ST_ClipByBox2D</code>, intersection with a convex polygon,
+staying a mesh</td>
+<td>~80 lines</td>
+<td><code>st_mesh.cpp</code></td>
+</tr>
+<tr class="odd">
+<td>producer: polygons to labelled mesh</td>
+<td>casting polygons in, and any relation between two different
+arrays</td>
+<td>a CDT plus ~200 lines of labelling</td>
+<td>cdtr + polymer</td>
+</tr>
+</tbody>
+</table>
+<p>About 800 lines plus a CDT library. Everything else falls back:
+dissolve, then GEOS (buffer, simplify, offset curves, concave hull,
+distance to far points).</p>
+<p>A natural home is the C++17 header the polymer-core brainstorm
+already recommended (polymer first, its own repository later): the
+labelling lives there, and these kernels read the same arrays. R, Python
+and a DuckDB or SedonaDB extension could then share one implementation,
+as GEOS is shared today.</p>
+<h2 id="requirement-5-relations-across-two-arrays">Requirement 5:
+relations across two arrays</h2>
+<p>Everything fast in the suite is within one array, where vertex ids
+are comparable. A SQL join, <code>ST_Intersects(a.geom, b.geom)</code>
+across two tables, compares features of two meshes whose ids mean
+nothing to each other. There are three routes, and the format should say
+which it expects:</p>
+<ol type="1">
+<li><strong>Overlay once.</strong> Build one mesh of both (polymer).
+After that every relation and every intersection area is an index lookup
+(the nc by grid overlay: 3.7 ms for 406 relate matrices, 1 ms for all
+intersection areas). The build (38 ms there) is the cost, so this pays
+for joins that ask many questions of the same pair of layers.</li>
+<li><strong>Locate and test.</strong> For points, or small geometries
+against a mesh, locate the vertices and test the crossing triangles.
+Near-native, no rebuild.</li>
+<li><strong>Fall back.</strong> Dissolve both sides and use GEOS
+prepared predicates. No worse than polygons today, plus a dissolve.</li>
+</ol>
+<p>A binding should pick per call: points take route 2, a join across
+two mesh columns takes route 1 when the engine can keep the overlay for
+the query, and route 3 otherwise. The type itself needs nothing extra
+for this, but <code>vertex_identity</code> matters again: an overlay of
+two <code>"exact"</code> meshes can stay exact (laridae), one of
+<code>"exact_float"</code> meshes cannot.</p>
+<h2 id="requirement-6-a-conformance-story">Requirement 6: a conformance
+story</h2>
+<p>GeoArrow changes arrive with an implementation. For ST_* the evidence
+that counts is agreement with GEOS (and, for the sphere, s2) on a public
+corpus:</p>
+<ul>
+<li>every function in the suite against the geos package, as now, plus
+the shapely equivalents in Python;</li>
+<li>DE-9IM against <code>geos_relate()</code> on the polygon validity
+catalogue and on coverages with holes, pinches and touching corners (the
+suite has 58,452 pairs, all equal, but no adversarial cases yet);</li>
+<li>the <code>vertex_identity</code> ladder: one input meshed at each
+rung, showing which answers change and why.</li>
+</ul>
+<h2 id="plan-on-our-side-first">Plan, on our side first</h2>
+<ol type="1">
+<li><strong>Land the two package steps.</strong> cdtr#9
+(<code>cdt_locate()</code>) and wkpool#15 (compiled
+<code>tri_dissolve()</code>), under review.</li>
+<li><strong>A feature-layout pilot.</strong> Extend the existing pilot
+(nanoarrow in R, pyarrow in Python) to write and read the list layout,
+with zero-copy views of the dictionary as <code>x</code>, <code>y</code>
+and of the offsets as the membership, so the suite's kernels run on
+Arrow memory directly.</li>
+<li><strong>Kernels into one C++ header</strong> next to the polymer
+core, with R bindings in wkpool or polymer (<code>tri_relate()</code>,
+<code>tri_measures()</code>, <code>tri_clip()</code>), and the same
+header compiled for Python.</li>
+<li><strong>Conformance corpus</strong> as above, in this
+repository.</li>
+<li><strong>Rings cache</strong> in the binding; measure the structural
+accessors again.</li>
+<li><strong>Revise the proposal</strong>: the list layout, orientation
+as a must, the meaning of each <code>vertex_identity</code> value, and a
+short "ST_* support" section that points at the kernels and the
+conformance results.</li>
+<li><strong>Sketch, without proposing,</strong> what a DuckDB or
+SedonaDB function over the type would look like: a scalar
+<code>ST_Area(triangles)</code> reading the row's list, and an aggregate
+or table function for the cross-array overlay.</li>
+</ol>
+<p>Steps 1 to 5 are code in our packages and this repository. Step 6
+changes the draft. Step 7 is a page. None of it needs anyone else
+yet.</p>
+<h2 id="open-questions">Open questions</h2>
+<ol type="1">
+<li>Row as feature (list layout) or row as triangle: which is primary,
+and does the other get its own extension name?</li>
+<li>Does the overlapping case (a triangle in several rows) belong in the
+type, or should the type require a coverage and leave overlaps to the
+v0.2 tables?</li>
+<li>Store rings, or leave them to a cache?</li>
+<li>Is the first implementation a C++ header (shared by R, Python and
+engines), or Rust beside geoarrow-rs?</li>
+<li>Spherical meshes: the closed forms and predicates exist (s2), but
+this suite has not tried them. In the first version, or later?</li>
+</ol>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>

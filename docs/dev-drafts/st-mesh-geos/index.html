@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ST_* on a mesh with wkpool and geos (draft)</title>
+<meta name="description" content="Development draft: 24 ST_* functions on a triangle mesh built with wkpool, cdtr and polymer, checked and timed against the R geos package, with DE-9IM from triangle indices.">
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e1db;
+  --grid: #ebe9e4;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --link: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --grid: #282826;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --link: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --border: #2f2f2c;
+  --grid: #282826;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --link: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 8px; }
+p, li { max-width: 760px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1 code, h2 code, h3 code, h4 code { font-size: 0.9em; }
+a { color: var(--link); }
+.tablewrap { overflow-x: auto; margin: 12px 0; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 10px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px;
+  border-bottom: 1px solid var(--grid); line-height: 1.45; }
+th:first-child, td:first-child { min-width: 12em; }
+tr:last-child td { border-bottom: none; }
+th { color: var(--text-secondary); font-weight: 600; background: var(--surface-0);
+  border-bottom: 1px solid var(--border); }
+td code { font-size: 12px; color: var(--text-secondary); }
+td small { color: var(--text-muted); font-size: 12px; }
+td:first-child a { text-decoration: none; }
+td:first-child a:hover { text-decoration: underline; }
+td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="../../">trianglewins</a> / dev draft</p>
+<h1 id="st_-on-a-mesh-with-wkpool-and-geos">ST_* on a mesh with wkpool
+and geos</h1>
+<p><em>Development draft, 15 November 2026. Follows <a
+href="../st-mesh/">ST_* functions on a triangle mesh</a>. The companion
+plan is <a href="../geoarrow-triangles-st/">What geoarrow.triangles
+needs for ST_*</a>.</em></p>
+<p>The first draft checked ten mesh functions against sf. This one asks
+how far the suite goes with no sf in the path at all: the mesh from
+polymer (wkpool's vertex pool, cdtr's triangulation, the v0.2
+labelling), point location from cdtr, the dissolve from wkpool, and the
+R <a href="https://paleolimbot.github.io/geos/">geos</a> package for
+everything a mesh cannot do and as the baseline every answer is checked
+against. Geometries on the geos side are held as GEOS objects, converted
+once, so the comparison is of algorithms, not of conversion.</p>
+<p>It now covers 24 functions on three layers and one two-layer overlay.
+Every answer agrees with geos: to machine precision for measures,
+exactly for predicates, and with zero symmetric difference for unions.
+That includes the full DE-9IM matrix, computed from the triangle indices
+alone, on all 58,452 candidate pairs. The code is in <a
+href="https://github.com/mdsumner/trianglewins/tree/main/survey/dev-drafts/st-mesh-geos">survey/dev-drafts/st-mesh-geos/</a>.
+Nothing here has been proposed upstream.</p>
+<p>The short version:</p>
+<ul>
+<li><strong>Relations are where the mesh wins, and they are all of
+DE-9IM.</strong> Touches is 11 to 17 times faster than geos, the full
+relate matrix 2 to 6 times, grouped union 3 to 19 times and point in
+polygon 3 to 4 times, all with answers identical to GEOS.</li>
+<li><strong>Against GEOS objects already in memory, simple measures are
+a draw.</strong> Area, envelope and perimeter are cheap on polygons too,
+and GEOS caches envelopes. The large native wins in the first draft were
+mostly sf converting to GEOS on every call.</li>
+<li><strong>Polygon structure is the mesh's weak spot.</strong> Counting
+parts and holes, or writing the boundary as lines, needs the dissolve;
+GEOS just reads its own structure. A stored ring table would fix
+it.</li>
+<li><strong>Distance to far points and the fallbacks belong to
+GEOS.</strong> GEOS's indexed facet distance beats a grid over the
+boundary edges by 5 to 7 times on the larger layers, and buffer or
+simplify after a dissolve costs the dissolve on top of GEOS.</li>
+<li><strong>The two steps named in the first draft are done:</strong>
+<code>cdt_locate()</code> in cdtr (<a
+href="https://github.com/hypertidy/cdtr/pull/9">cdtr#9</a>) and a
+compiled <code>tri_dissolve()</code> in wkpool (<a
+href="https://github.com/hypertidy/wkpool/pull/15">wkpool#15</a>), both
+open for review.</li>
+</ul>
+<p><img src="relate.png"
+alt="One nc county and everything related to it, from one overlay mesh of the counties and a rotated grid: cells within the county (dark blue), cells overlapping it (light blue), counties sharing an edge (pale orange) and the one county that touches it only at a corner (orange). Each class is a DE-9IM matrix computed from shared triangles, edges and vertices, with no coordinate read." /></p>
+<h2 id="the-pieces">The pieces</h2>
+<table>
+<thead>
+<tr class="header">
+<th>piece</th>
+<th>from</th>
+<th>role</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>vertex pool, triangle pool, dissolve</td>
+<td>wkpool</td>
+<td>the mesh's storage; <code>tri_dissolve()</code> back to polygons
+(now compiled)</td>
+</tr>
+<tr class="even">
+<td>triangulation, crossings, edge sources</td>
+<td>cdtr</td>
+<td>one constrained triangulation of all input edges</td>
+</tr>
+<tr class="odd">
+<td>labelling (which features cover each triangle)</td>
+<td>polymer</td>
+<td>spec v0.2 Annex A; also the overlay of two layers</td>
+</tr>
+<tr class="even">
+<td>point location</td>
+<td>cdtr</td>
+<td><code>cdt_locate()</code>: grid of triangle buckets, exact
+<code>orient2d</code></td>
+</tr>
+<tr class="odd">
+<td>everything that builds new geometry</td>
+<td>geos</td>
+<td>buffer, simplify, distance index, and the baseline</td>
+</tr>
+<tr class="even">
+<td>kernels for this page</td>
+<td><code>st_mesh.cpp</code></td>
+<td>DE-9IM, boundary, measures, clip by box, hull, distance grid</td>
+</tr>
+</tbody>
+</table>
+<p>The mesh as the functions read it is the triangle form of the mesh
+spec: the vertex dictionary (<code>x</code>, <code>y</code>),
+counter-clockwise corners (<code>v0</code>, <code>v1</code>,
+<code>v2</code>), a membership of triangles in features stored as
+offsets and ids (one per triangle for a coverage, several for
+overlapping inputs), and an edge table of the triangle across each edge,
+derived once when the mesh is read (one hash pass: 34 ms for the Voronoi
+mesh, and not in the timings below, as a format could store it).</p>
+<h2 id="de-9im-from-the-indices">DE-9IM from the indices</h2>
+<p>Every point of the plane lies in exactly one open triangle, open edge
+or vertex of the mesh, or outside it. Each of those cells lies wholly in
+the interior, boundary or exterior of a feature:</p>
+<ul>
+<li>a triangle is interior if it is a member, else exterior;</li>
+<li>an edge is interior if the triangles on both sides are members,
+boundary if exactly one is (outside the mesh counts as a non-member),
+exterior if neither;</li>
+<li>a vertex is interior if every triangle around it is a member and it
+is not on the hull, exterior if none is, boundary otherwise.</li>
+</ul>
+<p>The DE-9IM entry for (class in A, class in B) is the largest
+dimension of any cell in both classes: 2 for a triangle, 1 for an edge,
+0 for a vertex, F for none. Exterior meets exterior outside the mesh, so
+EE is always 2. Only cells of A's and B's own triangles can be anything
+but exterior to both, so a pair costs the size of the two features, and
+the candidates are the pairs that share a vertex.</p>
+<p>This is about 60 lines of C++. It reproduced
+<code>geos_relate()</code> on every pair: 245 in nc, 57,797 in the
+Voronoi coverage, 4 in inlandwaters, and 406 county by grid-cell pairs
+in the overlay, where interiors overlap, cells lie within counties and
+boundaries cross. Every named predicate (touches, overlaps, within,
+covers, equals, crosses for polygons) is a pattern on this matrix, so
+one function serves them all.</p>
+<p>It is exact on the mesh, which is the input after noding. Where two
+inputs nearly meet, the mesh and GEOS can disagree because the mesh has
+decided the noding and GEOS decides it again per pair; none of these
+layers hit that case.</p>
+<h2 id="results">Results</h2>
+<table>
+<thead>
+<tr class="header">
+<th>layer</th>
+<th>features</th>
+<th>polygon coordinates</th>
+<th>mesh vertices</th>
+<th>triangles</th>
+<th>build (s)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>nc counties</td>
+<td>100</td>
+<td>2,529</td>
+<td>1,255</td>
+<td>2,205</td>
+<td>0.03</td>
+</tr>
+<tr class="even">
+<td>Voronoi coverage</td>
+<td>19,493</td>
+<td>136,260</td>
+<td>39,478</td>
+<td>77,781</td>
+<td>0.99</td>
+</tr>
+<tr class="odd">
+<td>inlandwaters (holes)</td>
+<td>6</td>
+<td>33,644</td>
+<td>30,835</td>
+<td>33,205</td>
+<td>0.57</td>
+</tr>
+<tr class="even">
+<td>nc x rotated grid (overlay)</td>
+<td>100 + 160</td>
+<td>3,329</td>
+<td>1,752</td>
+<td>3,396</td>
+<td>0.04</td>
+</tr>
+</tbody>
+</table>
+<p><img src="speedup.png"
+alt="Times faster than the geos package for each function and layer, using the faster of the R and compiled versions where both exist. Above 1 the mesh is faster. Dotted lines separate the tiers: native, combinatorial, near-native, fallback, overlay." /></p>
+<p>Median milliseconds, mesh then geos, with the ratio:</p>
+<table>
+<thead>
+<tr class="header">
+<th>function</th>
+<th>tier</th>
+<th>nc</th>
+<th>Voronoi</th>
+<th>inlandwaters</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ST_Area</code></td>
+<td>native</td>
+<td>0.05, 0.01 (x0.2)</td>
+<td>2.4, 0.88 (x0.4)</td>
+<td>0.51, 0.10 (x0.2)</td>
+</tr>
+<tr class="even">
+<td><code>ST_Centroid</code></td>
+<td>native</td>
+<td>0.06, 0.13 (x2.1)</td>
+<td>2.6, 15 (x5.9)</td>
+<td>0.52, 0.94 (x1.8)</td>
+</tr>
+<tr class="odd">
+<td><code>ST_PointOnSurface</code></td>
+<td>native</td>
+<td>0.05, 0.08 (x1.4)</td>
+<td>2.4, 6.6 (x2.7)</td>
+<td>0.51, 0.36 (x0.7)</td>
+</tr>
+<tr class="even">
+<td><code>ST_Envelope</code></td>
+<td>native</td>
+<td>0.04, 0.07 (x1.8)</td>
+<td>4.2, 1.1 (x0.3)</td>
+<td>0.40, 0.06 (x0.2)</td>
+</tr>
+<tr class="odd">
+<td><code>ST_IsValid</code></td>
+<td>native</td>
+<td>0.17, 0.54 (x3.1)</td>
+<td>11, 25 (x2.3)</td>
+<td>2.1, 10 (x4.8)</td>
+</tr>
+<tr class="even">
+<td><code>ST_Affine</code></td>
+<td>native</td>
+<td>0.19, 0.09 (x0.5)</td>
+<td>1.6, 8.8 (x5.6)</td>
+<td>1.4, 0.47 (x0.3)</td>
+</tr>
+<tr class="odd">
+<td><code>ST_Perimeter</code></td>
+<td>combinatorial</td>
+<td>0.09, 0.01 (x0.1)</td>
+<td>5.3, 0.87 (x0.2)</td>
+<td>1.4, 0.10 (x0.1)</td>
+</tr>
+<tr class="even">
+<td><code>ST_Boundary</code></td>
+<td>combinatorial</td>
+<td>0.66, 0.04 (x0.1)</td>
+<td>38, 4.6 (x0.1)</td>
+<td>8.3, 0.35 (x0.0)</td>
+</tr>
+<tr class="odd">
+<td><code>ST_NumGeometries</code>, <code>ST_NumInteriorRings</code></td>
+<td>combinatorial</td>
+<td>1.9, 0.08 (x0.0)</td>
+<td>142, 3.3 (x0.0)</td>
+<td>26, 0.09 (x0.0)</td>
+</tr>
+<tr class="even">
+<td><code>ST_Touches</code> (all pairs)</td>
+<td>combinatorial</td>
+<td>2.3, 26 (x11)</td>
+<td>142, 2,128 (x15)</td>
+<td>13, 220 (x17)</td>
+</tr>
+<tr class="odd">
+<td><code>ST_Relate</code> (full DE-9IM, all pairs)</td>
+<td>combinatorial</td>
+<td>2.9, 10.0 (x3.4)</td>
+<td>128, 817 (x6.4)</td>
+<td>13, 27 (x2.1)</td>
+</tr>
+<tr class="even">
+<td><code>ST_Union_Agg</code> (grouped)</td>
+<td>combinatorial</td>
+<td>3.0, 8.6 (x2.9)</td>
+<td>55, 1,032 (x19)</td>
+<td>29, 154 (x5.2)</td>
+</tr>
+<tr class="odd">
+<td><code>ST_CoverageUnion</code> (grouped)</td>
+<td>combinatorial</td>
+<td>3.1, 2.7 (x0.9)</td>
+<td>52, 33 (x0.6)</td>
+<td>31, 134 (x4.4)</td>
+</tr>
+<tr class="even">
+<td><code>ST_Intersects(point)</code>, 100,000 points</td>
+<td>near-native</td>
+<td>15, 66 (x4.3)</td>
+<td>44, 142 (x3.2)</td>
+<td>13, 56 (x4.4)</td>
+</tr>
+<tr class="odd">
+<td><code>ST_Distance(point, feature)</code>, 10,000 points</td>
+<td>near-native</td>
+<td>3.8, 5.8 (x1.5)</td>
+<td>22, 4.5 (x0.2)</td>
+<td>175, 26 (x0.1)</td>
+</tr>
+<tr class="even">
+<td><code>ST_ClipByBox2D</code></td>
+<td>near-native</td>
+<td>0.16, 0.20 (x1.3)</td>
+<td>3.4, 9.5 (x2.7)</td>
+<td>2.8, 0.95 (x0.3)</td>
+</tr>
+<tr class="odd">
+<td><code>ST_ConvexHull</code></td>
+<td>near-native</td>
+<td>0.50, 0.66 (x1.3)</td>
+<td>8.9, 22 (x2.5)</td>
+<td>5.2, 8.5 (x1.6)</td>
+</tr>
+<tr class="even">
+<td><code>ST_Buffer</code></td>
+<td>fallback</td>
+<td>12, 7.6 (x0.6)</td>
+<td>508, 393 (x0.8)</td>
+<td>1,854, 1,759 (x0.9)</td>
+</tr>
+<tr class="odd">
+<td><code>ST_SimplifyPreserveTopology</code></td>
+<td>fallback</td>
+<td>7.7, 3.7 (x0.5)</td>
+<td>284, 137 (x0.5)</td>
+<td>76, 44 (x0.6)</td>
+</tr>
+<tr class="even">
+<td><code>ST_ConstrainedDelaunayTriangles</code></td>
+<td>producer</td>
+<td>26, 4.3 (x0.2)</td>
+<td>992, 104 (x0.1)</td>
+<td>572, 295 (x0.5)</td>
+</tr>
+</tbody>
+</table>
+<p>In the overlay of nc with a rotated 20 by 8 grid, the relate matrix
+for all 406 county by cell pairs took 3.7 ms on the mesh against 6.5 ms
+in geos, and the intersection area of every piece 1 ms against 16 ms for
+<code>geos_intersection()</code>, with areas agreeing to 2e-13. Building
+the overlay mesh took 38 ms, which is more than geos needs for either
+question on its own; the mesh pays off when the same overlay answers
+many questions.</p>
+<p>What the numbers say:</p>
+<ul>
+<li><strong>The relations tier is the case for the mesh.</strong>
+Touches, relate and grouped union read shared indices where GEOS
+intersects coordinates. The gap grows with the number of features
+(Voronoi) and with feature size (inlandwaters' 30,000-vertex
+polygons).</li>
+<li><strong>GEOS's coverage union is mesh-shaped too.</strong> It
+matches shared edges instead of overlaying, and on the Voronoi coverage
+it beats the mesh dissolve (33 ms against 52 ms, of which the ring walk
+is 45 ms and writing WKB the rest; the walk's hash table is the obvious
+thing to replace with a sort). On inlandwaters, where coverage union
+still has to node long rings, the mesh is 4 times faster.</li>
+<li><strong>Simple measures need no mesh.</strong> Area and envelope on
+GEOS objects in memory are a pass over coordinates that GEOS has already
+counted or cached, and the mesh has more vertex reads per feature (three
+per triangle). Centroid and point on surface favour the mesh, because
+GEOS does more work for them.</li>
+<li><strong>Structure is expensive on a mesh.</strong> Number of parts,
+holes and boundary lines all go through the dissolve, which GEOS never
+needs. If a format stores the rings (or ring counts) next to the
+triangles, these become reads again; otherwise they stay 20 to 300 times
+slower.</li>
+<li><strong>Point location is the clearest near-native win</strong>, 3
+to 4 times faster than the best geos route (a tree join, or one prepared
+geometry per feature for small layers), with identical answers on
+300,000 points.</li>
+<li><strong>Distance is GEOS's.</strong> Inside points are free (0 from
+the locator), but the nearest boundary edge for far points is a
+nearest-neighbour search that GEOS's indexed facet distance does well. A
+mesh binding should hand the boundary edges to that index rather than
+write its own.</li>
+<li><strong>Clip by box stays a mesh.</strong> Crossing triangles are
+clipped and fanned, with each cut point computed from its edge's
+endpoints in vertex-id order so the two triangles sharing an edge get
+bit-identical points and the result re-pools exactly. It is faster than
+GEOS where triangles are small (Voronoi) and slower where they are long
+(inlandwaters).</li>
+<li><strong>The fallback costs one dissolve.</strong> Buffer through the
+mesh is 5 to 60 percent slower than the same call on the original
+polygons, and simplify, which is cheap, about twice as slow. That is the
+price of not keeping polygons beside the mesh. Simplify answers also
+differ in detail, because the dissolve chooses where each ring starts;
+all results are valid.</li>
+<li><strong>Building the mesh costs more than GEOS's own
+triangulation</strong>, 2 to 10 times, because polymer triangulates the
+whole layer at once and labels it, where
+<code>geos_constrained_delaunay_triangles()</code> works one polygon at
+a time and shares nothing. It is paid once, by the producer.</li>
+</ul>
+<h2 id="geos-or-sf">geos or sf</h2>
+<p>Asked along the way: how much is the geos package against sf? The
+same five operations, three ways: sf on an <code>sfc</code>, geos
+converting from that <code>sfc</code> on each call, and geos on
+geometries already held:</p>
+<table>
+<thead>
+<tr class="header">
+<th>layer</th>
+<th>function</th>
+<th>sf</th>
+<th>geos, converting</th>
+<th>geos, held</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>nc</td>
+<td><code>ST_Area</code></td>
+<td>0.36</td>
+<td>0.20</td>
+<td>0.02</td>
+</tr>
+<tr class="even">
+<td>nc</td>
+<td><code>ST_Touches</code> (all pairs)</td>
+<td>11</td>
+<td>26</td>
+<td>25</td>
+</tr>
+<tr class="odd">
+<td>nc</td>
+<td><code>ST_Intersects(point)</code>, 100,000</td>
+<td>458</td>
+<td>221</td>
+<td>58</td>
+</tr>
+<tr class="even">
+<td>nc</td>
+<td><code>ST_Union_Agg</code> (grouped)</td>
+<td>11</td>
+<td>9.3</td>
+<td>8.5</td>
+</tr>
+<tr class="odd">
+<td>nc</td>
+<td><code>ST_Buffer</code></td>
+<td>11</td>
+<td>8.0</td>
+<td>7.7</td>
+</tr>
+<tr class="even">
+<td>Voronoi</td>
+<td><code>ST_Area</code></td>
+<td>34</td>
+<td>24</td>
+<td>1.5</td>
+</tr>
+<tr class="odd">
+<td>Voronoi</td>
+<td><code>ST_Touches</code> (all pairs)</td>
+<td>854</td>
+<td>1,980</td>
+<td>1,966</td>
+</tr>
+<tr class="even">
+<td>Voronoi</td>
+<td><code>ST_Intersects(point)</code>, 100,000</td>
+<td>851</td>
+<td>401</td>
+<td>179</td>
+</tr>
+<tr class="odd">
+<td>Voronoi</td>
+<td><code>ST_Union_Agg</code> (grouped)</td>
+<td>932</td>
+<td>1,016</td>
+<td>989</td>
+</tr>
+<tr class="even">
+<td>Voronoi</td>
+<td><code>ST_Buffer</code></td>
+<td>1,104</td>
+<td>409</td>
+<td>431</td>
+</tr>
+<tr class="odd">
+<td>inlandwaters</td>
+<td><code>ST_Area</code></td>
+<td>1.9</td>
+<td>3.4</td>
+<td>0.10</td>
+</tr>
+<tr class="even">
+<td>inlandwaters</td>
+<td><code>ST_Touches</code> (all pairs)</td>
+<td>63</td>
+<td>248</td>
+<td>233</td>
+</tr>
+<tr class="odd">
+<td>inlandwaters</td>
+<td><code>ST_Intersects(point)</code>, 100,000</td>
+<td>371</td>
+<td>1,616</td>
+<td>1,589</td>
+</tr>
+<tr class="even">
+<td>inlandwaters</td>
+<td><code>ST_Union_Agg</code> (grouped)</td>
+<td>129</td>
+<td>148</td>
+<td>147</td>
+</tr>
+<tr class="odd">
+<td>inlandwaters</td>
+<td><code>ST_Buffer</code></td>
+<td>1,400</td>
+<td>1,691</td>
+<td>1,689</td>
+</tr>
+</tbody>
+</table>
+<p>Milliseconds. Two things are mixed in sf's column: conversion to GEOS
+on every call, which dominates cheap functions (area is about 20 times
+faster with geometries held), and better predicate paths, because sf
+prepares one side of <code>st_touches()</code> and
+<code>st_intersects()</code> and links a newer GEOS (3.14 here, against
+3.11 bundled in libgeos). So sf is 2 to 4 times faster than geos for
+touches, and 4 times faster for point in polygon on large polygons,
+unless the geos caller prepares by hand. Holding GEOS objects is the
+right model for a mesh's fallback, since the mesh, not the polygons, is
+what is kept; for the predicate baselines here, sf would narrow the
+mesh's lead on touches to 4 to 6 times.</p>
+<p>Two notes on the geos package, kept here and not raised anywhere:
+<code>geos_touches_matrix()</code> crashed on polygons taken out of a
+collection with <code>geos_geometry_n()</code> (a WKB round trip avoids
+it; <code>geos_touches()</code> and the other matrix predicates were
+fine), and the package has no coverage simplify or coverage validation,
+which GEOS added in 3.12 to 3.14.</p>
+<h2 id="what-changed-in-our-packages">What changed in our packages</h2>
+<ul>
+<li><strong>cdtr: <code>cdt_locate()</code></strong> (<a
+href="https://github.com/hypertidy/cdtr/pull/9">cdtr#9</a>). The grid of
+triangle buckets inside <code>cdt_interpolate()</code> became one flat
+structure shared by both, and the new function returns the containing
+triangle per point with CDT's robust <code>orient2d</code>; ties on
+shared edges go to the lowest triangle id. Point in polygon is
+<code>feature[cdt_locate(...)]</code>.</li>
+<li><strong>wkpool: compiled <code>tri_dissolve()</code></strong> (<a
+href="https://github.com/hypertidy/wkpool/pull/15">wkpool#15</a>). The
+ring walk moved to C++, step for step with the R version, which stays as
+a test reference; the two agree exactly on random groupings and on the
+polymer meshes here, and inlandwaters dissolves in 24 ms instead of 228
+ms.</li>
+</ul>
+<h2 id="next-on-our-side">Next on our side</h2>
+<ul>
+<li>Store or cache rings: either a ring table beside the triangles, or a
+dissolve cached per mesh, so structural accessors stop costing a
+dissolve.</li>
+<li>Move the DE-9IM kernel into wkpool (or polymer) as
+<code>tri_relate()</code>, with the conformance corpus from the validity
+page.</li>
+<li>Hand the boundary edges to a GEOS STRtree for distance, instead of
+the grid here.</li>
+<li>Try the same suite on a laridae exact mesh, where
+<code>vertex_identity</code> is <code>"exact"</code> and the noding
+question in the DE-9IM section cannot arise.</li>
+</ul>
+</main>
+<script>
+document.querySelectorAll("table").forEach(function (t) {
+  var w = document.createElement("div");
+  w.className = "tablewrap";
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+</body>
+</html>

@@ -74,6 +74,14 @@ render dev-drafts/st-mesh.md dev-drafts/st-mesh \
   "ST_* functions on a triangle mesh (draft)" "dev draft" \
   "Development draft: which ST_* functions run natively on a triangle mesh, which need only its indices, which need one more index and which fall back to polygons, with a prototype checked against sf." \
   ../../
+render dev-drafts/st-mesh-geos.md dev-drafts/st-mesh-geos \
+  "ST_* on a mesh with wkpool and geos (draft)" "dev draft" \
+  "Development draft: 24 ST_* functions on a triangle mesh built with wkpool, cdtr and polymer, checked and timed against the R geos package, with DE-9IM from triangle indices." \
+  ../../
+render dev-drafts/geoarrow-triangles-st.md dev-drafts/geoarrow-triangles-st \
+  "What geoarrow.triangles needs for ST_* (draft)" "dev draft" \
+  "Development draft: a plan for geoarrow.triangles with ST_* support: a row as a feature, metadata promises, cached tables, kernels, joins across meshes and steps on our side first." \
+  ../../
 redirect choose ../start/#which-package
 redirect dimension ../notes/#dimension
 redirect interpolation ../notes/#interpolation
