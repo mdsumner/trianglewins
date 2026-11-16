@@ -179,7 +179,8 @@ area_for <- function(p, n) pslg_area(p) / n
 #' @param boundaries "unique": every distinct edge once, so a boundary two
 #'   polygons share counts as one crossing for every backend; "as_given": every
 #'   input segment, so a doubled boundary reaches the backend twice (laridae
-#'   and cdtr then count depth k, trowel 1; that choice is still open)
+#'   and cdtr then count depth k, and also offer depth_distinct, counted once;
+#'   trowel counts 1)
 #' @param region "inside": triangles inside the constraints; "hull": the
 #'   convex hull (open linework, points)
 #' @param attributes vertex columns carried through and interpolated onto new

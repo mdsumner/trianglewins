@@ -27,7 +27,9 @@ project, and then looks at a real dataset. The short version:
 - **A constrained triangulation reads parity for free.** The depth that
   cdtr, laridae and trowel give each triangle is a repair in itself, with
   no noding step, and it agrees with GEOS linework on every case here once
-  doubled edges are counted once.
+  doubled edges are counted once. cdtr's `cdt_winding()` reads the third
+  rule from the same mesh: the signed winding number of each input feature
+  in every triangle (not yet run on the cases here).
 
 The scripts and full results are in the project files
 (`polygon-validity/`): `catalogue.R`, `catalogue.py`, `coverage.py`,
@@ -179,7 +181,8 @@ Three things stand out.
 3. **Duplicated edges split the parity readings.** If a ring appears twice,
    counting each copy (Clipper evenodd, cdtr depth, laridae depth) cancels
    it; counting coincident edges once (GEOS linework, which nodes the lines
-   first, and laridae `depth_distinct`, trowel, s2) keeps it.
+   first, and laridae `depth_distinct`, cdtr `depth_distinct = TRUE`,
+   trowel, s2) keeps it.
 
 The input's own shoelace area is not a reading at all: it is 0 for the
 bowtie and 200 for the duplicate part.
@@ -276,7 +279,7 @@ to: each one reads its input in a definite way. The point is to know which.
 
 | package | what it does with invalid input |
 |---|---|
-| **cdtr** | Merges exactly coincident vertices, inserts every crossing as a vertex (`intersect = "resolve"`, the default; the count is returned as `n_crossing` and those vertices have origin "crossing"). `depth` counts per copy; `depth_distinct` counts once. `erase = "holes"` keeps odd per-copy depth. |
+| **cdtr** | Merges exactly coincident vertices, inserts every crossing as a vertex (`intersect = "resolve"`, the default; the count is returned as `n_crossing` and those vertices have origin "crossing"). `depth` counts per copy; `depth_distinct` counts once. `erase = "holes"` keeps odd per-copy depth; `holes` erases the bounded region around each hole point, as Triangle's `H` does. With `edge_sources = TRUE`, `cdt_winding()` gives each feature's signed winding number per triangle, from ring direction, with no point-in-polygon test. |
 | **laridae** | Same reading on CGAL (exact predicates, crossings constructed in double; exact crossings on the `exact-cdt` branch). Returns both `depth` and `depth_distinct`, and `count`, the number of input segments on each edge. `erase = "holes"` uses per-copy depth. |
 | **trowel** | Inserts crossings as vertices with origin "crossing". Coincident segments become one edge, so its depth is the distinct count, matching GEOS linework. |
 | **polymer** | Dedupes segments before triangulating, then labels each triangle by the parity of the rings of each feature that contain its centroid. Parity per feature, so overlapping parts of one multipolygon leave a hole, and a duplicated part cancels to nothing (area 0 above). |

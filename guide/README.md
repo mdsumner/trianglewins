@@ -103,8 +103,10 @@ back into the common shape. Two arguments are worth explaining:
   `"as_given"` feeds every input segment, so a doubled boundary arrives
   twice. On inlandwaters laridae and cdtr then report depth 3 on the 279
   ACT triangles (two crossings for the shared outline) while trowel stays
-  at 2. Which of those depth should mean is still an open decision (see the
-  harness results); this argument only makes the feeding explicit.
+  at 2. laridae and cdtr also return the depth that counts a doubled
+  boundary once (`depth_distinct`; in cdtr with `depth_distinct = TRUE`),
+  so both readings are on offer, and the mesh spec's `depth` counts per
+  copy. This argument only makes the feeding explicit.
 * **`region = "inside"`** keeps triangles inside some constraint;
   `"hull"` keeps the convex hull (linework, points).
 
@@ -154,6 +156,14 @@ So labelling is done topologically, with one geometric test per face:
 
 Areas per feature from the labelled mesh reproduce the input exactly, for
 all six states.
+
+With cdtr there is also a route with no geometric test at all:
+`cdt_triangulate(edge_sources = TRUE)` records the input segments behind
+every constraint edge, and `cdt_winding()` walks the mesh from a point
+covered by nothing and gives each feature's winding number in every
+triangle (outer rings counter-clockwise, holes clockwise). See cdtr's
+`vignette("overlay")`. `tri_features()` remains the route that works the
+same for every backend.
 
 ![Inlandwaters, labelled by state](figures/inlandwaters-overview.png)
 

@@ -3,8 +3,9 @@
 Every R package found (CRAN, GitHub, r-universe) that triangulates points,
 polygons or segment sets, classified by algorithm, upstream library, input,
 constraints and output control, with a short look at Python. Facts were
-checked against package source on 6 October 2026; claims resting only on
-upstream documentation are marked (upstream docs). No package was run for
+checked against package source on 6 October 2026, and the CRAN status and
+this project's packages (section 7) again on 16 November 2026; claims
+resting only on upstream documentation are marked (upstream docs). No package was run for
 this page: measured behaviour is in the harness and the
 [benchmark](../bench/), and the three main engines are compared on worked
 examples in [Triangulation in context](../context/). "xy" and "xyz" are
@@ -33,7 +34,8 @@ before the algorithm does:
 - **Inside and outside.** Ear cutting and GEOS use ring nesting; Triangle
   and fdaPDE need hole seed points; RCDT and delaunay use parity, which
   cannot express a coverage of neighbouring polygons; cdtr, trowel and
-  laridae report depth and leave the choice to you.
+  laridae report depth and leave the choice to you (cdtr also takes hole
+  points, as Triangle does).
 
 ## 1. The algorithm families
 
@@ -100,16 +102,18 @@ layer, so its GEOS is the one GDAL was built with.
 |---|---|---|---|---|
 | [**tripack**](https://cran.r-project.org/package=tripack)<br>`tri.mesh()` + `add.constraint()`<br><small>CRAN, ACM licence</small> | Renka TRIPACK (TOMS 751) | x, y; closed constraint curves | curve orientation | `tri` object |
 | [**akima**](https://cran.r-project.org/package=akima)<br><small>CRAN, ACM licence</small> | Renka inside ACM 761 | x, y, z | none | interpolation only |
-| [**RCDT**](https://cran.r-project.org/package=RCDT)<br>`delaunay()`<br><small>CRAN 1.3.0, Laurent</small> | artem-ogre/CDT | points, 2-column `edges` index | parity | list with rgl mesh, edges |
-| [**delaunay**](https://cran.r-project.org/package=delaunay)<br>`delaunay()`<br><small>CRAN 2.0.0, Laurent</small> | CGAL CDT via RcppCGAL; gmp, mpfr | points, `constraints` index; 2.5D `elevation`; xyz to tetrahedra | nesting level, odd inside | list with mesh, edges |
+| [**RCDT**](https://cran.r-project.org/package=RCDT)<br>`delaunay()`<br><small>archived from CRAN January 2026 (1.3.0), Laurent</small> | artem-ogre/CDT | points, 2-column `edges` index | parity | list with rgl mesh, edges |
+| [**delaunay**](https://cran.r-project.org/package=delaunay)<br>`delaunay()`<br><small>archived from CRAN August 2023 (2.0.0), Laurent</small> | CGAL CDT via RcppCGAL; gmp, mpfr | points, `constraints` index; 2.5D `elevation`; xyz to tetrahedra | nesting level, odd inside | list with mesh, edges |
 | [**sf**](https://cran.r-project.org/package=sf), [**geos**](https://cran.r-project.org/package=geos), [**terra**](https://cran.r-project.org/package=terra), [**gdalraster**](https://cran.r-project.org/package=gdalraster)<br>`st_triangulate_constrained()`, `geos_constrained_delaunay_triangles()`, `delaunay(constrained = TRUE)`, `g_delaunay_triangulation(constrained = TRUE)` | GEOS >= 3.10 (gdalraster: GDAL >= 3.12): ear clipping then flips (upstream docs) | valid polygons, one at a time | holes joined to shell | triangle polygons |
 | [**cgalPolygons**](https://cran.r-project.org/package=cgalPolygons)<br>`$convexParts(method = "triangle")`<br><small>CRAN 0.1.1</small> | CGAL Polygon_triangulation_decomposition_2 | R6 polygon with holes | holes | coordinate matrices |
 | [**spatstat.geom**](https://cran.r-project.org/package=spatstat.geom)<br>`triangulate.owin()` | deldir, recursive clipping | owin | holes | tess |
 
 GEOS's "constrained" Delaunay is a polygon triangulation: no Steiner
 points, no loose segments, each polygon on its own, so shared edges in a
-coverage are not matched. RCDT and delaunay are the only CRAN packages
-taking an arbitrary segment index without refinement.
+coverage are not matched. RCDT and delaunay take an arbitrary segment
+index without refinement, but both have been archived from CRAN (delaunay
+in August 2023, RCDT in January 2026). On CRAN, cdtr (section 7) does the
+same, with refinement optional.
 
 ## 5. Quality meshing
 
@@ -141,9 +145,9 @@ error or triangle budget. lasR and lidR build TINs from point clouds
 
 | Package | Upstream code | Algorithm | Output control | Output |
 |---|---|---|---|---|
-| [**cdtr**](https://github.com/hypertidy/cdtr)<br><small>GitHub, hypertidy</small> | artem-ogre/CDT, MPL-2.0 | CDT, conforming, CDT's refinement (one criterion per pass) | `max_area`, `min_angle`, `max_steiner`, `min_edge_length`; `unrefined` report; attributes | vertices with origin, triangles with depth, segments |
+| [**cdtr**](https://github.com/hypertidy/cdtr)<br><small>CRAN 0.1.0 (0.2.0 in development), hypertidy</small> | artem-ogre/CDT, MPL-2.0 | CDT, conforming, Ruppert refinement (one criterion per pass; encroached constraints split under an area bound too) | `max_area`, `min_angle`, `max_steiner`, `min_edge_length`; `erase`, hole points; `unrefined` report; attributes | vertices with origin, triangles with depth (per copy or distinct), segments, `edge_sources`; `cdt_winding()`, `cdt_locate()`, `cdt_quality()` |
 | [**trowel**](https://github.com/hypertidy/trowel)<br><small>GitHub, hypertidy</small> | spade 2.15 (Rust) | live CDT handle, insert and remove, spade refinement | `min_angle`, `max_area`, `max_steiner` | same tables, stable ids across edits |
-| [**laridae**](https://github.com/hypertidy/laridae)<br><small>GitHub, hypertidy</small> | CGAL Constrained_triangulation_plus_2 + Delaunay_mesher_2 | fully dynamic CDT, exact predicates, step-wise mesher | angle, area, edge floor, sizing function or grid, seeds, `max_steiner`, `lari_step()` | same tables, `lari_depth()` |
+| [**laridae**](https://github.com/hypertidy/laridae)<br><small>GitHub, hypertidy</small> | CGAL Constrained_triangulation_plus_2 + Delaunay_mesher_2 | fully dynamic CDT, exact predicates, step-wise mesher | angle, area, edge floor, sizing function or grid, seeds, `max_steiner`, `lari_step()` | same tables, `edge_sources`, `lari_depth()` |
 
 All three take `x, y, s0, s1` and return the triangle form of the
 [mesh spec v0.1](https://github.com/hypertidy/meshcore/blob/main/docs/mesh-spec-v0.1.md).
@@ -189,6 +193,8 @@ what it could not do; attributes onto new vertices.
 | Attributes onto new vertices | RTriangle, fdaPDE, cdtr, trowel, laridae |
 | Inside and outside by depth | cdtr, trowel, laridae only |
 | Origin of each vertex | cdtr, trowel, laridae; RTriangle only indirectly |
+| Input segments behind each constraint edge | cdtr, laridae (`edge_sources`) |
+| Coverage of each triangle by each input feature | cdtr (`cdt_winding()`, from `edge_sources`) |
 | Report of what refinement could not do | cdtr, laridae; Triangle stops silently |
 | Editing after build | trowel, laridae. Nothing on CRAN |
 | Sphere | fmesher, tulpaMesh |
@@ -255,6 +261,7 @@ inlabru, sdmTMB, rayrender). rgeos left CRAN in 2023.
 ## Method
 
 Metadata and signatures from the CRAN mirrors (github.com/cran) and
-authors' repositories on 6 October 2026; discovery through the r-universe
+authors' repositories on 6 October 2026, with CRAN status and section 7
+re-checked on 16 November 2026; discovery through the r-universe
 search API and web search; algorithm attributions from DESCRIPTION, Rd
 references and vendored source headers.

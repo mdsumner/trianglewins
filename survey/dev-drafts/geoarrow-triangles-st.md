@@ -173,7 +173,9 @@ corpus:
 ## Plan, on our side first
 
 1. **Land the two package steps.** cdtr#9 (`cdt_locate()`) and wkpool#15
-   (compiled `tri_dissolve()`), under review.
+   (compiled `tri_dissolve()`), under review. *(16 November: both merged on
+   15 November; cdtr's development version adds `cdt_locate(barycentric =
+   TRUE)`.)*
 2. **A feature-layout pilot.** Extend the existing pilot (nanoarrow in R,
    pyarrow in Python) to write and read the list layout, with zero-copy
    views of the dictionary as `x`, `y` and of the offsets as the

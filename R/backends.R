@@ -6,6 +6,9 @@
 ##              doubled boundary counted once; omitted when the backend lacks it)
 ##   unrefined  one string summarising what the backend reports it could
 ##              not do (NA when it reports nothing)
+##   min_edge_length  optional: the edge-length floor the refiner used (cdtr
+##              and laridae derive one from the input by default; NA or
+##              omitted when the backend has none or did not refine)
 ## The region kept follows case$region: "outer" keeps triangles inside the
 ## constraints, "hull" the whole convex hull.
 
@@ -52,20 +55,29 @@ run_laridae <- function(case, max_area = NULL, min_angle = NULL, attr = FALSE) {
                                  PA = PA, max_area = max_area, min_angle = min_angle,
                                  erase = erase, max_steiner = tw_budget())
   V <- r$vertices
+  ## laridae reports refinement in `report` (since October 2026; earlier
+  ## versions returned `unrefined`); counts other than these are what it
+  ## could not do
+  rep <- if (!is.null(r$report)) r$report else r$unrefined
+  refining <- !is.null(max_area) || !is.null(min_angle)
+  floor <- if (!is.null(r$min_edge_length)) r$min_edge_length else rep$min_edge_length
   list(vertices = xyz(V, attr),
        triangles = data.frame(v0 = r$triangles$v0, v1 = r$triangles$v1,
                               v2 = r$triangles$v2, depth = r$triangles$depth,
                               depth_distinct = r$triangles$depth_distinct),
-       unrefined = if (is.null(r$unrefined)) NA_character_
-                   else nonzero_summary(r$unrefined[setdiff(names(r$unrefined),
-                                                      c("min_edge_length", "inserted"))]))
+       unrefined = if (is.null(rep) || !refining) NA_character_
+                   else nonzero_summary(rep[setdiff(names(rep),
+                                                    c("min_edge_length", "inserted", "refined"))]),
+       min_edge_length = if (refining && length(floor)) floor[1] else NA_real_)
 }
 
+## cdtr runs with its default min_edge_length (NULL: a floor derived from the
+## input), as laridae runs with its own default floor
 run_cdtr <- function(case, max_area = NULL, min_angle = NULL, attr = FALSE) {
   erase <- if (case$region == "hull") "hull" else "outer"
   args <- list(case$x, case$y, seg_or_null(case$s0), seg_or_null(case$s1),
                max_area = max_area, min_angle = min_angle,
-               max_steiner = tw_budget(), erase = erase)
+               max_steiner = tw_budget(), erase = erase, depth_distinct = TRUE)
   if (attr) {
     r <- do.call(cdtr::cdt_triangulate_attr, c(args, list(PA = cbind(z = case$x + 2 * case$y))))
   } else {
@@ -75,8 +87,10 @@ run_cdtr <- function(case, max_area = NULL, min_angle = NULL, attr = FALSE) {
   if (attr) V$z <- as.matrix(r$PA)[, 1]
   refining <- !is.null(max_area) || !is.null(min_angle)
   list(vertices = V,
-       triangles = data.frame(v0 = r$T[, 1], v1 = r$T[, 2], v2 = r$T[, 3], depth = r$depth),
-       unrefined = if (refining) nonzero_summary(r$unrefined) else NA_character_)
+       triangles = data.frame(v0 = r$T[, 1], v1 = r$T[, 2], v2 = r$T[, 3], depth = r$depth,
+                              depth_distinct = r$depth_distinct),
+       unrefined = if (refining) nonzero_summary(r$unrefined) else NA_character_,
+       min_edge_length = if (refining) r$min_edge_length else NA_real_)
 }
 
 run_trowel <- function(case, max_area = NULL, min_angle = NULL, attr = FALSE) {

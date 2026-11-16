@@ -72,9 +72,8 @@ m <- cdtr::cdt_triangulate(xy[, 1], xy[, 2], s0 = 1:n, s1 = c(2:n, 1),
 ```
 
 `s0` and `s1` say which points are joined by an edge that must be kept.
-cdtr is on GitHub (`remotes::install_github("hypertidy/cdtr")`). On
-CRAN, fmesher does this job for statistical meshes, and RTriangle does
-it in general but has a non-commercial licence.
+cdtr is on CRAN. fmesher also does this job for statistical meshes,
+and RTriangle does it in general but has a non-commercial licence.
 
 ## Triangles as a network
 
@@ -184,12 +183,12 @@ solved off CRAN today, marked [GitHub].
 | A TIN from a height grid | terrainmeshr | lidR, lasR from LiDAR points |
 | A mesh for an SPDE model (INLA, TMB) | fmesher | tulpaMesh |
 | A mesh for finite elements on a polygon | fmesher, fdaPDE | RTriangle, tulpaMesh |
-| Polygons, lines and points with every edge kept | RCDT | RTriangle, delaunay; [GitHub] cdtr |
-| Good-shaped triangles on any set of edges | RTriangle | [GitHub] cdtr, laridae, trowel |
+| Polygons, lines and points with every edge kept | cdtr | RTriangle; [GitHub] laridae, trowel |
+| Good-shaped triangles on any set of edges | RTriangle, cdtr | [GitHub] laridae, trowel |
 | Triangle size that varies over space | fmesher | geometry::distmesh2d; [GitHub] laridae |
 | Add or remove points and edges after building | nothing on CRAN | [GitHub] trowel, laridae |
 | A mesh on the sphere | fmesher | tulpaMesh; for points only, see [Notes](../notes/#triangles-on-the-sphere) |
-| Delaunay of xyz points (tetrahedra) | geometry, tessellation | delaunay |
+| Delaunay of xyz points (tetrahedra) | geometry, tessellation | delaunay (archived from CRAN) |
 
 ## Where to go next
 

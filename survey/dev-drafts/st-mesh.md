@@ -128,7 +128,7 @@ do, in our packages and elsewhere.
 
 | function | tier | on the mesh | tables | exists |
 |---|---|---|---|---|
-| `ST_Intersects`, `ST_Contains`, `ST_Within` (point, feature) | near-native | locate the point (grid buckets, a walk, or a tree), then the triangle's feature | V T F | prototype; cdtr `cdt_interpolate()` has the grid locator inside; matplotlib `TriFinder`; scipy `find_simplex`; d3-delaunay `find`; spade `locate`; xugrid celltree; CGAL `locate` |
+| `ST_Intersects`, `ST_Contains`, `ST_Within` (point, feature) | near-native | locate the point (grid buckets, a walk, or a tree), then the triangle's feature | V T F | prototype; cdtr `cdt_locate()` (since 15 November; the grid locator from `cdt_interpolate()`); matplotlib `TriFinder`; scipy `find_simplex`; d3-delaunay `find`; spade `locate`; xugrid celltree; CGAL `locate` |
 | `ST_Intersects` (geometry, feature) | near-native | candidate triangles from the locator's grid, then convex triangle tests (separating axis, segment against triangle) | V T F | GEOS prepared geometry does the polygon-side equivalent |
 | `ST_Touches` between features of one mesh | combinatorial | features sharing a vertex id, no shared triangle | T F | prototype; wkpool `find_neighbours(type = "vertex")` |
 | `ST_Relate` `F***1****` (share an edge) | combinatorial | features on the two sides of a mesh edge | T F E | prototype; wkpool `find_shared_edges()`; the [boundaries page](../../boundaries/) owner table |
@@ -143,7 +143,7 @@ do, in our packages and elsewhere.
 |---|---|---|---|---|
 | `ST_Union_Agg`, grouped dissolve | combinatorial | keep edges whose twin is in another group, walk them into rings by rotating around each vertex, give each ring the component of its triangles (so holes need no point-in-polygon test) | V T F | prototype `mesh_dissolve_c`; wkpool `tri_dissolve()`; polymer `fuse()`; GEOS `CoverageUnion` is the polygon-side analogue |
 | `ST_Union`, `ST_Intersection`, `ST_Difference`, `ST_SymDifference` within one mesh | combinatorial | set algebra on `set_features`, then dissolve | T F | polymer `fuse()`, `layer_n()` |
-| the same between two layers | near-native | one constrained triangulation of both layers' edges, labelled by winding (v0.2 Annex A), then as above | V T C S | polymer on cdtr; laridae exact path in progress |
+| the same between two layers | near-native | one constrained triangulation of both layers' edges, labelled by winding (v0.2 Annex A), then as above | V T C S | polymer on cdtr; cdtr `cdt_winding()` (added 16 November); laridae exact path in progress |
 | `ST_ClipByBox2D`, intersection with a convex polygon | near-native | keep triangles inside, drop those outside, clip crossing triangles (convex against convex) and fan the pieces back into triangles; the result is still a mesh | V T F | not written; polyclip or a Sutherland-Hodgman loop per crossing triangle |
 | `ST_Split` (feature, line) | near-native | insert the line as constraints, relabel the two sides | V T C S | cdtr + polymer labelling |
 | `ST_Node`, `ST_Polygonize` | native to the producer | a constrained triangulation resolves crossings (`intersect = "resolve"`), and depth or labelling gives the faces | V T C D | cdtr, laridae, wkpool `find_faces()` |

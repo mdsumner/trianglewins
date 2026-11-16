@@ -85,6 +85,7 @@ tw_run <- function(backends = names(tw_backends()), cases = NULL, scenarios = NU
         if (length(warn)) row$message <- paste(unique(warn), collapse = "; ")
         m <- tw_measure(case, out, s$max_area, s$min_angle)
         m$unrefined <- out$unrefined
+        m$min_edge_length <- if (is.null(out$min_edge_length)) NA_real_ else out$min_edge_length
         m$time_ms <- if (time) 1000 * time_call(function() suppressWarnings(f()), min_time) else NA_real_
         oa <- tryCatch(suppressWarnings(f(attr = TRUE)), error = function(e) NULL)
         m$attr_err <- if (is.null(oa)) NA_real_ else tw_attr_error(oa, case)

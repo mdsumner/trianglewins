@@ -68,6 +68,7 @@ td small { color: var(--text-muted); font-size: 12px; }
 td:first-child a { text-decoration: none; }
 td:first-child a:hover { text-decoration: underline; }
 td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
 </style>
 </head>
 <body>
@@ -79,11 +80,12 @@ in R: a survey of packages and where their algorithms come from</h1>
 <p>Every R package found (CRAN, GitHub, r-universe) that triangulates
 points, polygons or segment sets, classified by algorithm, upstream
 library, input, constraints and output control, with a short look at
-Python. Facts were checked against package source on 6 October 2026;
-claims resting only on upstream documentation are marked (upstream
-docs). No package was run for this page: measured behaviour is in the
-harness and the <a href="../bench/">benchmark</a>, and the three main
-engines are compared on worked examples in <a
+Python. Facts were checked against package source on 6 October 2026, and
+the CRAN status and this project's packages (section 7) again on 16
+November 2026; claims resting only on upstream documentation are marked
+(upstream docs). No package was run for this page: measured behaviour is
+in the harness and the <a href="../bench/">benchmark</a>, and the three
+main engines are compared on worked examples in <a
 href="../context/">Triangulation in context</a>. "xy" and "xyz" are
 coordinate dimension, and triangles and tetrahedra are topological
 dimension; see <a href="../notes/">Notes</a>.</p>
@@ -110,7 +112,8 @@ split crossing segments; GEOS needs valid polygons.</li>
 <li><strong>Inside and outside.</strong> Ear cutting and GEOS use ring
 nesting; Triangle and fdaPDE need hole seed points; RCDT and delaunay
 use parity, which cannot express a coverage of neighbouring polygons;
-cdtr, trowel and laridae report depth and leave the choice to you.</li>
+cdtr, trowel and laridae report depth and leave the choice to you (cdtr
+also takes hole points, as Triangle does).</li>
 </ul>
 <h2 id="1-the-algorithm-families">1. The algorithm families</h2>
 <p>The families differ in what they promise about the output, which
@@ -358,8 +361,8 @@ ACM licence</small></td>
 </tr>
 <tr class="odd">
 <td><a
-href="https://cran.r-project.org/package=RCDT"><strong>RCDT</strong></a><br><code>delaunay()</code><br><small>CRAN
-1.3.0, Laurent</small></td>
+href="https://cran.r-project.org/package=RCDT"><strong>RCDT</strong></a><br><code>delaunay()</code><br><small>archived
+from CRAN January 2026 (1.3.0), Laurent</small></td>
 <td>artem-ogre/CDT</td>
 <td>points, 2-column <code>edges</code> index</td>
 <td>parity</td>
@@ -367,8 +370,8 @@ href="https://cran.r-project.org/package=RCDT"><strong>RCDT</strong></a><br><cod
 </tr>
 <tr class="even">
 <td><a
-href="https://cran.r-project.org/package=delaunay"><strong>delaunay</strong></a><br><code>delaunay()</code><br><small>CRAN
-2.0.0, Laurent</small></td>
+href="https://cran.r-project.org/package=delaunay"><strong>delaunay</strong></a><br><code>delaunay()</code><br><small>archived
+from CRAN August 2023 (2.0.0), Laurent</small></td>
 <td>CGAL CDT via RcppCGAL; gmp, mpfr</td>
 <td>points, <code>constraints</code> index; 2.5D <code>elevation</code>;
 xyz to tetrahedra</td>
@@ -413,8 +416,10 @@ href="https://cran.r-project.org/package=spatstat.geom"><strong>spatstat.geom</s
 </table>
 <p>GEOS's "constrained" Delaunay is a polygon triangulation: no Steiner
 points, no loose segments, each polygon on its own, so shared edges in a
-coverage are not matched. RCDT and delaunay are the only CRAN packages
-taking an arbitrary segment index without refinement.</p>
+coverage are not matched. RCDT and delaunay take an arbitrary segment
+index without refinement, but both have been archived from CRAN
+(delaunay in August 2023, RCDT in January 2026). On CRAN, cdtr (section
+7) does the same, with refinement optional.</p>
 <h2 id="5-quality-meshing">5. Quality meshing</h2>
 <table>
 <thead>
@@ -527,14 +532,18 @@ error or triangle budget. lasR and lidR build TINs from point clouds
 <tbody>
 <tr class="odd">
 <td><a
-href="https://github.com/hypertidy/cdtr"><strong>cdtr</strong></a><br><small>GitHub,
-hypertidy</small></td>
+href="https://github.com/hypertidy/cdtr"><strong>cdtr</strong></a><br><small>CRAN
+0.1.0 (0.2.0 in development), hypertidy</small></td>
 <td>artem-ogre/CDT, MPL-2.0</td>
-<td>CDT, conforming, CDT's refinement (one criterion per pass)</td>
+<td>CDT, conforming, Ruppert refinement (one criterion per pass;
+encroached constraints split under an area bound too)</td>
 <td><code>max_area</code>, <code>min_angle</code>,
 <code>max_steiner</code>, <code>min_edge_length</code>;
-<code>unrefined</code> report; attributes</td>
-<td>vertices with origin, triangles with depth, segments</td>
+<code>erase</code>, hole points; <code>unrefined</code> report;
+attributes</td>
+<td>vertices with origin, triangles with depth (per copy or distinct),
+segments, <code>edge_sources</code>; <code>cdt_winding()</code>,
+<code>cdt_locate()</code>, <code>cdt_quality()</code></td>
 </tr>
 <tr class="even">
 <td><a
@@ -554,7 +563,8 @@ hypertidy</small></td>
 <td>fully dynamic CDT, exact predicates, step-wise mesher</td>
 <td>angle, area, edge floor, sizing function or grid, seeds,
 <code>max_steiner</code>, <code>lari_step()</code></td>
-<td>same tables, <code>lari_depth()</code></td>
+<td>same tables, <code>edge_sources</code>,
+<code>lari_depth()</code></td>
 </tr>
 </tbody>
 </table>
@@ -720,6 +730,15 @@ only), cdtr, trowel, laridae</td>
 <td>cdtr, trowel, laridae; RTriangle only indirectly</td>
 </tr>
 <tr class="odd">
+<td>Input segments behind each constraint edge</td>
+<td>cdtr, laridae (<code>edge_sources</code>)</td>
+</tr>
+<tr class="even">
+<td>Coverage of each triangle by each input feature</td>
+<td>cdtr (<code>cdt_winding()</code>, from
+<code>edge_sources</code>)</td>
+</tr>
+<tr class="odd">
 <td>Report of what refinement could not do</td>
 <td>cdtr, laridae; Triangle stops silently</td>
 </tr>
@@ -871,9 +890,10 @@ programs (SAGA, GRASS, QGIS), and packages that only consume a mesh
 (INLA, inlabru, sdmTMB, rayrender). rgeos left CRAN in 2023.</p>
 <h2 id="method">Method</h2>
 <p>Metadata and signatures from the CRAN mirrors (github.com/cran) and
-authors' repositories on 6 October 2026; discovery through the
-r-universe search API and web search; algorithm attributions from
-DESCRIPTION, Rd references and vendored source headers.</p>
+authors' repositories on 6 October 2026, with CRAN status and section 7
+re-checked on 16 November 2026; discovery through the r-universe search
+API and web search; algorithm attributions from DESCRIPTION, Rd
+references and vendored source headers.</p>
 </main>
 <script>
 document.querySelectorAll("table").forEach(function (t) {
