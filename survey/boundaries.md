@@ -206,8 +206,9 @@ Three things follow:
 - **Noding is the rung that fixes it.** A constrained triangulation of the
   pooled linework (cdtr, laridae) nodes as it goes: it splits each
   constraint where another vertex lies on it. The mesh spec's
-  `edge_sources` table then records which input segments cover each mesh
-  edge. That is this page's owner table, built on noded edges.
+  `edge_sources` table, which laridae returns and cdtr returns with
+  `edge_sources = TRUE`, then records which input segments cover each
+  mesh edge. That is this page's owner table, built on noded edges.
 
 ## Some lines are not polygon edges
 

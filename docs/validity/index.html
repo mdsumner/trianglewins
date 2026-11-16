@@ -68,6 +68,7 @@ td small { color: var(--text-muted); font-size: 12px; }
 td:first-child a { text-decoration: none; }
 td:first-child a:hover { text-decoration: underline; }
 td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
 </style>
 </head>
 <body>
@@ -107,7 +108,10 @@ the R geos package use "linework".</li>
 <li><strong>A constrained triangulation reads parity for free.</strong>
 The depth that cdtr, laridae and trowel give each triangle is a repair
 in itself, with no noding step, and it agrees with GEOS linework on
-every case here once doubled edges are counted once.</li>
+every case here once doubled edges are counted once. cdtr's
+<code>cdt_winding()</code> reads the third rule from the same mesh: the
+signed winding number of each input feature in every triangle (not yet
+run on the cases here).</li>
 </ul>
 <p>The scripts and full results are in the project files
 (<code>polygon-validity/</code>): <code>catalogue.R</code>,
@@ -535,7 +539,8 @@ has to make, and the default depends on the tool.</li>
 ring appears twice, counting each copy (Clipper evenodd, cdtr depth,
 laridae depth) cancels it; counting coincident edges once (GEOS
 linework, which nodes the lines first, and laridae
-<code>depth_distinct</code>, trowel, s2) keeps it.</li>
+<code>depth_distinct</code>, cdtr <code>depth_distinct = TRUE</code>,
+trowel, s2) keeps it.</li>
 </ol>
 <p>The input's own shoelace area is not a reading at all: it is 0 for
 the bowtie and 200 for the duplicate part.</p>
@@ -704,7 +709,11 @@ vertex (<code>intersect = "resolve"</code>, the default; the count is
 returned as <code>n_crossing</code> and those vertices have origin
 "crossing"). <code>depth</code> counts per copy;
 <code>depth_distinct</code> counts once. <code>erase = "holes"</code>
-keeps odd per-copy depth.</td>
+keeps odd per-copy depth; <code>holes</code> erases the bounded region
+around each hole point, as Triangle's <code>H</code> does. With
+<code>edge_sources = TRUE</code>, <code>cdt_winding()</code> gives each
+feature's signed winding number per triangle, from ring direction, with
+no point-in-polygon test.</td>
 </tr>
 <tr class="even">
 <td><strong>laridae</strong></td>

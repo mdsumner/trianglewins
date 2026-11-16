@@ -342,10 +342,11 @@ test); per feature: valid by construction, with the v0.2
 <td>locate the point (grid buckets, a walk, or a tree), then the
 triangle's feature</td>
 <td>V T F</td>
-<td>prototype; cdtr <code>cdt_interpolate()</code> has the grid locator
-inside; matplotlib <code>TriFinder</code>; scipy
-<code>find_simplex</code>; d3-delaunay <code>find</code>; spade
-<code>locate</code>; xugrid celltree; CGAL <code>locate</code></td>
+<td>prototype; cdtr <code>cdt_locate()</code> (since 15 November; the
+grid locator from <code>cdt_interpolate()</code>); matplotlib
+<code>TriFinder</code>; scipy <code>find_simplex</code>; d3-delaunay
+<code>find</code>; spade <code>locate</code>; xugrid celltree; CGAL
+<code>locate</code></td>
 </tr>
 <tr class="even">
 <td><code>ST_Intersects</code> (geometry, feature)</td>
@@ -442,7 +443,8 @@ mesh</td>
 <td>one constrained triangulation of both layers' edges, labelled by
 winding (v0.2 Annex A), then as above</td>
 <td>V T C S</td>
-<td>polymer on cdtr; laridae exact path in progress</td>
+<td>polymer on cdtr; cdtr <code>cdt_winding()</code> (added 16
+November); laridae exact path in progress</td>
 </tr>
 <tr class="even">
 <td><code>ST_ClipByBox2D</code>, intersection with a convex polygon</td>

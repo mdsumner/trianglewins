@@ -286,9 +286,10 @@ href="../validity/">validity</a> page.</li>
 <li><strong>Noding is the rung that fixes it.</strong> A constrained
 triangulation of the pooled linework (cdtr, laridae) nodes as it goes:
 it splits each constraint where another vertex lies on it. The mesh
-spec's <code>edge_sources</code> table then records which input segments
-cover each mesh edge. That is this page's owner table, built on noded
-edges.</li>
+spec's <code>edge_sources</code> table, which laridae returns and cdtr
+returns with <code>edge_sources = TRUE</code>, then records which input
+segments cover each mesh edge. That is this page's owner table, built on
+noded edges.</li>
 </ul>
 <h2 id="some-lines-are-not-polygon-edges">Some lines are not polygon
 edges</h2>

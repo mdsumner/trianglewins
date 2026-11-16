@@ -68,6 +68,7 @@ td small { color: var(--text-muted); font-size: 12px; }
 td:first-child a { text-decoration: none; }
 td:first-child a:hover { text-decoration: underline; }
 td:first-child strong { font-size: 14px; }
+img { max-width: 100%; height: auto; }
 </style>
 </head>
 <body>
@@ -80,7 +81,7 @@ asking for them. Every filled polygon on a screen is drawn as triangles,
 and a terrain model is often a mesh of triangles. Spatial statistics
 packages such as INLA build a triangle mesh before they fit anything.
 This page explains what triangulation is, what it is good for, and which
-package to reach for.</p>
+package to reach for. It assumes you know sf and nothing else.</p>
 <h2 id="what-a-triangulation-is">What a triangulation is</h2>
 <p>A triangulation cuts a shape into triangles that fit together edge to
 edge, with no gaps or overlaps. You can start from a polygon or from a
@@ -132,10 +133,9 @@ area.</p>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>m <span class="ot">&lt;-</span> cdtr<span class="sc">::</span><span class="fu">cdt_triangulate</span>(xy[, <span class="dv">1</span>], xy[, <span class="dv">2</span>], <span class="at">s0 =</span> <span class="dv">1</span><span class="sc">:</span>n, <span class="at">s1 =</span> <span class="fu">c</span>(<span class="dv">2</span><span class="sc">:</span>n, <span class="dv">1</span>),</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>                           <span class="at">max_area =</span> <span class="fl">7e6</span>, <span class="at">min_angle =</span> <span class="dv">25</span>)   <span class="co"># m^2, degrees</span></span></code></pre></div>
 <p><code>s0</code> and <code>s1</code> say which points are joined by an
-edge that must be kept. cdtr is on GitHub
-(<code>remotes::install_github("hypertidy/cdtr")</code>). On CRAN,
-fmesher does this job for statistical meshes, and RTriangle does it in
-general but has a non-commercial licence.</p>
+edge that must be kept. cdtr is on CRAN. fmesher also does this job for
+statistical meshes, and RTriangle does it in general but has a
+non-commercial licence.</p>
 <h2 id="triangles-as-a-network">Triangles as a network</h2>
 <p>Once you have triangles you also have a network. Every triangle edge
 joins two points that are neighbours, every triangle knows the triangles
@@ -260,13 +260,13 @@ and terra</td>
 </tr>
 <tr class="odd">
 <td>Polygons, lines and points with every edge kept</td>
-<td>RCDT</td>
-<td>RTriangle, delaunay; [GitHub] cdtr</td>
+<td>cdtr</td>
+<td>RTriangle; [GitHub] laridae, trowel</td>
 </tr>
 <tr class="even">
 <td>Good-shaped triangles on any set of edges</td>
-<td>RTriangle</td>
-<td>[GitHub] cdtr, laridae, trowel</td>
+<td>RTriangle, cdtr</td>
+<td>[GitHub] laridae, trowel</td>
 </tr>
 <tr class="odd">
 <td>Triangle size that varies over space</td>
@@ -287,7 +287,7 @@ href="../notes/#triangles-on-the-sphere">Notes</a></td>
 <tr class="even">
 <td>Delaunay of xyz points (tetrahedra)</td>
 <td>geometry, tessellation</td>
-<td>delaunay</td>
+<td>delaunay (archived from CRAN)</td>
 </tr>
 </tbody>
 </table>

@@ -6,8 +6,8 @@ to none of them.
 
 | backend | library | source |
 |---|---|---|
-| laridae | CGAL 6 (`Constrained_triangulation_plus_2`, `Delaunay_mesher_2`) | hypertidy/laridae, main |
-| cdtr | artem-ogre/CDT | hypertidy/cdtr |
+| laridae | CGAL 6.1 (`Constrained_triangulation_plus_2`, `Delaunay_mesher_2`) | hypertidy/laridae, main |
+| cdtr | artem-ogre/CDT | CRAN (0.1.0); hypertidy/cdtr, main, for 0.2.0 |
 | trowel | spade (Rust, via extendr) | hypertidy/trowel, main |
 | RTriangle | Shewchuk's Triangle | CRAN |
 
@@ -55,13 +55,16 @@ alone:
   the mesh to each triangle, computed by a shortest path over the output
   triangle adjacency. It is computed two ways, counting an edge covered
   by k input segments as k crossings (`depth_k`) or as 1 (`depth_1`),
-  and the backend's own depth is matched against both
+  and the backend's own depth (and its distinct depth, where it returns
+  one) is matched against both
 * attribute carry: every case is run again with `z = x + 2y` on the input
   vertices. Linear interpolation reproduces a linear field exactly, so any
   deviation on crossing or Steiner vertices is an interpolation error
 * grid cells (`tw_in_cell()`, grid cases only): the share of triangles that
   are half of one grid quad, judged in the grid's own index, and of those
   the share using the (i, j)-(i + 1, j + 1) diagonal
+* the edge-length floor the refiner used (`min_edge_length`): cdtr and
+  laridae run with their defaults, which derive one from the input
 * time: median over repeats, including reading the tables back
 
 ## Cases
@@ -117,70 +120,98 @@ tw_report(r)
 (a crash or a runaway refinement cannot take the others down), and writes
 [inst/results/results.md](inst/results/results.md) and `results.csv`.
 
-## Findings (2 October 2026)
+## Findings (16 November 2026)
 
-From [inst/results/results.md](inst/results/results.md), on laridae
-bf90fc9, cdtr 93af86f, trowel 32e0fe8, and RTriangle 1.6-0.15 (4-core Linux
-container). Every refinement had the same Steiner budget (100000).
+From [inst/results/results.md](inst/results/results.md), on laridae 0.1.0
+(ca6770f, CGAL 6.1), cdtr 0.1.0.9002 (1b52f51, the development version for
+0.2.0), trowel 32e0fe8 and RTriangle 1.6-0.15 (32-core Linux, R 4.6.1).
+Every refinement had the same Steiner budget (100000). cdtr and laridae
+ran with their default edge-length floor (`min_edge_length = NULL`),
+which the results now record.
+
+The first run, on 2 October 2026 (laridae bf90fc9, cdtr 93af86f, from
+before cdtr 0.1.0), is in the history of `inst/results/`. Since then the
+cdtr, trowel and RTriangle meshes are unchanged in every case: the same
+vertex and triangle counts, status and attribute error. laridae's changed
+in 15 of 61, as described below. Times are not comparable between the two
+runs, which used different machines.
 
 **Agreed everywhere.** Every backend kept every input segment and every
 input vertex in every case. Every mesh was constrained Delaunay (0
 violations), with no edge shared by more than two triangles. Constrained-only
 meshes have the same triangle count and the same harness depth on all four
-backends, for every case each of them accepted. That is the contract, holding.
+backends, for every case each of them accepted, including the four grid
+cases added since October. That is the contract, holding.
 
-**Depth means two things.** laridae and cdtr count an edge covered by k
-input segments k times, and trowel counts it once. They agree on every
-input where no boundary is given twice. Where one is, they differ:
-`grid3_doubled` gives the centre cell 3 (laridae, cdtr) or 2 (trowel),
-`nc_rings` gives 1/3/5 or 1/2/3, and `cad_tas` (collinear overlapping
-segments even after exact deduplication) differs on 6 of 1974 triangles.
-Neither is wrong, but the shared contract has to name one, or offer both.
-The harness computes both and says which one each backend matches.
+**Depth means two things, and two backends give both.** laridae's and cdtr's
+`depth` counts an edge covered by k input segments k times, and trowel
+counts it once. They agree on every input where no boundary is given
+twice. Where one is, they differ: `grid3_doubled` gives the centre cell 3
+(laridae, cdtr) or 2 (trowel), `nc_rings` gives 1/3/5 or 1/2/3, and
+`cad_tas` (collinear overlapping segments even after exact deduplication)
+differs on 6 of 1974 triangles. laridae and cdtr (with
+`depth_distinct = TRUE`) also return `depth_distinct`, which counts once
+and matches trowel and the harness's `depth_1` on all three. Neither
+reading is wrong. The mesh spec's `depth` is the per-copy one, and the
+harness checks both.
 
 **RTriangle refuses duplicated vertices** ("Duplicated vertices in P"),
 so `grid3_doubled` and `nc_rings` fail there. The other three merge
 duplicates silently. RTriangle has no depth.
 
-**laridae leaves slivers along the hull.** When cont_tas is refined over its
-convex hull, laridae returns about 2650 triangles with area around
-1e-11 (smallest angle 0). Every one of them touches the hull. Points
-inserted on the temporarily constrained hull edges are not exactly
-collinear once those constraints are released. The same runs carry
-attributes with 4e-6 relative error. This is the only defect the harness
-found in laridae, and it shows up only in hull mode.
+**laridae no longer leaves slivers along the hull.** On 2 October,
+refining cont_tas over its convex hull left about 2650 triangles of area
+around 1e-11 in laridae, all touching the hull, and attributes carried
+with 4e-6 relative error. laridae 0.1.0 leaves no near-zero-area triangle
+in any case, and carries attributes to 7e-16. On cont_tas it now adds 2377
+vertices with the area bound (7661 before) and meets the angle bound on
+96.5% of triangles with both bounds (77% before). The harness finds no
+defect in laridae now.
 
 **trowel's attributes are not always interpolated.** On nc refined by
 area, 7 Steiner vertices near the Outer Banks have the value of a
 neighbouring vertex rather than the linear interpolant (1.7e-3 relative
-error). points_only shows the same at 3.7e-2. laridae, cdtr and
-RTriangle reproduce the linear field to 1e-11 or better.
+error). points_only shows the same at 3.7e-2, and the new grid_quads and
+grid_frames_lonlat cases at 1.8e-3. laridae, cdtr and RTriangle reproduce
+the linear field to 1e-11 or better.
 
-**cdtr does not refine without a closed boundary.** On crossing_x and
-points_only with an area bound, cdtr adds nothing (0% of triangles meet the
-bound) and reports `circumcenterOutside`. On the hull-meshed
-collinear_overlap and cont_tas it reaches 98% and 99.7%. In the
-area_angle scenario on nested3 and cad_tas, a handful of triangles miss
-the area bound (99.7%, 99.95%).
+**cdtr does not refine without a closed boundary.** On crossing_x with an
+area bound, cdtr adds only the crossing vertex, so no triangle meets the
+bound, and it reports `circumcenterOutside`. On points_only with an angle
+bound it adds one vertex and 95% of triangles meet the bound, where
+RTriangle adds 292 and reaches 100%. (The October text put points_only
+under the area bound, which its Delaunay mesh already meets.) On the
+hull-meshed collinear_overlap and cont_tas the area bound reaches 98% and
+99.7%. In the area_angle scenario on nested3 and cad_tas, a handful of
+triangles miss the area bound (99.7%, 99.95%).
 
 **How much each backend refines.** With both bounds on nc, RTriangle adds
-2455 vertices, laridae 2854, cdtr 3054 and trowel 5576. trowel has no
+2455 vertices, laridae 2847, cdtr 3054 and trowel 5576. trowel has no
 edge-length floor, so it meets the angle bound most often (99.5% of
-triangles or more on nc, cont_tas and cad_tas). The floor that laridae and cdtr
-share holds them at 92 to 99%, and laridae drops to 77% on cont_tas,
-where short contour segments make the floor large next to the hull's open
-triangles. RTriangle reaches 94 to 99.9% with the fewest vertices.
+triangles or more on nc, cont_tas and cad_tas). laridae and cdtr derive
+the same floor from the input (0.0138 on nc, 2.80 on cont_tas, 3.0 to 3.2
+on cad_tas), and it holds them at 92 to 99%. RTriangle reaches 94 to
+99.9%. It adds the fewest vertices on nc, but more than laridae and cdtr
+on the Tasmanian data (7992 on cont_tas, against 4662 and 4262). The
+floor matters little on cont_tas: with `min_edge_length = 0`, cdtr adds
+2152 vertices instead of 2008 with the area bound (checked separately).
 
-**Time.** Constrained only, all four take about 3 ms on nc. Refinement is
-where RTriangle leads: nc with both bounds takes 6.5 ms, against 19
-(laridae), 20 (cdtr) and 27 (trowel). On cont_tas the times are 19, 72, 35
-and 60 ms respectively. Editing a refined nc mesh and refining again takes
-5 ms in laridae and 18 ms in trowel. A rebuild with the edit takes 17 ms
-in cdtr and 6 ms in RTriangle.
+**Time.** Constrained only on nc, RTriangle and trowel take about 3 ms,
+cdtr 4 ms and laridae 8 ms, about 5 ms of which laridae spends building
+its output tables (the same in its 22 October build and in main).
+Refinement is where RTriangle leads: nc with both bounds takes 6.3 ms,
+against 30 (laridae), 20 (cdtr) and 25 (trowel). On cont_tas the times are
+18, 69, 35 and 54 ms respectively. Editing a refined nc mesh and
+refining again takes 18 ms in laridae and 17 ms in trowel. A rebuild with
+the edit takes 17 ms in cdtr and 6 ms in RTriangle. So at this size a
+live handle is no faster than a rebuild, and the October run's 5 ms for
+laridae no longer holds. The [benchmark](bench/) found the handle several
+hundred times faster than a rebuild at scale, but it ran on 6 October,
+before that change, and has not been re-run.
 
 **Checks on earlier claims.** Under this harness, Triangle did not give up
 on the cont_tas area bound: 100% of triangles meet it, both inside the
-contours and over the hull. trowel's re-refine after an edit took 18 ms
+contours and over the hull. trowel's re-refine after an edit took 17 ms
 here, against 8.4 ms in its own benchmark. This run used an angle bound of
 20 degrees as well as the area bound, so the two numbers are not directly
 comparable.

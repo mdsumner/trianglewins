@@ -48,7 +48,9 @@ tw_report <- function(results, file = NULL, header = character(0)) {
     out <- c(out, "## Depth", "",
              paste("Harness depth is computed from the output triangles: crossing an edge costs",
                    "the number of input segments on it (k) or 1 if there is any (1).",
-                   "`match` says which of the two the backend's own depth equals."), "")
+                   "`match` says which of the two the backend's own depth equals; where the",
+                   "backend also returns a distinct depth (a doubled boundary counted once),",
+                   "the match for that follows after a slash."), "")
     ## harness depth from the backend with the most triangles (all agree on
     ## constrained meshes unless one dropped part of the region)
     cr <- cr[order(cr$case, -cr$n_triangles), ]
@@ -60,7 +62,8 @@ tw_report <- function(results, file = NULL, header = character(0)) {
       dt[[b]] <- vapply(seq_len(nrow(dk)), function(i) {
         w <- cr$backend == b & cr$case == dk$case[i]
         if (!any(w)) return("")
-        fmt_txt(cr$depth_match[w][1])
+        dd <- if (is.null(cr$depth_distinct_match)) NA else cr$depth_distinct_match[w][1]
+        paste0(fmt_txt(cr$depth_match[w][1]), if (!is.na(dd)) paste0(" / ", dd) else "")
       }, "")
     }
     out <- c(out, md_table(dt), "")
@@ -86,7 +89,8 @@ tw_report <- function(results, file = NULL, header = character(0)) {
                  "segs: percent of input segments present as chains of edges; CD viol: unconstrained",
                  "edges failing the empty-circle test; depth: the backend's own depth table",
                  "(depth:count); attr err: largest relative error of a linear attribute carried onto",
-                 "new vertices; unrefined: what the backend says it could not do."), "")
+                 "new vertices; floor: the edge-length floor the refiner used (cdtr, laridae);",
+                 "unrefined: what the backend says it could not do."), "")
   for (cs in unique(r$case)) {
     rc <- r[r$case == cs & r$status == "ok", ]
     if (!nrow(rc)) next
@@ -98,7 +102,9 @@ tw_report <- function(results, file = NULL, header = character(0)) {
       `angle ok` = fmt_pct(rc$angle_ok), segs = fmt_pct(rc$segs_kept),
       `CD viol` = fmt_int(rc$cd_violations), depth = fmt_txt(rc$depth_backend),
       `attr err` = ifelse(is.na(rc$attr_err), "", sprintf("%.1e", rc$attr_err)),
-      ms = fmt_num(rc$time_ms), unrefined = fmt_txt(rc$unrefined),
+      ms = fmt_num(rc$time_ms),
+      floor = if (is.null(rc$min_edge_length)) "" else fmt_num(rc$min_edge_length),
+      unrefined = fmt_txt(rc$unrefined),
       check.names = FALSE)
     out <- c(out, md_table(tb), "")
   }

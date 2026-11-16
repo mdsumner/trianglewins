@@ -238,10 +238,13 @@ contract:
 - refinement without a non-commercial clause, which Triangle could not give.
 
 silicate's models and verbs remain the abstraction worth keeping; what
-changes is the machinery underneath: cdtr (CDT, MPL-2.0), the lightweight
-default; laridae (CGAL), the full-contract engine; and trowel (spade, in
-Rust), a third live handle. All three take and return the same tables, and
-this harness judges them. Those tables are the triangle form of the hypertidy
+changes is the machinery underneath: cdtr (CDT, MPL-2.0), the
+builds-anywhere, permissively licensed baseline, whose value is what it
+says about how the mesh relates to its input (depth, vertex origin, the
+input segments behind each constraint edge, per-feature winding); laridae
+(CGAL), a persistent mesh that can be edited and refined, with CGAL's
+meshing; and trowel (spade, in Rust), a second live handle. All three
+take and return the same tables, and this harness judges them. Those tables are the triangle form of the hypertidy
 [mesh spec v0.1](https://github.com/hypertidy/meshcore/blob/main/docs/mesh-spec-v0.1.md):
 input vertices first, `origin`, counter-clockwise triangles, 1-based rows
 in R, and depth counted per copy.
@@ -323,8 +326,10 @@ promises.
 Quick answers by kind of problem, CRAN first, are in
 [Start here](../start/#which-package). In short: decido to draw polygons, the
 GEOS functions for quick per-polygon jobs, deldir for points, fmesher for
-SPDE meshes, cdtr for a general segment set under a permissive licence,
-and laridae for the full contract.
+SPDE meshes, cdtr for a general segment set under a permissive licence
+(and for how the mesh relates to its input), RTriangle when refinement
+speed matters most and its licence suits, and laridae for a mesh you keep
+editing.
 
 ## References
 
@@ -345,5 +350,5 @@ and laridae for the full contract.
 - silicate: <https://CRAN.R-project.org/package=silicate>; anglr:
   <https://github.com/hypertidy/anglr>; laridae:
   <https://github.com/hypertidy/laridae>; cdtr:
-  <https://github.com/hypertidy/cdtr>; trowel:
+  <https://CRAN.R-project.org/package=cdtr>; trowel:
   <https://github.com/hypertidy/trowel>

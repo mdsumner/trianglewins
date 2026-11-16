@@ -198,3 +198,11 @@ python3 survey/dev-drafts/mathgl-terrain/build-viewer.py
 
 Results land in `survey/dev-drafts/mathgl-terrain/results/` (`step.csv`,
 `coast.csv`, `fixtures.csv`). Large intermediates go to `cache/`, which git ignores.
+
+## See also
+
+cdtr's development version (for 0.2.0) has a terrain vignette,
+`vignette("terrain", package = "cdtr")`: a surface from contour lines on
+a small Tasmania 2 m DEM extract, relating the quality of the triangles
+to the error and appearance of the surface, with `cdt_quality()` for the
+per-triangle measures.
