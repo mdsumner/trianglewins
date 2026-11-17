@@ -9,12 +9,19 @@
 ## The parquet file is sds::CGAZ(). Environment: BENCH_TIMEOUT (seconds per
 ## job, default 900), BENCH_MEM_GB (address space cap, default 12),
 ## BENCH_BACKENDS, BENCH_DATASETS (comma-separated subsets).
+##
+## Every job runs with OPENBLAS_NUM_THREADS=1. None of the backends uses
+## BLAS, but a threaded OpenBLAS starts one thread per core in every R
+## process, and each reserves address space: 4.3 GB on a 32-core machine,
+## against 0.2 GB with one thread. Without this the memory cap would leave
+## less room on a machine with more cores.
 
 args <- commandArgs(TRUE)
 datadir <- if (length(args)) args[1] else "data"
 out <- "bench/results/bench.csv"
 timeout <- Sys.getenv("BENCH_TIMEOUT", "900")
 mem_kb <- as.numeric(Sys.getenv("BENCH_MEM_GB", "12")) * 1024^2
+Sys.setenv(OPENBLAS_NUM_THREADS = "1")
 
 ds <- utils::read.csv(file.path(datadir, "datasets.csv"), stringsAsFactors = FALSE)
 backends <- c("laridae", "cdtr", "trowel", "RTriangle")
