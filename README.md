@@ -205,9 +205,9 @@ against 30 (laridae), 20 (cdtr) and 25 (trowel). On cont_tas the times are
 refining again takes 18 ms in laridae and 17 ms in trowel. A rebuild with
 the edit takes 17 ms in cdtr and 6 ms in RTriangle. So at this size a
 live handle is no faster than a rebuild, and the October run's 5 ms for
-laridae no longer holds. The [benchmark](bench/) found the handle several
-hundred times faster than a rebuild at scale, but it ran on 6 October,
-before that change, and has not been re-run.
+laridae no longer holds. At scale the handle still wins: the
+[benchmark](bench/), re-run on 16 November, finds an insert into the
+South America mesh 30 to 200 times faster than a rebuild.
 
 **Checks on earlier claims.** Under this harness, Triangle did not give up
 on the cont_tas area bound: 100% of triangles meet it, both inside the
