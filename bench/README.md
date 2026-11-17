@@ -11,7 +11,6 @@ are country boundaries from geoBoundaries CGAZ ADM0, the GeoParquet that
 | `bench.R` | one job: read a dataset, run one backend on one scenario, time it, measure the output |
 | `run.R` | every dataset x backend x scenario, each in its own R process with a timeout and a memory cap; appends to `results/bench.csv` and resumes where it stopped |
 | `site.R`, `site-template.html`, `findings.html` | build `docs/bench/index.html` from the results |
-| `results/world-laridae-insert-16gb.csv` | the one job of the 16 November run re-run alone with `BENCH_MEM_GB=16`, after it failed under the 12 GB cap |
 
 ```sh
 curl -LO https://github.com/mdsumner/geoboundaries/releases/download/latest/geoBoundariesCGAZ_ADM0.parquet
@@ -26,4 +25,7 @@ until no triangle exceeds bounding box area / 1e5); `quality` (that bound
 plus a 20 degree minimum angle); `insert_1k` (1000 points added to the
 constrained mesh, by the live handle for laridae and trowel, by a rebuild
 for cdtr and RTriangle). `BENCH_TIMEOUT`, `BENCH_MEM_GB`, `BENCH_BACKENDS`
-and `BENCH_DATASETS` adjust a run.
+and `BENCH_DATASETS` adjust a run. The memory cap is on address space, so
+`run.R` sets `OPENBLAS_NUM_THREADS=1`: a threaded OpenBLAS reserves address
+space for every core, and the cap would otherwise leave less room on a
+larger machine.

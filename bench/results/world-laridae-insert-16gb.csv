@@ -1,2 +1,0 @@
-"dataset","backend","scenario","n_in","s_in","reps","status","message","time_s","time_min_s","peak_mb","mem_cap_gb"
-"world","laridae","insert_1k",6777640,6777884,3,"ok",NA,0.0510000000000019,0.0489999999999995,8927.23828125,16
