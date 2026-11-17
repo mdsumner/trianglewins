@@ -151,8 +151,8 @@ error or triangle budget. lasR and lidR build TINs from point clouds
 
 All three take `x, y, s0, s1` and return the triangle form of the
 [mesh spec v0.1](https://github.com/hypertidy/meshcore/blob/main/docs/mesh-spec-v0.1.md).
-trowel needs work before CRAN: a spatial sort or bulk load (152 s for a
-million unordered points, against 2 to 4 s for the others), the southern
+trowel needs work before CRAN: a spatial sort or bulk load (160 s for a
+million unordered points, against 2 to 6 s for the others), the southern
 Africa stall, Steiner attributes that take the nearest value, then
 vendored crates under CRAN's Rust policy.
 
